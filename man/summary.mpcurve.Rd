@@ -26,15 +26,11 @@ An object of class \code{summary.mpcurve}. Every result contains
   \code{$partition}, \code{$objective_history},
   \code{$convergence_info}, \code{$control}, the shared
   \code{$sigma2} vector (or \code{NULL}), \code{$measurement_sd}, and
-  \code{$variational_family}. Compatibility dimension fields remain equal
-  to the retained fixed \code{M} for current structural objects.
+  \code{$variational_family}.
 }
 \description{
-Single-ordering objects delegate algorithm-specific diagnostics to the
-underlying fit and store that result in \code{$underlying}. Fixed-\code{M}
-partition objects are summarized directly from their canonical structural
-state instead: the result contains the partition probabilities and hard
-assignments, fitted priors, structural objective history, convergence
-information, noise specification, and variational-family label. It does not
-contain an independently summarized per-ordering \code{$underlying} fit.
+Summarises model dimensions, fitted priors, and convergence diagnostics.
+Multi-ordering summaries also contain feature-assignment probabilities,
+the most probable assignment for each feature, and the noise specification.
+The returned list can be used to construct comparison tables across fits.
 }

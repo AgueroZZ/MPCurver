@@ -22,21 +22,18 @@ knitr::opts_chunk$set(
 
 ## Overview
 
-This vignette shows how to use the public `fit_mpcurve()` interface on the
-eLife fitness dataset. The goal is not just to produce a fit, but to explain
-the modeling logic step by step.
+This vignette uses MPCurver to study how mutant fitness varies across
+environments. It develops an analysis from a single latent ordering to a
+two-ordering feature partition, and examines how smoothing and measurement
+uncertainty affect the fitted trajectories.
 
 We will use `MPCurver` to answer three practical questions:
 
 1. Can a single latent ordering explain mutant fitness across environments?
 2. If we encourage smoother trajectories, do we keep the same ordering while
    improving interpretability?
-3. What feature partition and conditional trajectories appear under a
-   scientifically chosen fixed two-ordering model, with and without known
-   measurement error?
-
-The recommended workflow throughout is the default `cavi` backend exposed by
-`fit_mpcurve()`.
+3. Which environments follow similar mutant orderings, and how does accounting
+   for measurement uncertainty affect those groups and trajectories?
 
 ## Load package and data
 
@@ -83,7 +80,12 @@ meta <- dat[, c("barcode", "gene", "type", "ploidy", "class", "mutation_type"), 
 ```
 
 
-Just using the error columns as the true SEs might be too risky, so we will adjust the SEs using t-statistics-adjustment:
+For this illustration, we calibrate the reported errors using a Student's
+$t$ distribution with four degrees of freedom. For each ratio $z_t=X/S$, we
+find the Gaussian score $z_n=\Phi^{-1}\{F_{t_4}(z_t)\}$ with the same cumulative
+probability and use the adjusted scale $\widetilde S=S z_t/z_n$. The choice of
+four degrees of freedom is an analysis assumption; the resulting scales are
+treated as fixed measurement standard deviations in the fits below.
 
 ```{r adjust-se}
 t_adjust_se <- function(Y, S, nu, tol = 1e-12) {
@@ -152,7 +154,7 @@ In this dataset:
 - each column is an environment;
 - each matrix entry is a fitness score;
 - and the paired `*_error` columns provide observation-level measurement
-  standard deviations that we can optionally pass to `fit_mpcurve()` via `S`.
+  error estimates used to construct the adjusted standard deviations `S`.
 
 ## First look at the data
 
@@ -215,7 +217,7 @@ orderings.
 We start with the simplest question: can one latent ordering explain the main
 structure in the dataset?
 
-The call below uses the main user-facing API:
+The fitting choices are:
 
 - `method = "isomap"` supplies the initialization;
 - `K = 50` uses a 50-bin latent grid;
@@ -233,7 +235,8 @@ fit_unidir <- fit_mpcurve(
 
 ### Check convergence
 
-For the default `cavi` backend, the main quantity to inspect is the ELBO trace.
+The ELBO trace shows progress in fitting the variational model. A plateau
+indicates small improvements between successive iterations.
 
 ```{r uni-convergence, out.width = "100%", fig.alt = "ELBO trace for the single-ordering CAVI fit, showing convergence over iterations."}
 plot(fit_unidir, plot_type = "elbo")
@@ -289,7 +292,7 @@ par(mfrow = c(1, 1))
 These curves are easier to read: the global ordering remains, but the fitted
 environment trajectories are less wiggly.
 
-A useful sanity check is whether smoothing changes the inferred mutant ordering
+A useful comparison is whether smoothing changes the inferred mutant ordering
 itself, or mainly changes the trajectory estimates.
 
 ```{r compare-single-orderings, out.width = "100%", fig.alt = "Scatter plot comparing inferred mutant pseudotime between the default and smoothed single-ordering fits."}
@@ -307,28 +310,23 @@ plot(
 abline(0, 1, lty = 2)
 ```
 
-In this dataset the two fits stay close, which is reassuring: stronger
-regularization mostly improves interpretability rather than changing the basic
-ordering story.
+The correlation and scatterplot show how closely the two mutant orderings
+agree. Together with the trajectory plots, they help distinguish a change
+in curve smoothness from a change in sample ordering.
 
-## Step 3: Explore a fixed two-ordering representation
+## Step 3: Explore two orderings and environment groups
 
 The single-ordering fit assumes that every environment varies smoothly along
-the same latent mutant axis. As a scientifically motivated sensitivity
-analysis, we can instead ask how the environments partition under two fixed
-latent orderings. This is an exploratory representation, not an automatic test
-that $M=2$ is preferable to $M=1$.
+the same latent mutant axis. A two-ordering model lets groups of environments
+follow different axes. We specify `intrinsic_dim = 2` and jointly estimate
+two mutant orderings, environment-assignment probabilities, and trajectories
+conditional on each assignment.
 
-To examine that idea, we fit a structural partition model with a scientifically
-chosen fixed value $M=2$. The structural ELBO is a fitting objective for a
-given $M$; it is not used here as an automatic complexity penalty for choosing
-among different values of $M$.
-
-For every `intrinsic_dim >= 2`, the fitted object has one canonical
-$q(C)q(Z)q(U\mid Z)$ state. Estimated feature variances form one shared
-length-$d$ `params$sigma2` vector across orderings. There are no
-active/inactive, freeze, or drop states, and greedy cross-$M$ selection is
-currently unavailable.
+Structural variational inference keeps the dependence between an environment's
+assignment and its trajectory. Each environment has one estimated noise
+variance shared across orderings, while its smoothness can differ between
+orderings. This analysis explores a two-axis representation; choosing the
+number of axes would require a separate model-selection assessment.
 
 ```{r partition-fit}
 fit_partition <- fit_mpcurve(
@@ -348,18 +346,22 @@ fit_partition <- fit_mpcurve(
 fit_partition
 ```
 
-### Inspect conditional structural trajectories
+### Inspect trajectories under each ordering
 
-For `plot_type = "mu"`, each ordering panel shows the canonical conditional
-posterior mean $E[U_j\mid Z_j=m]$. The title also reports the feature-assignment
-probability $q(Z_j=m)$. These are conditional alternatives, so the plotted
-trajectory is not multiplied by its assignment probability.
+For `plot_type = "mu"`, each panel shows the conditional posterior mean
+$E[U_j\mid Z_j=m]$: the estimated environment trajectory if it follows
+ordering $m$. The title reports the assignment probability $q(Z_j=m)$,
+indicating the support for that interpretation.
 
 ```{r partition-plot, out.width = "100%", fig.alt = "Conditional posterior mean trajectory for environment dimension 1 under each of two fixed orderings."}
 plot(fit_partition, plot_type = "mu", dims = 1)
 ```
 
 ### Which environments were assigned to which ordering?
+
+The table lists each environment's most probable ordering. To examine
+uncertain assignments, inspect the corresponding row of
+`fit_partition$partition$pi_weights`.
 
 ```{r partition-table}
 assignment_tbl <- data.frame(
@@ -374,6 +376,10 @@ assignment_tbl[order(assignment_tbl$ordering, assignment_tbl$category, assignmen
 ```
 
 ### How similar are the inferred orderings?
+
+Compare the inferred mutant positions across orderings. A correlation near
+$1$ or $-1$ indicates similar positions after allowing for reversal of the
+axis; smaller absolute correlations indicate more distinct orderings.
 
 ```{r partition-correlation}
 ordering_names <- names(fit_partition$locations)
@@ -392,15 +398,12 @@ cor(t_df) |>
 
 
 
-## Step 4: Refit with known measurement error
+## Step 4: Account for measurement uncertainty
 
-The raw file includes paired `*_error` columns, and `fit_mpcurve()` can use
-them directly through the `S` argument. In the public API, `S` is interpreted
-as a matrix of known measurement standard deviations.
-
-This matters here because ignoring heterogeneous measurement error can make a
-fixed multi-ordering fit attribute noisy columns to apparently distinct
-trajectory structure.
+We now supply the adjusted measurement standard deviations computed above
+through `S`. This gives more precise observations greater influence in the
+likelihood. Comparing these fits with the estimated-noise fits shows how
+the supplied measurement precision affects orderings and trajectories.
 
 ### Single-ordering fit with known measurement SD
 
@@ -430,11 +433,11 @@ plot(fit_unidir_known_sd, dims = 45)
 par(mfrow = c(1, 1))
 ```
 
-### Fixed two-ordering fit with known measurement SD
+### Two-ordering fit with supplied measurement SD
 
-We now refit the same fixed $M=2$ structural model while accounting for
-measurement error. This isolates the effect of known noise without mixing it
-with a separate dimension-selection procedure.
+We refit the two-ordering model with the same smoothing settings and the
+supplied standard deviations. Examine both the trajectories and assignment
+probabilities to see how the environment groups respond to this noise model.
 
 ```{r partition-fit-known-sd}
 fit_partition_known_sd <- fit_mpcurve(
@@ -466,9 +469,8 @@ This dataset gives a useful template for real-world `fit_mpcurve()` analyses.
 1. Start with a single-ordering fit to establish the basic latent ordering.
 2. Use `lambda_sd_prior_rate` when the ordering looks sensible but the fitted
    trajectories are too rough to interpret comfortably.
-3. Use a fixed `intrinsic_dim` to study a scientifically plausible number of
-   ordering systems; assess different values through stability or external
-   validation rather than the raw structural ELBO alone.
-4. If measurement error is available, pass it through `S`; otherwise a fixed
-   multi-ordering fit may interpret noisy environments as distinct trajectory
-   structure.
+3. Use `intrinsic_dim` to explore multiple orderings. Interpret the environment
+   groups together with their assignment probabilities and fitted trajectories.
+4. When measurement standard deviations are available, supply them through
+   `S` and examine how the inferred structure changes. Document any calibration
+   assumptions used to obtain those standard deviations.

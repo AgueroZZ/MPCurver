@@ -2,13 +2,24 @@
 % Please edit documentation in R/MPCurver-package.R
 \name{mpcurve}
 \alias{mpcurve}
-\title{Unified MPCurve fit object}
+\title{Fitted MPCurve models}
 \description{
-The public return type of \code{\link{fit_mpcurve}} and
-\code{\link{do_mpcurve}}. An \code{mpcurve} object normalizes the public
-fields of the recommended CAVI backend while retaining the raw fit in
-\code{$fit}.
+An \code{mpcurve} object contains the sample positions, feature trajectories,
+uncertainty estimates, and convergence diagnostics returned by
+\code{\link{fit_mpcurve}} or \code{\link{do_mpcurve}}.
+Use \code{\link{summary.mpcurve}} for a numerical summary and
+\code{\link{plot.mpcurve}} to visualize trajectories and sample orderings.
 }
+\section{Sample positions}{
+
+For a single ordering, \code{$locations$mean$pseudotime} contains
+posterior-mean positions on \eqn{[0,1]}, and
+\code{$locations$map$pseudotime} contains positions at the most probable
+grid component. For multiple orderings, \code{$locations} is a named list
+with one such record per ordering. Pseudotime represents relative position
+along an inferred trajectory; its direction can be reversed.
+}
+
 \section{Single-ordering objects}{
 
 For \code{intrinsic_dim = 1}, \code{$params$pi} is a length-\code{K}
@@ -22,11 +33,12 @@ from \code{$fit$posterior}. When \code{S} is supplied,
 form or its \code{n x d} observation-level form.
 }
 
-\section{Fixed-M structural partition objects}{
+\section{Multiple orderings and feature assignments}{
 
 For \code{intrinsic_dim = M >= 2}, the variational family is
 \deqn{q(C)\prod_{j=1}^d q(Z_j)q(U_j\mid Z_j).}
-The normalized object has one canonical structural state:
+Here \eqn{C} represents sample positions, \eqn{Z_j} the ordering followed
+by feature \eqn{j}, and \eqn{U_j} its trajectory. The object contains:
 \itemize{
   \item \code{$params$pi}: named list of \code{M} length-\code{K}
     position-prior vectors;
@@ -39,7 +51,7 @@ The normalized object has one canonical structural state:
   \item \code{$measurement_sd}: \code{NULL} when noise is estimated, or the
     supplied length-\code{d} / \code{n x d} known-standard-deviation
     specification;
-  \item \code{$conditional_posterior}: named conditional Gaussian state for
+  \item \code{$conditional_posterior}: conditional Gaussian distributions for
     \eqn{q(U_j\mid Z_j=m)}. Each \code{$mean[[m]]} is \code{d x K};
     each \code{$cov[[m]][[j]]} is \code{K x K}; and
     \code{$var[[m]]} (also available as \code{$diag[[m]]}) is
@@ -50,16 +62,24 @@ The normalized object has one canonical structural state:
     \eqn{q(Z_j=m)}, with the hard display assignment in
     \code{$partition$assign};
   \item \code{$objective_history} and \code{$temperature_history}: the
-    fixed-\code{M} structural objective and its temperature schedule.
-    Objective values at different temperatures are not directly
-    comparable; use the exact \eqn{T=1} segment for monotonicity checks.
+    variational objective and its temperature schedule. Use the
+    \eqn{T=1} segment to assess convergence after annealing.
 }
-\code{$fits} contains named, derived single-ordering views for compatibility
-with existing inspection and plotting code. Those views are not independent
-fitting states and are never used to continue the structural algorithm.
-Structural objects always retain their requested fixed \code{M}; the
-compatibility fields \code{$active_intrinsic_dim} and
-\code{$displayed_intrinsic_dim} therefore both equal \code{M}.
+Each row of \code{$partition$pi_weights} sums to one. Concentrated rows
+indicate strong support for an ordering; diffuse rows indicate uncertainty
+about the feature assignment. Conditional trajectory means describe the
+fitted shape under each possible assignment, so interpret them alongside
+these probabilities.
+}
+
+\section{Additional fields}{
+
+\code{$fit} stores the underlying variational fit. For partition models,
+\code{$fits} provides derived per-ordering views for inspection; continue
+the complete model with \code{do_mpcurve(object)}. The dimension fields
+\code{$intrinsic_dim}, \code{$active_intrinsic_dim}, and
+\code{$displayed_intrinsic_dim} all equal the specified \code{M} for
+structural partition fits.
 }
 
 \keyword{models}

@@ -11,13 +11,13 @@ Authors@R: c(
   )
 Description: Implements the MPCurve statistical model for trajectory and
     pseudotime inference via Gaussian mixture models with Gaussian Markov
-    random field priors on smooth latent trajectories. Provides a
-    mean-field coordinate-ascent variational backend ('cavi') that is the
-    recommended public workflow. Older MAP/EM backends ('csmooth_em' and
-    'smooth_em') remain in the codebase but are not part of the public
-    API or public website. Also includes a unified 'fit_mpcurve()'
-    interface, multi-ordering partition tools via 'intrinsic_dim', and
-    multiple initialization methods for the CAVI path.
+    random field priors on smooth latent trajectories. Estimates sample
+    positions, feature trajectories, and trajectory uncertainty using
+    coordinate-ascent variational inference. Multi-ordering models use
+    structural variational inference to jointly estimate latent orderings
+    and probabilistic feature assignments. Supports feature-specific noise
+    estimation or known measurement standard deviations, several
+    initialization methods, and graphical summaries of fitted trajectories.
 URL: https://aguerozz.github.io/MPCurver/,
     https://github.com/AgueroZZ/MPCurver
 BugReports: https://github.com/AgueroZZ/MPCurver/issues

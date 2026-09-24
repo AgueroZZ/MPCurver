@@ -5,13 +5,13 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Getting Started with MPCurver CAVI • MPCurver</title>
+<title>Getting Started with MPCurver • MPCurver</title>
 <!-- katex math --><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script><script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous" onload="renderMathInElement(document.body);"></script><script src="../katex-auto.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Getting Started with MPCurver CAVI">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Getting Started with MPCurver">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -36,7 +36,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
-    <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver CAVI</a></li>
+    <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver</a></li>
     <li><a class="dropdown-item" href="../articles/partition.html">Feature Partitioning with MPCurver</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Case studies</h6></li>
@@ -62,7 +62,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
 
-      <h1>Getting Started with MPCurver CAVI</h1>
+      <h1>Getting Started with MPCurver</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/AgueroZZ/MPCurver/blob/HEAD/vignettes/mpcurve_intro.Rmd" class="external-link"><code>vignettes/mpcurve_intro.Rmd</code></a></small>
@@ -74,17 +74,19 @@
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://aguerozz.github.io/MPCurver/">MPCurver</a></span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">42</span><span class="op">)</span></span></code></pre></div>
-<p><code>MPCurver</code> now uses a CAVI backend through the public
-<code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> and <code><a href="../reference/do_mpcurve.html">do_mpcurve()</a></code> interface. This
-vignette introduces the statistical model, the variational algorithm,
-and then walks through a larger but still easy spiral example.</p>
+<p><code>MPCurver</code> estimates an ordering of samples and smooth
+feature trajectories along that ordering. This vignette introduces the
+statistical model and its coordinate-ascent variational inference (CAVI)
+algorithm, then uses a simulated spiral to show how to fit a model,
+assess convergence, and interpret pseudotime.</p>
 <div class="section level2">
 <h2 id="statistical-model">1 Statistical model<a class="anchor" aria-label="anchor" href="#statistical-model"></a>
 </h2>
 <p>We observe a data matrix <span class="math display">
 X = (x_{ij}) \in \mathbb{R}^{n \times d},
-</span> where row <span class="math inline">i</span> is one cell and
-column <span class="math inline">j</span> is one feature.</p>
+</span> where row <span class="math inline">i</span> is one sample (for
+example, a cell) and column <span class="math inline">j</span> is one
+feature.</p>
 <p>The single-ordering MPCurve model assumes:</p>
 <ol style="list-style-type: decimal">
 <li>each cell has a latent position <span class="math display">
@@ -102,28 +104,27 @@ x_{ij} \mid c_i = k, \boldsymbol{u}_j, \sigma_j^2 \sim N(u_{jk},
 </li>
 <li>and each trajectory is regularized by a Gaussian Markov random field
 prior along the component axis: <span class="math display">
-\boldsymbol{u}_j \sim N\!\left(0, (\lambda_j Q_K)^{-1}\right),
+p(\boldsymbol{u}_j\mid\lambda_j)
+\propto \exp\!\left(-\frac{\lambda_j}{2}
+\boldsymbol{u}_j^\top Q_K\boldsymbol{u}_j\right),
 </span> where <span class="math inline">Q_K</span> is the random-walk
-precision matrix on the <span class="math inline">K</span> bins.</li>
+precision matrix on the <span class="math inline">K</span> bins. The
+default intrinsic prior penalizes differences along the trajectory; the
+likelihood identifies directions left unpenalized by the prior.</li>
 </ol>
-<p>In the current <code>cavi</code> implementation:</p>
-<ul>
-<li>
-<code>sigma_j^2</code> is feature-specific,</li>
-<li>
-<code>lambda_j</code> is feature-specific,</li>
-<li>the covariance model is homoskedastic across components,</li>
-<li>and the posterior is approximated with a mean-field family <span class="math display">
+<p>The model estimates a separate noise variance <span class="math inline">\sigma_j^2</span> and smoothness parameter <span class="math inline">\lambda_j</span> for each feature. The noise
+variance is shared across grid positions. To describe uncertainty in
+positions and trajectories, CAVI uses the variational family</p>
+<p><span class="math display">
 q(C,U) = \prod_{i=1}^n q_i(c_i)\prod_{j=1}^d q_j(\boldsymbol{u}_j).
-</span>
-</li>
-</ul>
+</span></p>
 </div>
 <div class="section level2">
 <h2 id="variational-algorithm">2 Variational algorithm<a class="anchor" aria-label="anchor" href="#variational-algorithm"></a>
 </h2>
-<p>The backend used by <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> performs
-coordinate-ascent variational inference on an explicit ELBO. Write <span class="math display">
+<p><code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> alternates between updates of the
+posterior distributions and model parameters to maximize the evidence
+lower bound (ELBO). Write <span class="math display">
 r_{ik} := q_i(c_i = k),
 \qquad
 N_k := \sum_{i=1}^n r_{ik},
@@ -154,9 +155,13 @@ r_{ik}
 + \log |S_j|
 \right].
 </span></p>
-<p>This is the quantity recorded in <code>elbo_trace</code>. The updates
-used by the public backend are obtained by maximizing this ELBO one
-block at a time.</p>
+<p>This objective, including its additive constants, is recorded in
+<code>elbo_trace</code>. For the intrinsic prior, normalization uses the
+rank and generalized determinant of <span class="math inline">Q_K</span>, with a fixed reference measure on its
+null space. It provides a within-model fitting objective. The updates
+below maximize it one block at a time, with estimated noise, adaptive
+position probabilities, and no additional smoothness-parameter prior.
+Parameter estimates are restricted to the configured bounds.</p>
 <div class="section level3">
 <h3 id="update-for-qboldsymbolu_j">2.1 Update for <span class="math inline">q(\boldsymbol{u}_j)</span><a class="anchor" aria-label="anchor" href="#update-for-qboldsymbolu_j"></a>
 </h3>
@@ -180,8 +185,10 @@ S_j = A_j^{-1},
 \qquad
 \boldsymbol{m}_j = S_j \boldsymbol{b}_j.
 </span></p>
-<p>This is exactly the linear-algebra step implemented by the backend
-behind <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code>.</p>
+<p>The diagonal likelihood term supplies information at the grid
+positions, while the random-walk precision shares information between
+neighboring positions. Their combination determines both the fitted
+trajectory and its uncertainty.</p>
 </div>
 <div class="section level3">
 <h3 id="update-for-qc_i">2.2 Update for <span class="math inline">q(c_i)</span><a class="anchor" aria-label="anchor" href="#update-for-qc_i"></a>
@@ -190,7 +197,7 @@ behind <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code>.</
 involving the row <span class="math inline">r_{i\cdot}</span> gives
 <span class="math display">
 \log r_{ik}
-\propto
+= a_i +
 \log \pi_k
 - \frac12 \sum_{j=1}^d
 \left[
@@ -203,10 +210,10 @@ involving the row <span class="math inline">r_{i\cdot}</span> gives
 r_{i\cdot} \leftarrow
 \operatorname{softmax}\!\big(\ell_{i1},\dots,\ell_{iK}\big),
 </span> with <span class="math inline">\ell_{ik}</span> equal to the
-right-hand side above.</p>
-<p>The extra <span class="math inline">S_{j,kk}</span> term is the
-uncertainty correction that distinguishes this update from a pure
-plug-in EM step.</p>
+position-specific terms above and <span class="math inline">a_i</span>
+the normalizing constant.</p>
+<p>The <span class="math inline">S_{j,kk}</span> term accounts for
+trajectory uncertainty when assigning a sample to a grid position.</p>
 </div>
 <div class="section level3">
 <h3 id="update-for-pi_k">2.3 Update for <span class="math inline">\pi_k</span><a class="anchor" aria-label="anchor" href="#update-for-pi_k"></a>
@@ -251,26 +258,26 @@ S_j)}.
 </span></p>
 </div>
 <div class="section level3">
-<h3 id="why-the-elbo-is-monotone-here">2.6 Why the ELBO is monotone here<a class="anchor" aria-label="anchor" href="#why-the-elbo-is-monotone-here"></a>
+<h3 id="assessing-convergence">2.6 Assessing convergence<a class="anchor" aria-label="anchor" href="#assessing-convergence"></a>
 </h3>
-<p>Each of the five updates above is the exact optimizer of one ELBO
-block while holding the others fixed. That is why the current
-<code>cavi</code> implementation has a clean monotonicity story: the
-recorded <code>elbo_trace</code> should be nondecreasing up to numerical
-tolerance.</p>
+<p>Each update maximizes one objective block while holding the others
+fixed, so <code>elbo_trace</code> should be nondecreasing up to
+numerical tolerance. A plateau indicates that successive iterations are
+making small improvements. Because the objective can have multiple
+optima, compare several initializations when the trajectory is complex
+or weakly identified.</p>
 </div>
 </div>
 <div class="section level2">
 <h2 id="simulated-spiral-example">3 Simulated spiral example<a class="anchor" aria-label="anchor" href="#simulated-spiral-example"></a>
 </h2>
-<p>We use a larger and more stable spiral than the older vignette
-examples:</p>
+<p>We simulate a two-dimensional spiral with:</p>
 <ul>
 <li>
 <code>n = 1000</code> cells,</li>
-<li>a shorter latent range <code>t in [1.5*pi, 4.5*pi]</code>,</li>
-<li>lower noise,</li>
-<li>and a finer mixture grid <code>K = 60</code>.</li>
+<li>latent range <code>t in [1.5*pi, 4.5*pi]</code>,</li>
+<li>measurement standard deviation <code>sigma = 0.12</code>,</li>
+<li>and a fitting grid of <code>K = 60</code> positions.</li>
 </ul>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simulate_swiss_roll_1d_2d.html">simulate_swiss_roll_1d_2d</a></span><span class="op">(</span></span>
@@ -297,13 +304,14 @@ examples:</p>
 <span>     xlab <span class="op">=</span> <span class="st">"x"</span>, ylab <span class="op">=</span> <span class="st">"y"</span>,</span>
 <span>     main <span class="op">=</span> <span class="st">"Observed spiral, coloured by true pseudotime"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
-<img src="mpcurve_intro_files/figure-html/plot-data-1.png" class="r-plt" alt="Shorter spiral used in the introductory CAVI example." width="672"><p class="caption">
-Shorter spiral used in the introductory CAVI example.
+<img src="mpcurve_intro_files/figure-html/plot-data-1.png" class="r-plt" alt="Simulated spiral observations, colored by the generating latent position." width="672"><p class="caption">
+Simulated spiral observations, colored by the generating latent
+position.
 </p>
 </div>
 </div>
 <div class="section level2">
-<h2 id="fit-the-default-public-interface">4 Fit the default public interface<a class="anchor" aria-label="anchor" href="#fit-the-default-public-interface"></a>
+<h2 id="fit-the-model">4 Fit the model<a class="anchor" aria-label="anchor" href="#fit-the-model"></a>
 </h2>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
@@ -353,8 +361,8 @@ Shorter spiral used in the introductory CAVI example.
 <div class="section level2">
 <h2 id="check-convergence-and-recovery">5 Check convergence and recovery<a class="anchor" aria-label="anchor" href="#check-convergence-and-recovery"></a>
 </h2>
-<p>The default <code>cavi</code> fit should have a nondecreasing ELBO
-trace.</p>
+<p>First, check whether the variational objective increases throughout
+fitting.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diff.html" class="external-link">diff</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">elbo_trace</span><span class="op">)</span> <span class="op">&gt;=</span> <span class="op">-</span><span class="fl">1e-8</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"ELBO monotone:"</span>, <span class="cn">TRUE</span>, <span class="st">"\n"</span><span class="op">)</span></span>
@@ -390,8 +398,8 @@ True pseudotime (left) and inferred CAVI pseudotime (right).
 </div>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span><span class="va">op</span><span class="op">)</span></span></code></pre></div>
-<p>The built-in <code>mpcurve</code> plotting methods work directly on
-the fitted object.</p>
+<p>The fitted object also provides plots of the objective and posterior
+mean trajectory.</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
@@ -408,15 +416,23 @@ Posterior mean trajectories across the K bins.
 </div>
 </div>
 <div class="section level2">
-<h2 id="takeaway">7 Takeaway<a class="anchor" aria-label="anchor" href="#takeaway"></a>
+<h2 id="using-the-results">7 Using the results<a class="anchor" aria-label="anchor" href="#using-the-results"></a>
 </h2>
-<p>For this easier spiral regime, the public CAVI workflow is:</p>
-<ul>
-<li>fast enough to use as the default frontend algorithm,</li>
-<li>explicit about its optimization target through the ELBO,</li>
-<li>and able to recover the ordering very accurately on a moderately
-large example with a fairly fine grid.</li>
-</ul>
+<p>The ordering-recovery statistic above compares estimated sample
+positions with the generating latent variable. Its absolute value
+accounts for the arbitrary direction of an inferred ordering. In an
+application, use known sample annotations to help interpret that
+direction and assess whether nearby samples have similar feature
+profiles.</p>
+<p>Normalized positions are available in
+<code>fit$locations$mean$pseudotime</code>, trajectory means in
+<code>fit$params$mu</code>, and trajectory covariance matrices in
+<code>fit$fit$posterior$cov</code>. If the objective is still increasing
+at the iteration limit, continue with
+<code>fit &lt;- do_mpcurve(fit, iter = 100)</code>.</p>
+<p>When different feature groups may follow different sample orderings,
+see the <a href="partition.html">feature-partitioning tutorial</a>. For
+data with supplied measurement uncertainty, see the <a href="fitness.html">fitness analysis</a>.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

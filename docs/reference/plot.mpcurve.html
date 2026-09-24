@@ -3,7 +3,7 @@
 grid component \(k\) at \((k-1)/(K-1)\). For a responsibility row
 \(\gamma_i\), the posterior-mean pseudotime is
 $$t_i = \sum_{k=1}^{K} \gamma_{ik} \cdot \frac{k-1}{K-1}.$$
-For a fixed-M structural partition fit, scatterplots contain one
+For a multi-ordering fit, scatterplots contain one
 panel per ordering. Panel \(m\) uses that ordering's
 \(q(C^{(m)})\) responsibilities for pseudotime and overlays the
 conditional trajectory mean from \(q(U_j\mid Z_j=m)\). The fitted
@@ -13,22 +13,22 @@ each panel title.
   &quot;scatterplot&quot;
 Scatter of two chosen dimensions, colored by
     pseudotime, with posterior means overlaid as an orange path. For a
-    structural partition fit, draws one panel per fixed ordering.
+    multi-ordering fit, draws one panel per ordering. With one dimension,
+    displays the observed feature values against inferred pseudotime.
 
   &quot;elbo&quot;
-For a single-ordering fit, delegates to the
-    underlying CAVI trace plot. For a structural partition fit, plots the
-    single fixed-M structural objective history. Values recorded at
-    different annealing temperatures are not directly comparable; the
-    exact \(T=1\) segment is the monotonicity diagnostic.
+Variational objective over fitting iterations.
+    For multi-ordering fits, the initial annealing phase is followed by
+    iterations at \(T=1\). Assess convergence within that final segment,
+    since changing the temperature changes the objective.
 
   &quot;mu&quot;
 Posterior-mean trajectory only. With one selected
     dimension, plots the feature mean against normalized latent position;
     with two dimensions, plots the posterior-mean path in that feature
-    plane. Structural partition fits draw one panel per ordering directly
-    from the canonical $conditional_posterior$mean, representing
-    \(E[U_j\mid Z_j=m]\); derived $fits are not the data source.
+    plane. Multi-ordering fits draw one panel per ordering, showing
+    \(E[U_j\mid Z_j=m]\). Interpret each conditional trajectory alongside
+    its feature-assignment probability, shown in the panel title.
 
 
 
@@ -36,7 +36,7 @@ Posterior-mean trajectory only. With one selected
 grid component \(k\) at \((k-1)/(K-1)\). For a responsibility row
 \(\gamma_i\), the posterior-mean pseudotime is
 $$t_i = \sum_{k=1}^{K} \gamma_{ik} \cdot \frac{k-1}{K-1}.$$
-For a fixed-M structural partition fit, scatterplots contain one
+For a multi-ordering fit, scatterplots contain one
 panel per ordering. Panel \(m\) uses that ordering's
 \(q(C^{(m)})\) responsibilities for pseudotime and overlays the
 conditional trajectory mean from \(q(U_j\mid Z_j=m)\). The fitted
@@ -46,22 +46,22 @@ each panel title.
   &quot;scatterplot&quot;
 Scatter of two chosen dimensions, colored by
     pseudotime, with posterior means overlaid as an orange path. For a
-    structural partition fit, draws one panel per fixed ordering.
+    multi-ordering fit, draws one panel per ordering. With one dimension,
+    displays the observed feature values against inferred pseudotime.
 
   &quot;elbo&quot;
-For a single-ordering fit, delegates to the
-    underlying CAVI trace plot. For a structural partition fit, plots the
-    single fixed-M structural objective history. Values recorded at
-    different annealing temperatures are not directly comparable; the
-    exact \(T=1\) segment is the monotonicity diagnostic.
+Variational objective over fitting iterations.
+    For multi-ordering fits, the initial annealing phase is followed by
+    iterations at \(T=1\). Assess convergence within that final segment,
+    since changing the temperature changes the objective.
 
   &quot;mu&quot;
 Posterior-mean trajectory only. With one selected
     dimension, plots the feature mean against normalized latent position;
     with two dimensions, plots the posterior-mean path in that feature
-    plane. Structural partition fits draw one panel per ordering directly
-    from the canonical $conditional_posterior$mean, representing
-    \(E[U_j\mid Z_j=m]\); derived $fits are not the data source.
+    plane. Multi-ordering fits draw one panel per ordering, showing
+    \(E[U_j\mid Z_j=m]\). Interpret each conditional trajectory alongside
+    its feature-assignment probability, shown in the panel title.
 
 
 
@@ -86,7 +86,7 @@ Posterior-mean trajectory only. With one selected
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
-    <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver CAVI</a></li>
+    <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver</a></li>
     <li><a class="dropdown-item" href="../articles/partition.html">Feature Partitioning with MPCurver</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Case studies</h6></li>
@@ -113,7 +113,7 @@ Posterior-mean trajectory only. With one selected
 grid component \(k\) at \((k-1)/(K-1)\). For a responsibility row
 \(\gamma_i\), the posterior-mean pseudotime is
 $$t_i = \sum_{k=1}^{K} \gamma_{ik} \cdot \frac{k-1}{K-1}.$$</p>
-<p>For a fixed-<code>M</code> structural partition fit, scatterplots contain one
+<p>For a multi-ordering fit, scatterplots contain one
 panel per ordering. Panel \(m\) uses that ordering's
 \(q(C^{(m)})\) responsibilities for pseudotime and overlays the
 conditional trajectory mean from \(q(U_j\mid Z_j=m)\). The fitted
@@ -122,22 +122,22 @@ each panel title.</p>
 <dl><dt><code>"scatterplot"</code></dt>
 <dd><p>Scatter of two chosen dimensions, colored by
     pseudotime, with posterior means overlaid as an orange path. For a
-    structural partition fit, draws one panel per fixed ordering.</p></dd>
+    multi-ordering fit, draws one panel per ordering. With one dimension,
+    displays the observed feature values against inferred pseudotime.</p></dd>
 
   <dt><code>"elbo"</code></dt>
-<dd><p>For a single-ordering fit, delegates to the
-    underlying CAVI trace plot. For a structural partition fit, plots the
-    single fixed-<code>M</code> structural objective history. Values recorded at
-    different annealing temperatures are not directly comparable; the
-    exact \(T=1\) segment is the monotonicity diagnostic.</p></dd>
+<dd><p>Variational objective over fitting iterations.
+    For multi-ordering fits, the initial annealing phase is followed by
+    iterations at \(T=1\). Assess convergence within that final segment,
+    since changing the temperature changes the objective.</p></dd>
 
   <dt><code>"mu"</code></dt>
 <dd><p>Posterior-mean trajectory only. With one selected
     dimension, plots the feature mean against normalized latent position;
     with two dimensions, plots the posterior-mean path in that feature
-    plane. Structural partition fits draw one panel per ordering directly
-    from the canonical <code>$conditional_posterior$mean</code>, representing
-    \(E[U_j\mid Z_j=m]\); derived <code>$fits</code> are not the data source.</p></dd>
+    plane. Multi-ordering fits draw one panel per ordering, showing
+    \(E[U_j\mid Z_j=m]\). Interpret each conditional trajectory alongside
+    its feature-assignment probability, shown in the panel title.</p></dd>
 
 
 </dl></div>
@@ -184,9 +184,8 @@ It determines the scatterplot axes and the trajectory coordinates used by
 
 <dt id="arg-pal">pal<a class="anchor" aria-label="anchor" href="#arg-pal"></a></dt>
 <dd><p>Colour palette (length-256 character vector) used to map
-pseudotime to point colours. Defaults to the classic pseudotime rainbow
-(navy \(\to\) cyan \(\to\) green \(\to\) gold \(\to\) red),
-which avoids white and is easy to read against a white background.</p></dd>
+pseudotime to point colours. Defaults to a rainbow palette
+(blue \(\to\) cyan \(\to\) green \(\to\) yellow \(\to\) red).</p></dd>
 
 
 <dt id="arg-add-legend">add_legend<a class="anchor" aria-label="anchor" href="#arg-add-legend"></a></dt>

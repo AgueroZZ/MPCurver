@@ -23,7 +23,7 @@ fitted_prior(x, type = c("position", "partition"), ordering = NULL, ...)
 
 \item{ordering}{Optional ordering label or 1-based ordering index. For a
 single-ordering position prior it may identify the sole ordering; for a
-structural fit it is validated against the canonical ordering labels.}
+partition fit use the labels in \code{names(x$locations)}.}
 
 \item{...}{Unused.}
 }
@@ -36,14 +36,17 @@ If \code{type = "position"}, a numeric vector for a
   numeric mass when an ordering is supplied.
 }
 \description{
-Returns the current fitted/effective prior from an \code{mpcurve} object.
-For position priors, single-ordering fits return a numeric length-\code{K}
-vector. Fixed-\code{M} structural partition fits return a named list of
-\code{M} length-\code{K} vectors, one for every retained ordering, unless a
-specific ordering is requested. For partition priors,
+Extracts the fitted probability distribution over sample positions or
+feature orderings. Position probabilities \eqn{\pi_k} describe the
+population distribution across the latent grid. Partition probabilities
+\eqn{\omega_m} describe the relative prevalence of the orderings among
+features. These are the priors used to calculate sample-specific position
+responsibilities and feature-specific assignment probabilities.
+
+Single-ordering position priors are length-\code{K} vectors. Multi-ordering
+fits return a named list of \code{M} such vectors unless a specific ordering
+is requested. For partition priors,
 \code{ordering = NULL} returns the full prior record, including the prior
 mode and effective \eqn{\omega} vector; a specific \code{ordering} returns
-the corresponding scalar \eqn{\omega_m} mass. Structural fits never
-renormalize these values over an active/frozen subset because the requested
-fixed \code{M} is always retained.
+the corresponding scalar \eqn{\omega_m} mass.
 }

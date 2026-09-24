@@ -36,7 +36,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
-    <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver CAVI</a></li>
+    <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver</a></li>
     <li><a class="dropdown-item" href="../articles/partition.html">Feature Partitioning with MPCurver</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Case studies</h6></li>
@@ -75,58 +75,317 @@
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://aguerozz.github.io/MPCurver/">MPCurver</a></span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">42</span><span class="op">)</span></span></code></pre></div>
 <div class="section level2">
-<h2 id="the-feature-partition-problem">The feature-partition problem<a class="anchor" aria-label="anchor" href="#the-feature-partition-problem"></a>
+<h2 id="when-to-use-multiple-orderings">When to use multiple orderings<a class="anchor" aria-label="anchor" href="#when-to-use-multiple-orderings"></a>
 </h2>
-<p>The single-ordering model assumes that all features share one latent
-sample ordering. The partition model instead uses a fixed number <span class="math inline">M</span> of candidate orderings and a feature-level
-assignment <span class="math inline">Z_j \in \{1,\ldots,M\}</span>. If
-feature <span class="math inline">j</span> belongs to ordering <span class="math inline">m</span>,</p>
-<p><span class="math display">
-x_{ij} \mid Z_j=m,\; C_i^{(m)}=k,\; U_j
-\sim N(u_{jk},\sigma_j^2).
-</span></p>
-<p>The feature variance <span class="math inline">\sigma_j^2</span> is
-shared across orderings. Each conditional trajectory has an
-ordering-specific smoothness parameter,</p>
-<p><span class="math display">
-U_j \mid Z_j=m
-\sim N\!\left(0,(\lambda_{jm}Q_K)^{-1}\right).
-</span></p>
-<p>The public interface uses <code>intrinsic_dim = M</code>. Version
-0.3.0 supports fitting a user-specified fixed <span class="math inline">M</span>; automatic greedy selection of <span class="math inline">M</span> is temporarily unavailable because the
-fixed-<span class="math inline">M</span> variational objective is not
-itself a complexity-penalized model-selection criterion.</p>
+<p>Different groups of features can reflect different patterns among the
+same samples. For example, one group of genes may track cell
+differentiation while another tracks a separate cell-state axis. A
+feature-partition model estimates several sample orderings and the
+probability that each feature follows each one.</p>
+<p>Set <code>intrinsic_dim = M</code> to specify the number of
+orderings. The fit returns sample positions along each ordering, smooth
+feature trajectories conditional on each assignment, and assignment
+probabilities that quantify support for the feature groups.</p>
+<p>This tutorial starts with a two-ordering example, shows how to
+interpret its results, and then explains the model and structural
+variational updates.</p>
 </div>
 <div class="section level2">
-<h2 id="structural-variational-family">Structural variational family<a class="anchor" aria-label="anchor" href="#structural-variational-family"></a>
+<h2 id="fit-a-two-ordering-model">Fit a two-ordering model<a class="anchor" aria-label="anchor" href="#fit-a-two-ordering-model"></a>
 </h2>
-<p>For every <span class="math inline">M \geq 2</span>, MPCurver
-uses</p>
+<p>We simulate 500 samples with two groups of ten features. The groups
+vary along different latent orderings, with quadratic and monotone
+trajectory families.</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simulate_dual_trajectory.html">simulate_dual_trajectory</a></span><span class="op">(</span></span>
+<span>  n <span class="op">=</span> <span class="fl">500</span>,</span>
+<span>  d1 <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>  d2 <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>  d_noise <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  sigma <span class="op">=</span> <span class="fl">0.05</span>,</span>
+<span>  trajectory_family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"quadratic"</span>, <span class="st">"monotone"</span><span class="op">)</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">1</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">sim</span><span class="op">$</span><span class="va">X</span></span>
+<span><span class="va">truth</span> <span class="op">&lt;-</span> <span class="va">sim</span><span class="op">$</span><span class="va">true_assign</span></span></code></pre></div>
+<p>Fit two orderings using 50 grid positions and a second-order
+random-walk prior. The default initialization groups similar features
+and uses PCA to initialize a sample ordering within each group.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fit_partition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
+<span>  <span class="va">X</span>,</span>
+<span>  intrinsic_dim <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  method <span class="op">=</span> <span class="st">"PCA"</span>,</span>
+<span>  K <span class="op">=</span> <span class="fl">50</span>,</span>
+<span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  ridge <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<div class="section level3">
+<h3 id="interpret-feature-assignments">Interpret feature assignments<a class="anchor" aria-label="anchor" href="#interpret-feature-assignments"></a>
+</h3>
+<p><code>fit_partition$partition$pi_weights</code> is a
+feature-by-ordering matrix: entry <span class="math inline">(j,m)</span>
+is the fitted probability <span class="math inline">q(Z_j=m)</span> that
+feature <span class="math inline">j</span> follows ordering <span class="math inline">m</span>. Each row sums to one. A row concentrated
+on one ordering gives a clear assignment; a diffuse row indicates that
+several orderings describe the feature similarly well.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">pi_weights</span><span class="op">)</span></span>
+<span><span class="co">#&gt;      A             B</span></span>
+<span><span class="co">#&gt; [1,] 1  0.000000e+00</span></span>
+<span><span class="co">#&gt; [2,] 0  1.000000e+00</span></span>
+<span><span class="co">#&gt; [3,] 1  0.000000e+00</span></span>
+<span><span class="co">#&gt; [4,] 1 1.508606e-216</span></span>
+<span><span class="co">#&gt; [5,] 0  1.000000e+00</span></span>
+<span><span class="co">#&gt; [6,] 0  1.000000e+00</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">assign</span><span class="op">)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt;  A  B </span></span>
+<span><span class="co">#&gt; 10 10</span></span></code></pre></div>
+<p>The labels in <code>partition$assign</code> select the most probable
+ordering for each feature. For this simulation we can compare those
+labels with the generating groups, allowing for an exchange of the two
+ordering labels.</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">pred</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">assign</span><span class="op">)</span></span>
+<span><span class="va">truth</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">truth</span><span class="op">)</span></span>
+<span><span class="va">accuracy</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">pred</span> <span class="op">==</span> <span class="va">truth</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">pred</span> <span class="op">!=</span> <span class="va">truth</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Partition accuracy:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">accuracy</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Partition accuracy: 1</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="inspect-sample-orderings-and-trajectories">Inspect sample orderings and trajectories<a class="anchor" aria-label="anchor" href="#inspect-sample-orderings-and-trajectories"></a>
+</h3>
+<p><code>plot(fit_partition, dims = 4)</code> displays the observed
+values of feature 4 against the inferred sample positions for each
+ordering, together with its fitted trajectory. The objective plot shows
+progress over fitting iterations.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
+<div class="figure">
+<img src="partition_files/figure-html/visualize-mpcurve-1.png" class="r-plt" alt="Variational objective over fitting iterations and observed feature values along each inferred ordering." width="672"><p class="caption">
+Variational objective over fitting iterations and observed feature
+values along each inferred ordering.
+</p>
+</div>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, dims <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
+<div class="figure">
+<img src="partition_files/figure-html/visualize-mpcurve-2.png" class="r-plt" alt="Variational objective over fitting iterations and observed feature values along each inferred ordering." width="672"><p class="caption">
+Variational objective over fitting iterations and observed feature
+values along each inferred ordering.
+</p>
+</div>
+<p>To focus on trajectory shape, use <code>plot_type = "mu"</code>.
+Panel <span class="math inline">m</span> displays the conditional
+posterior mean <span class="math inline">E[U_j\mid Z_j=m]</span> against
+normalized latent position. The assignment probability in the panel
+title indicates how strongly the data support that ordering for the
+selected feature.</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
+<div class="figure">
+<img src="partition_files/figure-html/structural-mu-one-dimensional-1.png" class="r-plt" alt="Conditional mean trajectory of feature 4 under each ordering; panel titles report assignment probabilities." width="672"><p class="caption">
+Conditional mean trajectory of feature 4 under each ordering; panel
+titles report assignment probabilities.
+</p>
+</div>
+<p>Each curve answers: what trajectory is estimated if this feature
+follows this ordering? A low-probability panel describes an alternative
+assignment and should be interpreted with that probability in view.</p>
+<p>With two selected features, each panel traces their conditional means
+against one another across the latent grid. This shows the joint path
+implied by placing both features on that ordering. Check both assignment
+probabilities when interpreting the path.</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">14</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<div class="figure">
+<img src="partition_files/figure-html/structural-mu-two-dimensional-1.png" class="r-plt" alt="Conditional mean paths for features 4 and 14 under each ordering." width="672"><p class="caption">
+Conditional mean paths for features 4 and 14 under each ordering.
+</p>
+</div>
+</div>
+<div class="section level3">
+<h3 id="extract-results">Extract results<a class="anchor" aria-label="anchor" href="#extract-results"></a>
+</h3>
+<p>The following fields support further analysis:</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">Quantity</th>
+<th align="left">Field</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">Sample positions for ordering <span class="math inline">m</span>
+</td>
+<td align="left"><code>locations[[m]]$mean$pseudotime</code></td>
+</tr>
+<tr class="even">
+<td align="left">Feature-assignment probabilities</td>
+<td align="left"><code>partition$pi_weights</code></td>
+</tr>
+<tr class="odd">
+<td align="left">Most probable feature assignments</td>
+<td align="left"><code>partition$assign</code></td>
+</tr>
+<tr class="even">
+<td align="left">Conditional trajectory means</td>
+<td align="left"><code>conditional_posterior$mean[[m]]</code></td>
+</tr>
+<tr class="odd">
+<td align="left">Trajectory covariance for feature <span class="math inline">j</span>, ordering <span class="math inline">m</span>
+</td>
+<td align="left"><code>conditional_posterior$cov[[m]][[j]]</code></td>
+</tr>
+<tr class="even">
+<td align="left">Feature noise variances, shared across orderings</td>
+<td align="left"><code>params$sigma2</code></td>
+</tr>
+<tr class="odd">
+<td align="left">Feature-by-ordering smoothness parameters</td>
+<td align="left"><code>lambda_mat</code></td>
+</tr>
+</tbody>
+</table>
+<p>Sample positions are normalized to <span class="math inline">[0,1]</span>. Ordering labels and directions are
+arbitrary; use sample annotations to interpret the axes and align
+orderings when comparing fits. See <code><a href="../reference/mpcurve.html">?mpcurve</a></code> for the
+complete object description.</p>
+</div>
+<div class="section level3">
+<h3 id="assess-convergence-and-continue-fitting">Assess convergence and continue fitting<a class="anchor" aria-label="anchor" href="#assess-convergence-and-continue-fitting"></a>
+</h3>
+<p>Fitting begins with an annealing schedule that encourages diffuse
+feature assignments, followed by coordinate updates at temperature <span class="math inline">T=1</span>. Inspect <code>objective_history</code>
+together with <code>temperature_history</code>: the <span class="math inline">T=1</span> segment tracks improvements in a common
+objective. Values from different temperatures correspond to different
+objectives.</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">t1_objective</span> <span class="op">&lt;-</span> <span class="va">fit_partition</span><span class="op">$</span><span class="va">objective_history</span><span class="op">[</span></span>
+<span>  <span class="va">fit_partition</span><span class="op">$</span><span class="va">temperature_history</span> <span class="op">==</span> <span class="fl">1</span></span>
+<span><span class="op">]</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Recorded T=1 objective values:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">t1_objective</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Recorded T=1 objective values: 101</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Final objective increments:\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Final objective increments:</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">tail</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diff.html" class="external-link">diff</a></span><span class="op">(</span><span class="va">t1_objective</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 0.8311716 0.7412944 0.7044794 0.6753721 0.6311281 0.5810605</span></span></code></pre></div>
+<p>If the increments remain appreciable at the iteration limit, run
+additional iterations:</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fit_partition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/do_mpcurve.html">do_mpcurve</a></span><span class="op">(</span><span class="va">fit_partition</span>, iter <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></code></pre></div>
+<p>This refines the orderings, trajectories, assignments, and estimated
+parameters at <span class="math inline">T=1</span>, extending the
+objective history.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="choose-fitting-settings">Choose fitting settings<a class="anchor" aria-label="anchor" href="#choose-fitting-settings"></a>
+</h2>
+<div class="section level3">
+<h3 id="number-of-orderings">Number of orderings<a class="anchor" aria-label="anchor" href="#number-of-orderings"></a>
+</h3>
+<p><code>intrinsic_dim</code> determines the number of orderings and
+stays fixed during fitting. Choose values that address the scientific
+question, then examine the stability of feature groups and their
+interpretation across fits. The structural objective assesses
+convergence for a given <span class="math inline">M</span>; it does not
+include a complexity penalty for comparing different values of <span class="math inline">M</span>. Use a separate predictive or
+model-selection assessment for that comparison.</p>
+</div>
+<div class="section level3">
+<h3 id="initialization">Initialization<a class="anchor" aria-label="anchor" href="#initialization"></a>
+</h3>
+<p>The default <code>partition_init = "similarity"</code> clusters
+features by similarity and initializes one ordering per feature group.
+Alternatively, <code>partition_init = "ordering_methods"</code> uses the
+specified ordering methods:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fit3</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
+<span>  <span class="va">X</span>,</span>
+<span>  intrinsic_dim <span class="op">=</span> <span class="fl">3</span>,</span>
+<span>  partition_init <span class="op">=</span> <span class="st">"ordering_methods"</span>,</span>
+<span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"fiedler"</span>, <span class="st">"PCA"</span>, <span class="st">"PCA"</span><span class="op">)</span>,</span>
+<span>  K <span class="op">=</span> <span class="fl">16</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Compare several initializations when trajectories are non-monotone or
+groups are weakly separated. Within a common model and fitting
+configuration, compare final <span class="math inline">T=1</span>
+objective values as well as the resulting orderings and feature
+assignments.</p>
+</div>
+<div class="section level3">
+<h3 id="noise-and-smoothness">Noise and smoothness<a class="anchor" aria-label="anchor" href="#noise-and-smoothness"></a>
+</h3>
+<p>By default, the model estimates one noise variance per feature,
+shared across orderings. <code>sigma2_init</code> supplies a scalar or a
+vector of initial feature variances. Alternatively, supply known
+measurement standard deviations through <code>S</code>, as a
+feature-specific vector or a matrix matching <code>X</code>. In that
+case <code>params$sigma2</code> is <code>NULL</code>, and the supplied
+measurement errors determine the likelihood variances.</p>
+<p><code>lambda</code> initializes the smoothness parameters. Larger
+values give stronger smoothing; <code>fix_lambda = TRUE</code> holds
+them fixed during fitting. An optional <code>lambda_sd_prior_rate</code>
+encourages smooth trajectories while allowing their smoothness
+parameters to be estimated.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="statistical-model">Statistical model<a class="anchor" aria-label="anchor" href="#statistical-model"></a>
+</h2>
+<p>Let <span class="math inline">C_i^{(m)}</span> be the latent grid
+position of sample <span class="math inline">i</span> along ordering
+<span class="math inline">m</span>, and let <span class="math inline">Z_j\in\{1,\ldots,M\}</span> identify the ordering
+followed by feature <span class="math inline">j</span>. The position and
+feature-assignment probabilities are <span class="math inline">\Pr(C_i^{(m)}=k)=\pi_{mk}</span> and <span class="math inline">\Pr(Z_j=m)=\omega_m</span>. Conditional on these
+assignments,</p>
+<p><span class="math display">
+x_{ij}\mid Z_j=m,\; C_i^{(m)}=k,\; U_j
+\sim N(u_{jk},\sigma_j^2).
+</span></p>
+<p>Each feature has a trajectory <span class="math inline">U_j</span>
+whose prior smoothness depends on its ordering:</p>
+<p><span class="math display">
+p(U_j\mid Z_j=m,\lambda_{jm})
+\propto
+\exp\!\left(-\frac{\lambda_{jm}}{2}U_j^TQ_KU_j\right).
+</span></p>
+<p><span class="math inline">Q_K</span> is the random-walk precision
+matrix. Its quadratic form penalizes variation along the ordered grid.
+With known measurement standard deviations, replace <span class="math inline">\sigma_j^2</span> by <span class="math inline">v_{ij}=S_{ij}^2</span> (or <span class="math inline">S_j^2</span> for a feature-specific vector).</p>
+<div class="section level3">
+<h3 id="structural-variational-inference">Structural variational inference<a class="anchor" aria-label="anchor" href="#structural-variational-inference"></a>
+</h3>
+<p>MPCurver approximates the posterior by</p>
 <p><span class="math display">
 q(C,Z,U)
 =
 \prod_{m=1}^M\prod_{i=1}^n q(C_i^{(m)})
 \prod_{j=1}^d q(Z_j)q(U_j\mid Z_j).
 </span></p>
-<p>Write</p>
-<p><span class="math display">
-q(C_i^{(m)}=k)=r_{imk},\qquad
-q(Z_j=m)=w_{jm},
-</span></p>
-<p>and</p>
+<p>Write <span class="math inline">q(C_i^{(m)}=k)=r_{imk}</span>, <span class="math inline">q(Z_j=m)=w_{jm}</span>, and</p>
 <p><span class="math display">
 q(U_j\mid Z_j=m)=N(\mu_{jm},V_{jm}).
 </span></p>
-<p>This dependence is important: the <span class="math inline">M</span>
-Gaussian factors for feature <span class="math inline">j</span> are
-conditional alternatives under <span class="math inline">Z_j</span>,
-rather than <span class="math inline">M</span> independent potential
-trajectories that all exist simultaneously.</p>
+<p>The conditional Gaussian distributions describe the possible
+trajectory shapes under each feature assignment. Preserving this
+dependence allows assignment uncertainty and trajectory uncertainty to
+be represented together. Coordinate updates alternate between
+trajectories, sample positions, feature assignments, and model
+parameters.</p>
+</div>
 <div class="section level3">
 <h3 id="conditional-trajectory-update">Conditional trajectory update<a class="anchor" aria-label="anchor" href="#conditional-trajectory-update"></a>
 </h3>
-<p>Let <span class="math inline">N_{mk}=\sum_i r_{imk}</span>. With
-estimated feature variance,</p>
+<p>Let <span class="math inline">R^{(m)}=(r_{imk})</span> and <span class="math inline">N_{mk}=\sum_i r_{imk}</span>. With estimated feature
+variance,</p>
 <p><span class="math display">
 A_{jm}
 =
@@ -141,12 +400,12 @@ b_{jm}
 <p><span class="math display">
 V_{jm}=A_{jm}^{-1},\qquad \mu_{jm}=V_{jm}b_{jm}.
 </span></p>
-<p>The feature-assignment probability <span class="math inline">w_{jm}</span> does <strong>not</strong> occur in
-either the precision or the right-hand side. Therefore a small or zero
-<span class="math inline">w_{jm}</span> does not drive the conditional
-posterior back toward a singular intrinsic prior.</p>
-<p>If known observation-level variances <span class="math inline">v_{ij}</span> are supplied through <code>S</code>,
-the likelihood terms become</p>
+<p>These updates combine the smoothness prior with the full likelihood
+conditional on <span class="math inline">Z_j=m</span>. Thus each
+possible assignment has its own trajectory estimate and covariance,
+including assignments with small <span class="math inline">w_{jm}</span>.</p>
+<p>With known variances <span class="math inline">v_{ij}</span>, the
+likelihood terms become</p>
 <p><span class="math display">
 A_{jm}
 =
@@ -159,18 +418,18 @@ b_{jmk}=\sum_i\frac{r_{imk}x_{ij}}{v_{ij}}.
 <div class="section level3">
 <h3 id="ordering-responsibilities">Ordering responsibilities<a class="anchor" aria-label="anchor" href="#ordering-responsibilities"></a>
 </h3>
-<p>The ordering-specific sample responsibilities still average over
-feature assignments:</p>
+<p>The sample-position update weights each feature’s contribution by its
+assignment probability:</p>
 <p><span class="math display">
 \log r_{imk}
 \stackrel{+}{=}
 \log\pi_{mk}
 -\frac12\sum_j w_{jm}
-\frac{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}}{\sigma_j^2}.
+\frac{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}}{\sigma_j^2},
 </span></p>
-<p>Thus <span class="math inline">w_{jm}</span> affects how strongly
-feature <span class="math inline">j</span> informs ordering <span class="math inline">m</span>, while it does not change the definition of
-the conditional trajectory posterior.</p>
+<p>where <span class="math inline">\stackrel{+}{=}</span> denotes
+equality up to a normalizing constant in <span class="math inline">k</span>. A feature with large <span class="math inline">w_{jm}</span> strongly informs ordering <span class="math inline">m</span>. The term <span class="math inline">V_{jm,kk}</span> propagates trajectory uncertainty
+into the position update. For known measurement variances, replace <span class="math inline">\sigma_j^2</span> by <span class="math inline">v_{ij}</span>.</p>
 </div>
 <div class="section level3">
 <h3 id="shared-feature-variance">Shared feature variance<a class="anchor" aria-label="anchor" href="#shared-feature-variance"></a>
@@ -182,26 +441,27 @@ E_{jm}
 \sum_{i,k}r_{imk}
 \left[(x_{ij}-\mu_{jmk})^2+V_{jm,kk}\right].
 </span></p>
-<p>The single shared variance update is</p>
+<p>The variance update averages the expected squared residuals across
+ordering assignments:</p>
 <p><span class="math display">
 \sigma_j^2
 =
 \frac1n\sum_{m=1}^M w_{jm}E_{jm}.
 </span></p>
-<p>Consequently, a partition fit exposes one length-<span class="math inline">d</span> vector in <code>fit$params$sigma2</code>.
-When <code>S</code> is known, this field is <code>NULL</code>.</p>
+<p>This gives one noise scale for each feature. When measurement
+variances are supplied through <code>S</code>, those variances are used
+directly.</p>
 </div>
 <div class="section level3">
-<h3 id="feature-assignment-and-local-elbo">Feature assignment and local ELBO<a class="anchor" aria-label="anchor" href="#feature-assignment-and-local-elbo"></a>
+<h3 id="feature-assignments">Feature assignments<a class="anchor" aria-label="anchor" href="#feature-assignments"></a>
 </h3>
-<p>The feature assignment uses the complete conditional local ELBO, not
-only the expected likelihood. Let</p>
+<p>Assignment probabilities balance expected data fit, trajectory
+smoothness, and posterior uncertainty. Define</p>
 <p><span class="math display">
 G_{jm}=\mu_{jm}^TQ_K\mu_{jm}+\operatorname{tr}(Q_KV_{jm}).
 </span></p>
-<p>For an intrinsic precision with rank <span class="math inline">r</span> and generalized determinant <span class="math inline">|Q_K|_+</span>, the local block <span class="math inline">B_{jm}</span> contains the expected likelihood, the
-trajectory prior, the optional lambda prior, and the Gaussian
-entropy:</p>
+<p>With estimated noise, precision rank <span class="math inline">r</span>, and generalized determinant <span class="math inline">|Q_K|_+</span>, the local objective for feature
+<span class="math inline">j</span> under ordering <span class="math inline">m</span> is</p>
 <p><span class="math display">
 \begin{aligned}
 B_{jm}
@@ -216,250 +476,42 @@ r\{\log\lambda_{jm}-\log(2\pi)\}
 +\frac12\left[K\log(2\pi e)+\log|V_{jm}|\right].
 \end{aligned}
 </span></p>
-<p>At temperature <span class="math inline">T</span>,</p>
+<p>The terms are the expected likelihood, expected trajectory log prior,
+optional smoothness-parameter log prior, and Gaussian entropy. The
+default smoothness-parameter penalty is zero. At annealing temperature
+<span class="math inline">T</span>,</p>
 <p><span class="math display">
 w_{jm}
 \propto
 \exp\left\{
-\frac{\mathbb E\log\omega_m+B_{jm}}{T}
-\right\}.
+\frac{\log\omega_m+B_{jm}}{T}
+\right\}
 </span></p>
-<p>At <span class="math inline">T=1</span>,
-<code>objective_history</code> records the fixed-<span class="math inline">M</span> structural ELBO. Objective values at
-different annealing temperatures are not directly comparable; only the
-fixed-<span class="math inline">T</span> segment should be checked for
-coordinate-ascent monotonicity.</p>
+<p>for a fixed or empirically estimated ordering prior <span class="math inline">\omega</span>. At <span class="math inline">T=1</span>, these are the feature-assignment updates
+for the structural variational objective.</p>
 </div>
-</div>
-<div class="section level2">
-<h2 id="intrinsic-prior-with-ridge-0">Intrinsic prior with <code>ridge = 0</code><a class="anchor" aria-label="anchor" href="#intrinsic-prior-with-ridge-0"></a>
-</h2>
-<p>For an intrinsic random-walk prior, <span class="math inline">Q_K</span> is rank deficient. The conditional
-posterior precision is nevertheless</p>
+<div class="section level3">
+<h3 id="intrinsic-random-walk-prior">Intrinsic random-walk prior<a class="anchor" aria-label="anchor" href="#intrinsic-random-walk-prior"></a>
+</h3>
+<p>The default <code>ridge = 0</code> gives an intrinsic random-walk
+prior. <span class="math inline">Q_K</span> is rank deficient, and the
+likelihood provides information about the unpenalized directions. The
+conditional posterior is proper when <span class="math inline">\lambda_{jm}Q_K+D_{jm}</span> is positive definite,
+equivalently when</p>
 <p><span class="math display">
-\lambda_{jm}Q_K+D_{jm},
+\ker(Q_K)\cap\ker(D_{jm})=\{0\},
 </span></p>
-<p>where <span class="math inline">D_{jm}</span> is supplied by the
-likelihood and does not vanish with <span class="math inline">w_{jm}</span>. This is the same
-posterior-identification mechanism used by the single-ordering CAVI fit.
-The algorithm does not use feature-weight floors, automatic precision
-jitter, active/inactive orderings, or freeze/drop states.</p>
-<p><code>ridge</code> remains available as an explicit modelling choice.
-A positive value makes the trajectory prior proper, but it is not
-required merely to rescue the conditional posterior from a small
-feature-assignment weight.</p>
-<p>With <code>ridge = 0</code>, the trajectory prior normalization uses
-the rank and generalized determinant of <span class="math inline">Q_K</span>. Accordingly, the recorded value follows
-the package’s intrinsic or pseudo-ELBO convention; structural VI fixes
-the posterior singularity caused by the old fractional update, but it
-does not turn an improper intrinsic prior into a proper marginal
-likelihood.</p>
+<p>where <span class="math inline">D_{jm}</span> is the diagonal
+likelihood precision in the trajectory update. This is the same
+identification condition as in the single-ordering model. A positive
+<code>ridge</code> adds a diagonal term to <span class="math inline">Q_K</span> and gives a proper Gaussian trajectory
+prior.</p>
+<p>For an intrinsic prior, the objective uses the rank and generalized
+determinant of <span class="math inline">Q_K</span>, with a fixed
+reference measure on the null space. It supports fitting and convergence
+assessment for the specified model; an ordinary marginal-likelihood
+interpretation requires a proper prior.</p>
 </div>
-<div class="section level2">
-<h2 id="fitting-a-fixed-number-of-orderings">Fitting a fixed number of orderings<a class="anchor" aria-label="anchor" href="#fitting-a-fixed-number-of-orderings"></a>
-</h2>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simulate_dual_trajectory.html">simulate_dual_trajectory</a></span><span class="op">(</span></span>
-<span>  n <span class="op">=</span> <span class="fl">500</span>,</span>
-<span>  d1 <span class="op">=</span> <span class="fl">10</span>,</span>
-<span>  d2 <span class="op">=</span> <span class="fl">10</span>,</span>
-<span>  d_noise <span class="op">=</span> <span class="fl">0</span>,</span>
-<span>  sigma <span class="op">=</span> <span class="fl">0.05</span>,</span>
-<span>  trajectory_family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"quadratic"</span>, <span class="st">"monotone"</span><span class="op">)</span>,</span>
-<span>  seed <span class="op">=</span> <span class="fl">1</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">sim</span><span class="op">$</span><span class="va">X</span></span>
-<span><span class="va">truth</span> <span class="op">&lt;-</span> <span class="va">sim</span><span class="op">$</span><span class="va">true_assign</span></span></code></pre></div>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">fit_partition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  <span class="va">X</span>,</span>
-<span>  intrinsic_dim <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"PCA"</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">50</span>,</span>
-<span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  ridge <span class="op">=</span> <span class="fl">0</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>The returned <code>mpcurve</code> object has one canonical structural
-state:</p>
-<ul>
-<li>
-<code>params$sigma2</code>: shared length-<span class="math inline">d</span> variance vector, or <code>NULL</code> with
-known <code>S</code>;</li>
-<li>
-<code>gamma</code>: named list of <span class="math inline">M</span>
-responsibility matrices;</li>
-<li>
-<code>conditional_posterior</code>: conditional means and
-covariances for every ordering;</li>
-<li>
-<code>lambda_mat</code>: <span class="math inline">d\times M</span>
-smoothness matrix;</li>
-<li>
-<code>partition$pi_weights</code>: <span class="math inline">d\times
-M</span> feature-assignment probabilities;</li>
-<li>
-<code>partition$assign</code>: hard labels obtained from the largest
-probability;</li>
-<li>
-<code>objective_history</code> and <code>temperature_history</code>:
-fitting diagnostics.</li>
-</ul>
-<p><code>fits</code> remains available only as a derived compatibility
-view for existing read-only code. These child objects are regenerated
-from the canonical state; they are not independent fitting states and
-are not used by <code><a href="../reference/do_mpcurve.html">do_mpcurve()</a></code>.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
-<div class="figure">
-<img src="partition_files/figure-html/visualize-mpcurve-1.png" class="r-plt" alt="Inspecting the fixed-M structural objective and the ordering-specific pseudotime views." width="672"><p class="caption">
-Inspecting the fixed-M structural objective and the ordering-specific
-pseudotime views.
-</p>
-</div>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, dims <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
-<div class="figure">
-<img src="partition_files/figure-html/visualize-mpcurve-2.png" class="r-plt" alt="Inspecting the fixed-M structural objective and the ordering-specific pseudotime views." width="672"><p class="caption">
-Inspecting the fixed-M structural objective and the ordering-specific
-pseudotime views.
-</p>
-</div>
-<div class="section level3">
-<h3 id="plotting-structural-trajectory-means">Plotting structural trajectory means<a class="anchor" aria-label="anchor" href="#plotting-structural-trajectory-means"></a>
-</h3>
-<p>For a partition fit, <code>plot_type = "mu"</code> reads the
-canonical conditional posterior directly. With one selected feature,
-panel <span class="math inline">m</span> displays</p>
-<p><span class="math display">
-E[U_j \mid Z_j=m]
-</span></p>
-<p>against normalized latent position for every fixed ordering <span class="math inline">m</span>. The panel title reports <span class="math inline">q(Z_j=m)</span>, which helps distinguish a
-well-supported conditional trajectory from a low-probability
-alternative. The trajectory itself is not multiplied by this assignment
-probability: it is the mean of the conditional Gaussian branch.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
-<div class="figure">
-<img src="partition_files/figure-html/structural-mu-one-dimensional-1.png" class="r-plt" alt="Conditional posterior mean trajectory for feature 4 under each of the two fixed orderings." width="672"><p class="caption">
-Conditional posterior mean trajectory for feature 4 under each of the
-two fixed orderings.
-</p>
-</div>
-<p>When <code>dims</code> contains two features, each panel instead
-plots the two conditional mean coordinates against one another along the
-latent grid. This is useful for comparing the geometric paths implied by
-the same pair of features under the different ordering assignments.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">14</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<div class="figure">
-<img src="partition_files/figure-html/structural-mu-two-dimensional-1.png" class="r-plt" alt="Two-dimensional conditional posterior mean paths for features 4 and 14 under each fixed ordering." width="672"><p class="caption">
-Two-dimensional conditional posterior mean paths for features 4 and 14
-under each fixed ordering.
-</p>
-</div>
-<p>Both forms use <code>conditional_posterior$mean</code>, not an
-independently updated child fit. Consequently, the displayed paths are
-exactly the <span class="math inline">q(U_j\mid Z_j=m)</span> means used
-by the structural coordinate updates.</p>
-</div>
-<div class="section level3">
-<h3 id="inspecting-the-fixed-temperature-objective">Inspecting the fixed-temperature objective<a class="anchor" aria-label="anchor" href="#inspecting-the-fixed-temperature-objective"></a>
-</h3>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">t1</span> <span class="op">&lt;-</span> <span class="va">fit_partition</span><span class="op">$</span><span class="va">temperature_history</span> <span class="op">==</span> <span class="fl">1</span></span>
-<span><span class="va">delta_t1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/diff.html" class="external-link">diff</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">objective_history</span><span class="op">[</span><span class="va">t1</span><span class="op">]</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Largest T=1 decrease:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="va">delta_t1</span><span class="op">)</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Largest T=1 decrease: 0</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="partition-accuracy">Partition accuracy<a class="anchor" aria-label="anchor" href="#partition-accuracy"></a>
-</h3>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">pred</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">assign</span><span class="op">)</span></span>
-<span><span class="va">truth</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">truth</span><span class="op">)</span></span>
-<span><span class="va">accuracy</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">pred</span> <span class="op">==</span> <span class="va">truth</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">pred</span> <span class="op">!=</span> <span class="va">truth</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Partition accuracy:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">accuracy</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Partition accuracy: 1</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="continuing-a-fit">Continuing a fit<a class="anchor" aria-label="anchor" href="#continuing-a-fit"></a>
-</h3>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">fit_partition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/do_mpcurve.html">do_mpcurve</a></span><span class="op">(</span><span class="va">fit_partition</span>, iter <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></code></pre></div>
-<p>Continuation uses only the canonical structural state and appends
-exact <span class="math inline">T=1</span> coordinate sweeps to
-<code>objective_history</code>.</p>
-</div>
-</div>
-<div class="section level2">
-<h2 id="initialization">Initialization<a class="anchor" aria-label="anchor" href="#initialization"></a>
-</h2>
-<p>The default <code>partition_init = "similarity"</code> clusters
-features and initializes one ordering per feature block. Alternatively,
-<code>partition_init = "ordering_methods"</code> accepts one method per
-ordering:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">fit3</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  <span class="va">X</span>,</span>
-<span>  intrinsic_dim <span class="op">=</span> <span class="fl">3</span>,</span>
-<span>  partition_init <span class="op">=</span> <span class="st">"ordering_methods"</span>,</span>
-<span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"fiedler"</span>, <span class="st">"PCA"</span>, <span class="st">"PCA"</span><span class="op">)</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">16</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>For estimated noise, <code>sigma2_init</code> is a scalar or
-length-<span class="math inline">d</span> shared variance vector.
-<code>lambda</code> initializes all entries of <code>lambda_mat</code>;
-use <code>fix_lambda = TRUE</code> to keep them fixed.
-<code>sigma2_init</code> cannot be combined with known measurement
-standard deviations <code>S</code>.</p>
-</div>
-<div class="section level2">
-<h2 id="deprecated-transition-arguments">Deprecated transition arguments<a class="anchor" aria-label="anchor" href="#deprecated-transition-arguments"></a>
-</h2>
-<p>The former augmented algorithm exposed
-<code>freeze_unused_ordering</code>, <code>freeze_feature</code>, their
-thresholds, and <code>drop_unused_ordering</code>. They are no longer
-part of the fitting algorithm. During the 0.3.x transition they remain
-accepted by <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> and <code><a href="../reference/do_mpcurve.html">do_mpcurve()</a></code>
-only to issue a deprecation warning; their values are ignored and new
-objects do not store active, frozen, effective-weight, or
-dropped-ordering state.</p>
-</div>
-<div class="section level2">
-<h2 id="practical-guidance">Practical guidance<a class="anchor" aria-label="anchor" href="#practical-guidance"></a>
-</h2>
-<ul>
-<li>Choose a fixed, scientifically plausible <code>intrinsic_dim</code>
-and compare the resulting partitions through stability or external
-validation.</li>
-<li>Do not use the raw structural ELBO alone to select <span class="math inline">M</span>: with an adaptive ordering prior, an extra
-nearly empty ordering is not automatically charged a model-complexity
-penalty.</li>
-<li>
-<code>ridge = 0</code> is the default intrinsic-prior path. Use
-positive <code>ridge</code> only when a properized trajectory prior is
-part of the intended model.</li>
-<li>Inspect only fixed-<span class="math inline">T</span> segments for
-monotonicity.</li>
-<li>Use multiple initializations when trajectories are non-monotone or
-weakly separated.</li>
-</ul>
-</div>
-<div class="section level2">
-<h2 id="summary">Summary<a class="anchor" aria-label="anchor" href="#summary"></a>
-</h2>
-<ul>
-<li>All fixed <span class="math inline">M\ge2</span> fits use structural
-VI, <span class="math inline">q(C)q(Z)q(U\mid Z)</span>.</li>
-<li>Conditional trajectory precision is independent of <span class="math inline">w_{jm}</span>.</li>
-<li>Estimated <span class="math inline">\sigma_j^2</span> is shared
-across orderings.</li>
-<li>New fits have one canonical state; <code>$fits</code> is a derived
-compatibility view.</li>
-<li>Freeze/drop machinery is retired, and greedy cross-<span class="math inline">M</span> selection is temporarily unavailable.</li>
-</ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

@@ -6,11 +6,12 @@
 \alias{MPCurver}
 \title{MPCurver package}
 \description{
-CAVI-first trajectory and pseudotime inference with legacy smoothEM
-backends retained for internal benchmarking and compatibility checks.
-Single-ordering fits use ordinary CAVI; fixed multi-ordering fits use the
-structural family \eqn{q(C)\prod_j q(Z_j)q(U_j\mid Z_j)} with one canonical
-shared state.
+Estimate latent sample orderings, smooth feature trajectories, and
+trajectory uncertainty using Gaussian measurement models and random-walk
+priors. Multi-ordering models also estimate the probability that each
+feature follows each ordering, using structural variational inference.
+Start with \code{\link{fit_mpcurve}} and explore the results with
+\code{\link{summary.mpcurve}} and \code{\link{plot.mpcurve}}.
 }
 \seealso{
 Useful links:

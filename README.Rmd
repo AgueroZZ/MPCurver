@@ -18,23 +18,32 @@ knitr::opts_chunk$set(
 <!-- badges: start -->
 <!-- badges: end -->
 
-`MPCurver` fits smooth latent orderings with Gaussian-mixture / GMRF models.
+`MPCurver` estimates latent sample orderings and smooth feature trajectories
+from multivariate data. It represents an ordering by a grid of positions and
+models each feature as a smooth function along that grid. Gaussian measurement
+models and random-walk priors allow it to estimate trajectories together with
+their uncertainty.
 
-The public workflow is **`mpcurve`-first and CAVI-first**:
-use `fit_mpcurve()` to fit a model, `do_mpcurve()` to continue a fitted model,
-and the usual `print()`, `summary()`, and `plot()` methods to inspect results.
+For data with several sources of variation, MPCurver can learn multiple
+orderings and the probability that each feature follows each ordering. This
+allows different groups of features to describe different patterns among the
+same samples.
+
+Use `fit_mpcurve()` to fit a model, `summary()` and `plot()` to explore the
+results, and `do_mpcurve()` to run additional fitting iterations.
 
 ## Documentation
 
-The package documentation is organized around the public `mpcurve` workflow.
-
-- `vignettes/mpcurve_intro.Rmd`: current single-ordering introduction.
-- `vignettes/partition.Rmd`: current multi-ordering / feature-partition tools.
-- `vignettes/fitness.rmd`: applied case study using the public interface.
+- [Getting started](https://aguerozz.github.io/MPCurver/articles/mpcurve_intro.html):
+  the model, variational inference, and a simulated trajectory example.
+- [Feature partitioning](https://aguerozz.github.io/MPCurver/articles/partition.html):
+  fitting multiple orderings and interpreting feature assignments.
+- [Fitness data analysis](https://aguerozz.github.io/MPCurver/articles/fitness.html):
+  a worked example with smoothing and measurement uncertainty.
 
 ## Installation
 
-You can install the development version of `MPCurver` like so:
+Install `MPCurver` from GitHub:
 
 ``` r
 pak::pak("AgueroZZ/MPCurver")
@@ -42,14 +51,14 @@ pak::pak("AgueroZZ/MPCurver")
 
 ## Example
 
-This is a basic example using the recommended `mpcurve` interface:
+The example below recovers a latent ordering from a noisy two-dimensional
+spiral.
 
 ```{r setup}
 library(MPCurver)
 ```
 
-We will simulate a moderately easy 2D spiral and fit the default MPCurver
-workflow.
+First, generate the observations:
 
 ```{r}
 sim <- simulate_spiral2d(n = 1500, turns = 1, noise = 0.08, seed = 123)
@@ -57,8 +66,9 @@ plot(sim$obs, pch = 16, cex = 0.35, col = "grey80",
      xlab = "x1", ylab = "x2", main = "Noisy 2D spiral")
 ```
 
-Now we fit the model with `fit_mpcurve()`. The public wrapper uses the CAVI
-backend and returns an `mpcurve` object.
+Fit a model with 40 grid positions and a second-order random-walk prior. The
+first plot shows the inferred ordering and trajectory; the second shows the
+variational objective over fitting iterations.
 
 ```{r}
 set.seed(123)
@@ -76,9 +86,9 @@ plot(fit)
 plot(fit, plot_type = "elbo")
 ```
 
-We can compare several initialization strategies under the same `cavi` model.
-The explicit serial loop below is reproducible on platforms where forked
-parallel numerical libraries are unavailable:
+Initialization can affect the fitted ordering, especially for curved or
+weakly separated patterns. Here we compare three starting orderings under the
+same model and fitting settings:
 
 ```{r}
 init_methods <- c("PCA", "fiedler", "isomap")
@@ -103,37 +113,48 @@ data.frame(
 )
 ```
 
-Each fit keeps the unified `params`, `gamma`, `elbo_trace`, `loglik_trace`, and
-the underlying backend fit in `$fit`.
+For these fits with the same model and data, a larger final ELBO indicates a
+better variational objective. Inspect the fitted trajectories as well as this
+numerical comparison. Sample positions are available in
+`fit$locations$mean$pseudotime`, and `fit$params$mu` contains the estimated
+feature trajectories.
 
-For multi-ordering analyses, use `fit_mpcurve(..., intrinsic_dim = 2)` or more
-generally `fit_mpcurve(..., intrinsic_dim = M)` with a fixed, user-chosen
-`M >= 2`.
+## Multiple orderings and feature groups
 
-## Fixed-M structural partition models
+A single ordering may describe some features well while missing the patterns
+in others. Set `intrinsic_dim = M` to fit $M$ orderings of the same samples.
+MPCurver jointly estimates those orderings, smooth trajectories, and a
+probability distribution over orderings for each feature. For example, two
+groups of genes may vary along different cell-state axes.
 
-Multi-ordering fits use the structural variational family
+Inference uses structural variational inference: a feature's trajectory
+distribution is conditional on its ordering assignment. This preserves the
+dependence between which ordering a feature follows and the shape of its
+trajectory. Each feature has one noise variance shared across the candidate
+orderings, while smoothness can vary with the feature and ordering.
 
-$$
-q(C)\prod_j q(Z_j)q(U_j \mid Z_j),
-$$
+For a two-ordering analysis of your sample-by-feature data matrix `X`:
 
-so each trajectory posterior is conditional on the feature assignment rather
-than treated as an independent potential trajectory. Estimated feature
-variances are represented by one shared length-$d$ `params$sigma2` vector
-across all orderings. The fitted `mpcurve` object stores one canonical
-structural state, including the named ordering-specific `gamma` matrices,
-`conditional_posterior`, `lambda_mat`, and `partition$pi_weights`; `$fits` is a
-derived compatibility view, not an independent fitting state.
+``` r
+fit_multi <- fit_mpcurve(X, intrinsic_dim = 2, K = 40)
+summary(fit_multi)
+fit_multi$partition$pi_weights
+plot(fit_multi, plot_type = "mu", dims = 1)
+```
 
-There are no active/inactive, freeze, or drop states in this model. Automatic
-`greedy = "forward"` and `greedy = "backward"` selection is temporarily
-unavailable because the raw fixed-$M$ structural ELBO is not a
-complexity-penalized criterion for comparing different values of $M$. Choose
-`M` from scientific context and assess alternatives through stability or
-external validation.
+The assignment probabilities describe how strongly each feature supports
+each ordering. The trajectory plot shows the feature's fitted mean under
+each ordering, with the corresponding assignment probability in the panel
+title. Choose the number of orderings for the scientific question and examine
+the stability and interpretability of the resulting feature groups. The
+[feature-partitioning tutorial](https://aguerozz.github.io/MPCurver/articles/partition.html)
+develops this workflow and the statistical model in detail.
 
-The same `print()`, `summary()`, and `plot()` interface works for both
-single-ordering and structural partition fits. For a partition fit,
-`plot(fit, plot_type = "mu", dims = j)` displays the conditional posterior mean
-$E[U_j \mid Z_j=m]$ separately for every ordering $m$.
+## Measurement uncertainty
+
+By default, MPCurver estimates a noise variance for each feature. When
+measurement standard deviations are available, supply them through `S` as
+either a vector of feature-specific values or a matrix matching `X`. The
+likelihood then accounts for the supplied precision of each measurement.
+See the [fitness case study](https://aguerozz.github.io/MPCurver/articles/fitness.html)
+for an example.

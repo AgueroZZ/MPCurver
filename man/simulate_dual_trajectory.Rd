@@ -51,7 +51,7 @@ signal amplitude.}
 
 \item{monotone_power_range}{Length-2 positive range controlling the power-like
 basis shapes used in the monotone family. The monotone generator mixes
-several increasing bases internally to create more varied monotone curves.}
+several increasing bases to create varied monotone curves.}
 
 \item{quadratic_curvature_range}{Length-2 positive range for quadratic
 curvature magnitudes.}
@@ -60,18 +60,19 @@ curvature magnitudes.}
 quadratic vertex.}
 
 \item{intercept_sd}{Standard deviation of feature-specific intercept shifts.
-Defaults to \code{0} to preserve the historical simulation baseline.}
+Defaults to \code{0}, giving no intercept shifts.}
 
 \item{sinusoid_freq}{Integer vector of admissible sinusoid frequencies.}
 }
 \value{
 A list with the same fields as
-  \code{\link{simulate_intrinsic_trajectories}}, plus backward-compatible
-  aliases \code{t1} and \code{t2}.
+  \code{\link{simulate_intrinsic_trajectories}}, plus \code{t1} and
+  \code{t2} containing the true positions along each ordering.
 }
 \description{
-Backward-compatible convenience wrapper around
-\code{\link{simulate_intrinsic_trajectories}} for the two-ordering case.
-Preserves the old \code{t1}/\code{t2} return values and the
-\code{crossing} shortcut.
+Generates two groups of features that vary along distinct latent sample
+orderings, with optional Gaussian noise features. Choose a trajectory
+family for each group and use \code{crossing} to control the relationship
+between the two orderings. For more groups, use
+\code{\link{simulate_intrinsic_trajectories}}.
 }

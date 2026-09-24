@@ -1448,13 +1448,13 @@ plot_soft_weights <- function(result, feature_names = NULL,
 #' @param linear_slope_range Length-2 positive range for linear slopes.
 #' @param monotone_power_range Length-2 positive range controlling the power-like
 #'   basis shapes used in the monotone family. The monotone generator mixes
-#'   several increasing bases internally to create more varied monotone curves.
+#'   several increasing bases to create varied monotone curves.
 #' @param quadratic_curvature_range Length-2 positive range for quadratic
 #'   curvature magnitudes.
 #' @param quadratic_center_range Length-2 range inside \code{[0, 1]} for the
 #'   quadratic vertex.
 #' @param intercept_sd Standard deviation of feature-specific intercept shifts.
-#'   Defaults to \code{0} to preserve the historical simulation baseline.
+#'   Defaults to \code{0}, giving no intercept shifts.
 #' @param sinusoid_freq Integer vector of admissible sinusoid frequencies.
 #' @param latent_positions Optional \code{n x M} matrix of true latent sample
 #'   positions. If \code{NULL}, each intrinsic ordering is generated
@@ -1592,10 +1592,11 @@ simulate_intrinsic_trajectories <- function(n = 200,
 #' Simulate a dual-trajectory dataset with configurable trajectory families
 #'
 #' @description
-#' Backward-compatible convenience wrapper around
-#' \code{\link{simulate_intrinsic_trajectories}} for the two-ordering case.
-#' Preserves the old \code{t1}/\code{t2} return values and the
-#' \code{crossing} shortcut.
+#' Generates two groups of features that vary along distinct latent sample
+#' orderings, with optional Gaussian noise features. Choose a trajectory
+#' family for each group and use \code{crossing} to control the relationship
+#' between the two orderings. For more groups, use
+#' \code{\link{simulate_intrinsic_trajectories}}.
 #'
 #' @inheritParams simulate_intrinsic_trajectories
 #' @param d1,d2 Integer numbers of signal features assigned to trajectories A
@@ -1605,8 +1606,8 @@ simulate_intrinsic_trajectories <- function(n = 200,
 #'   orderings harder to disentangle.
 #'
 #' @return A list with the same fields as
-#'   \code{\link{simulate_intrinsic_trajectories}}, plus backward-compatible
-#'   aliases \code{t1} and \code{t2}.
+#'   \code{\link{simulate_intrinsic_trajectories}}, plus \code{t1} and
+#'   \code{t2} containing the true positions along each ordering.
 #' @export
 simulate_dual_trajectory <- function(n = 200,
                                      d1 = 30,

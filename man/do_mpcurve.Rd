@@ -2,7 +2,7 @@
 % Please edit documentation in R/07_mpcurve.R
 \name{do_mpcurve}
 \alias{do_mpcurve}
-\title{Continue CAVI iterations on an existing \code{mpcurve} fit}
+\title{Run additional iterations of a fitted MPCurve model}
 \usage{
 do_mpcurve(
   object,
@@ -27,7 +27,9 @@ do_mpcurve(
 )
 }
 \arguments{
-\item{object}{An \code{mpcurve} object wrapping a CAVI fit.}
+\item{object}{An \code{mpcurve} object returned by \code{fit_mpcurve()}.
+Partition fits saved before version 0.3.0 require refitting with
+\code{fit_mpcurve()} before they can be continued.}
 
 \item{iter}{Integer >= 1. Maximum number of additional CAVI sweeps (single
 ordering) or exact \code{T = 1} partition steps.}
@@ -47,9 +49,7 @@ allowed when it matches the stored specification.}
 
 \item{lambda_sd_prior_rate}{Optional positive rate for the induced
 exponential prior on \code{1 / sqrt(lambda_j)}. If \code{NULL}, the stored
-control value is reused. An explicit \code{0} is treated as "no penalty"
-for backward compatibility and does not represent a literal exponential
-prior with rate zero.}
+control value is reused. Use \code{0} to remove this penalty.}
 
 \item{lambda_min, lambda_max}{Optional positive bounds for \code{lambda_j}. If
 \code{NULL}, reuse the stored values.}
@@ -58,53 +58,34 @@ prior with rate zero.}
 \code{NULL}, reuse the stored values.}
 
 \item{tol_outer}{For partition fits only: relative objective tolerance used
-by the phase-2 convergence rule. If \code{NULL}, reuse the stored value.}
+after annealing. If \code{NULL}, reuse the stored value.}
 
-\item{freeze_unused_ordering, freeze_unused_ordering_threshold}{Deprecated
-no-op compatibility arguments. Explicit values emit a warning for either
-a single-ordering or structural continuation.}
+\item{freeze_unused_ordering, freeze_unused_ordering_threshold, freeze_feature, freeze_feature_weight_threshold, drop_unused_ordering}{Deprecated; leave as \code{NULL}. Explicit values are ignored with a warning.}
 
-\item{freeze_feature, freeze_feature_weight_threshold}{Deprecated no-op
-compatibility arguments. Structural conditional trajectories are not
-frozen by assignment weight.}
-
-\item{drop_unused_ordering}{Deprecated no-op compatibility argument. The
-fitted fixed \eqn{M} is retained.}
-
-\item{assignment_prior, ordering_alpha}{Deprecated no-op compatibility
-arguments. Structural continuation always reuses the partition-prior
-state stored in the canonical fit; explicitly supplying either argument
-emits a warning and does not change that state.}
+\item{assignment_prior, ordering_alpha}{Deprecated; leave as \code{NULL}.
+Continuation uses the fitted partition prior. Explicit values are ignored
+with a warning.}
 
 \item{verbose}{Logical. Print per-iteration progress?}
 }
 \value{
-An updated \code{mpcurve} object.
+An updated \code{mpcurve} object with refined estimates and extended
+  convergence traces.
 }
 \description{
-Public continuation wrapper for MPCurve's recommended CAVI paths. For
-single-ordering fits, this continues the underlying CAVI backend. For
-structural partition fits, it continues exact \eqn{T = 1} coordinate
-sweeps from the canonical state. Legacy augmented partition fits remain
-readable but must be refitted before continuation.
+Refines a fitted model by running additional coordinate-ascent variational
+iterations. Use this when the objective is still increasing at the
+iteration limit, or to explore a change in smoothing parameters.
 }
 \details{
-Legacy smoothEM/csmoothEM continuation is not part of this high-level
-interface.
+Fitting resumes from the stored posterior and parameter estimates. A
+single-ordering fit appends to \code{$elbo_trace}. A multi-ordering fit
+refines all \eqn{M} orderings, trajectories, and feature assignments at
+temperature \eqn{T=1}, appending to \code{$objective_history} and
+\code{$temperature_history}.
 
-
-Structural continuation uses only the canonical fields stored on the raw
-fit: \code{$gamma}, \code{$params$pi}, the shared
-\code{$params$sigma2} (when noise is estimated),
-\code{$conditional_posterior}, \code{$lambda_mat}, and
-\code{$partition$pi_weights}. The derived compatibility view
-\code{$fits} is never used as continuation state.
-
-The additional structural sweeps run at exactly \eqn{T=1}. Their objective
-values are appended to \code{$objective_history}, and the corresponding
-entries of \code{$temperature_history} are \code{1}. Consequently,
-monotonicity should be checked within this exact-temperature segment rather
-than across the earlier annealing schedule. The fitted value of \eqn{M} is
-fixed throughout continuation, and a shared estimated \eqn{\sigma_j^2}
-remains shared across all conditional ordering branches.
+With unchanged model settings, the additional objective values should be
+nondecreasing up to numerical tolerance. Changing a smoothing prior or
+parameter bounds can change the objective or feasible parameter range;
+assess convergence within the new run in that case.
 }

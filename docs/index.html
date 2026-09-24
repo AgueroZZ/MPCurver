@@ -12,8 +12,8 @@
 <script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Fit and Explore MPCurve Trajectory Models in R">
-<meta name="description" content="Implements the MPCurve statistical model for trajectory and pseudotime inference via Gaussian mixture models with Gaussian Markov random field priors on smooth latent trajectories. Provides a mean-field coordinate-ascent variational backend (cavi) that is the recommended public workflow. Older MAP/EM backends (csmooth_em and smooth_em) remain in the codebase but are not part of the public API or public website. Also includes a unified fit_mpcurve() interface, multi-ordering partition tools via intrinsic_dim, and multiple initialization methods for the CAVI path.">
-<meta property="og:description" content="Implements the MPCurve statistical model for trajectory and pseudotime inference via Gaussian mixture models with Gaussian Markov random field priors on smooth latent trajectories. Provides a mean-field coordinate-ascent variational backend (cavi) that is the recommended public workflow. Older MAP/EM backends (csmooth_em and smooth_em) remain in the codebase but are not part of the public API or public website. Also includes a unified fit_mpcurve() interface, multi-ordering partition tools via intrinsic_dim, and multiple initialization methods for the CAVI path.">
+<meta name="description" content="Implements the MPCurve statistical model for trajectory and pseudotime inference via Gaussian mixture models with Gaussian Markov random field priors on smooth latent trajectories. Estimates sample positions, feature trajectories, and trajectory uncertainty using coordinate-ascent variational inference. Multi-ordering models use structural variational inference to jointly estimate latent orderings and probabilistic feature assignments. Supports feature-specific noise estimation or known measurement standard deviations, several initialization methods, and graphical summaries of fitted trajectories.">
+<meta property="og:description" content="Implements the MPCurve statistical model for trajectory and pseudotime inference via Gaussian mixture models with Gaussian Markov random field priors on smooth latent trajectories. Estimates sample positions, feature trajectories, and trajectory uncertainty using coordinate-ascent variational inference. Multi-ordering models use structural variational inference to jointly estimate latent orderings and probabilistic feature assignments. Supports feature-specific noise estimation or known measurement standard deviations, several initialization methods, and graphical summaries of fitted trajectories.">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -38,7 +38,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
-    <li><a class="dropdown-item" href="articles/mpcurve_intro.html">Getting Started with MPCurver CAVI</a></li>
+    <li><a class="dropdown-item" href="articles/mpcurve_intro.html">Getting Started with MPCurver</a></li>
     <li><a class="dropdown-item" href="articles/partition.html">Feature Partitioning with MPCurver</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Case studies</h6></li>
@@ -63,41 +63,41 @@
 </h1></div>
 <!-- badges: start -->
 <!-- badges: end -->
-<p><code>MPCurver</code> fits smooth latent orderings with Gaussian-mixture / GMRF models.</p>
-<p>The public workflow is <strong><code>mpcurve</code>-first and CAVI-first</strong>: use <code><a href="reference/fit_mpcurve.html">fit_mpcurve()</a></code> to fit a model, <code><a href="reference/do_mpcurve.html">do_mpcurve()</a></code> to continue a fitted model, and the usual <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>, <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, and <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> methods to inspect results.</p>
+<p><code>MPCurver</code> estimates latent sample orderings and smooth feature trajectories from multivariate data. It represents an ordering by a grid of positions and models each feature as a smooth function along that grid. Gaussian measurement models and random-walk priors allow it to estimate trajectories together with their uncertainty.</p>
+<p>For data with several sources of variation, MPCurver can learn multiple orderings and the probability that each feature follows each ordering. This allows different groups of features to describe different patterns among the same samples.</p>
+<p>Use <code><a href="reference/fit_mpcurve.html">fit_mpcurve()</a></code> to fit a model, <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> and <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> to explore the results, and <code><a href="reference/do_mpcurve.html">do_mpcurve()</a></code> to run additional fitting iterations.</p>
 <div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
 </h2>
-<p>The package documentation is organized around the public <code>mpcurve</code> workflow.</p>
 <ul>
 <li>
-<code>vignettes/mpcurve_intro.Rmd</code>: current single-ordering introduction.</li>
+<a href="https://aguerozz.github.io/MPCurver/articles/mpcurve_intro.html">Getting started</a>: the model, variational inference, and a simulated trajectory example.</li>
 <li>
-<code>vignettes/partition.Rmd</code>: current multi-ordering / feature-partition tools.</li>
+<a href="https://aguerozz.github.io/MPCurver/articles/partition.html">Feature partitioning</a>: fitting multiple orderings and interpreting feature assignments.</li>
 <li>
-<code>vignettes/fitness.rmd</code>: applied case study using the public interface.</li>
+<a href="https://aguerozz.github.io/MPCurver/articles/fitness.html">Fitness data analysis</a>: a worked example with smoothing and measurement uncertainty.</li>
 </ul>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<p>You can install the development version of <code>MPCurver</code> like so:</p>
+<p>Install <code>MPCurver</code> from GitHub:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/pak/man/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"AgueroZZ/MPCurver"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="example">Example<a class="anchor" aria-label="anchor" href="#example"></a>
 </h2>
-<p>This is a basic example using the recommended <code>mpcurve</code> interface:</p>
+<p>The example below recovers a latent ordering from a noisy two-dimensional spiral.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://aguerozz.github.io/MPCurver/">MPCurver</a></span><span class="op">)</span></span></code></pre></div>
-<p>We will simulate a moderately easy 2D spiral and fit the default MPCurver workflow.</p>
+<p>First, generate the observations:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/simulate_spiral2d.html">simulate_spiral2d</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">1500</span>, turns <span class="op">=</span> <span class="fl">1</span>, noise <span class="op">=</span> <span class="fl">0.08</span>, seed <span class="op">=</span> <span class="fl">123</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">obs</span>, pch <span class="op">=</span> <span class="fl">16</span>, cex <span class="op">=</span> <span class="fl">0.35</span>, col <span class="op">=</span> <span class="st">"grey80"</span>,</span>
 <span>     xlab <span class="op">=</span> <span class="st">"x1"</span>, ylab <span class="op">=</span> <span class="st">"x2"</span>, main <span class="op">=</span> <span class="st">"Noisy 2D spiral"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="reference/figures/README-unnamed-chunk-2-1.png" width="100%"></p>
-<p>Now we fit the model with <code><a href="reference/fit_mpcurve.html">fit_mpcurve()</a></code>. The public wrapper uses the CAVI backend and returns an <code>mpcurve</code> object.</p>
+<p>Fit a model with 40 grid positions and a second-order random-walk prior. The first plot shows the inferred ordering and trajectory; the second shows the variational objective over fitting iterations.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
 <span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
@@ -115,7 +115,7 @@
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="reference/figures/README-unnamed-chunk-3-2.png" width="100%"></p>
-<p>We can compare several initialization strategies under the same <code>cavi</code> model. The explicit serial loop below is reproducible on platforms where forked parallel numerical libraries are unavailable:</p>
+<p>Initialization can affect the fitted ordering, especially for curved or weakly separated patterns. Here we compare three starting orderings under the same model and fitting settings:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">init_methods</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PCA"</span>, <span class="st">"fiedler"</span>, <span class="st">"isomap"</span><span class="op">)</span></span>
 <span><span class="va">fits</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/setNames.html" class="external-link">setNames</a></span><span class="op">(</span></span>
@@ -141,19 +141,25 @@
 <span><span class="co">#&gt; 1     PCA -424.1734</span></span>
 <span><span class="co">#&gt; 2 fiedler -375.5500</span></span>
 <span><span class="co">#&gt; 3  isomap -376.9430</span></span></code></pre></div>
-<p>Each fit keeps the unified <code>params</code>, <code>gamma</code>, <code>elbo_trace</code>, <code>loglik_trace</code>, and the underlying backend fit in <code>$fit</code>.</p>
-<p>For multi-ordering analyses, use <code>fit_mpcurve(..., intrinsic_dim = 2)</code> or more generally <code>fit_mpcurve(..., intrinsic_dim = M)</code> with a fixed, user-chosen <code>M &gt;= 2</code>.</p>
+<p>For these fits with the same model and data, a larger final ELBO indicates a better variational objective. Inspect the fitted trajectories as well as this numerical comparison. Sample positions are available in <code>fit$locations$mean$pseudotime</code>, and <code>fit$params$mu</code> contains the estimated feature trajectories.</p>
 </div>
 <div class="section level2">
-<h2 id="fixed-m-structural-partition-models">Fixed-M structural partition models<a class="anchor" aria-label="anchor" href="#fixed-m-structural-partition-models"></a>
+<h2 id="multiple-orderings-and-feature-groups">Multiple orderings and feature groups<a class="anchor" aria-label="anchor" href="#multiple-orderings-and-feature-groups"></a>
 </h2>
-<p>Multi-ordering fits use the structural variational family</p>
-<p><span class="math display">
-q(C)\prod_j q(Z_j)q(U_j \mid Z_j),
-</span></p>
-<p>so each trajectory posterior is conditional on the feature assignment rather than treated as an independent potential trajectory. Estimated feature variances are represented by one shared length-<span class="math inline">d</span> <code>params$sigma2</code> vector across all orderings. The fitted <code>mpcurve</code> object stores one canonical structural state, including the named ordering-specific <code>gamma</code> matrices, <code>conditional_posterior</code>, <code>lambda_mat</code>, and <code>partition$pi_weights</code>; <code>$fits</code> is a derived compatibility view, not an independent fitting state.</p>
-<p>There are no active/inactive, freeze, or drop states in this model. Automatic <code>greedy = "forward"</code> and <code>greedy = "backward"</code> selection is temporarily unavailable because the raw fixed-<span class="math inline">M</span> structural ELBO is not a complexity-penalized criterion for comparing different values of <span class="math inline">M</span>. Choose <code>M</code> from scientific context and assess alternatives through stability or external validation.</p>
-<p>The same <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>, <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, and <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> interface works for both single-ordering and structural partition fits. For a partition fit, <code>plot(fit, plot_type = "mu", dims = j)</code> displays the conditional posterior mean <span class="math inline">E[U_j \mid Z_j=m]</span> separately for every ordering <span class="math inline">m</span>.</p>
+<p>A single ordering may describe some features well while missing the patterns in others. Set <code>intrinsic_dim = M</code> to fit <span class="math inline">M</span> orderings of the same samples. MPCurver jointly estimates those orderings, smooth trajectories, and a probability distribution over orderings for each feature. For example, two groups of genes may vary along different cell-state axes.</p>
+<p>Inference uses structural variational inference: a feature’s trajectory distribution is conditional on its ordering assignment. This preserves the dependence between which ordering a feature follows and the shape of its trajectory. Each feature has one noise variance shared across the candidate orderings, while smoothness can vary with the feature and ordering.</p>
+<p>For a two-ordering analysis of your sample-by-feature data matrix <code>X</code>:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fit_multi</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span><span class="va">X</span>, intrinsic_dim <span class="op">=</span> <span class="fl">2</span>, K <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_multi</span><span class="op">)</span></span>
+<span><span class="va">fit_multi</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">pi_weights</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_multi</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+<p>The assignment probabilities describe how strongly each feature supports each ordering. The trajectory plot shows the feature’s fitted mean under each ordering, with the corresponding assignment probability in the panel title. Choose the number of orderings for the scientific question and examine the stability and interpretability of the resulting feature groups. The <a href="https://aguerozz.github.io/MPCurver/articles/partition.html">feature-partitioning tutorial</a> develops this workflow and the statistical model in detail.</p>
+</div>
+<div class="section level2">
+<h2 id="measurement-uncertainty">Measurement uncertainty<a class="anchor" aria-label="anchor" href="#measurement-uncertainty"></a>
+</h2>
+<p>By default, MPCurver estimates a noise variance for each feature. When measurement standard deviations are available, supply them through <code>S</code> as either a vector of feature-specific values or a matrix matching <code>X</code>. The likelihood then accounts for the supplied precision of each measurement. See the <a href="https://aguerozz.github.io/MPCurver/articles/fitness.html">fitness case study</a> for an example.</p>
 </div>
 </div>
   </main><aside class="col-md-3"></aside>

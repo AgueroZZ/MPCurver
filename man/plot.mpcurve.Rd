@@ -30,9 +30,8 @@ It determines the scatterplot axes and the trajectory coordinates used by
 \code{plot_type = "elbo"} or \code{plot_type = "mu"}.}
 
 \item{pal}{Colour palette (length-256 character vector) used to map
-pseudotime to point colours. Defaults to the classic pseudotime rainbow
-(navy \eqn{\to} cyan \eqn{\to} green \eqn{\to} gold \eqn{\to} red),
-which avoids white and is easy to read against a white background.}
+pseudotime to point colours. Defaults to a rainbow palette
+(blue \eqn{\to} cyan \eqn{\to} green \eqn{\to} yellow \eqn{\to} red).}
 
 \item{add_legend}{Logical; draw a gradient color-bar legend?  Default
 \code{TRUE}.}
@@ -49,7 +48,7 @@ grid component \eqn{k} at \eqn{(k-1)/(K-1)}. For a responsibility row
 \eqn{\gamma_i}, the posterior-mean pseudotime is
 \deqn{t_i = \sum_{k=1}^{K} \gamma_{ik} \cdot \frac{k-1}{K-1}.}
 
-For a fixed-\code{M} structural partition fit, scatterplots contain one
+For a multi-ordering fit, scatterplots contain one
 panel per ordering. Panel \eqn{m} uses that ordering's
 \eqn{q(C^{(m)})} responsibilities for pseudotime and overlays the
 conditional trajectory mean from \eqn{q(U_j\mid Z_j=m)}. The fitted
@@ -59,18 +58,18 @@ each panel title.
 \describe{
   \item{\code{"scatterplot"}}{Scatter of two chosen dimensions, colored by
     pseudotime, with posterior means overlaid as an orange path. For a
-    structural partition fit, draws one panel per fixed ordering.}
-  \item{\code{"elbo"}}{For a single-ordering fit, delegates to the
-    underlying CAVI trace plot. For a structural partition fit, plots the
-    single fixed-\code{M} structural objective history. Values recorded at
-    different annealing temperatures are not directly comparable; the
-    exact \eqn{T=1} segment is the monotonicity diagnostic.}
+    multi-ordering fit, draws one panel per ordering. With one dimension,
+    displays the observed feature values against inferred pseudotime.}
+  \item{\code{"elbo"}}{Variational objective over fitting iterations.
+    For multi-ordering fits, the initial annealing phase is followed by
+    iterations at \eqn{T=1}. Assess convergence within that final segment,
+    since changing the temperature changes the objective.}
   \item{\code{"mu"}}{Posterior-mean trajectory only. With one selected
     dimension, plots the feature mean against normalized latent position;
     with two dimensions, plots the posterior-mean path in that feature
-    plane. Structural partition fits draw one panel per ordering directly
-    from the canonical \code{$conditional_posterior$mean}, representing
-    \eqn{E[U_j\mid Z_j=m]}; derived \code{$fits} are not the data source.}
+    plane. Multi-ordering fits draw one panel per ordering, showing
+    \eqn{E[U_j\mid Z_j=m]}. Interpret each conditional trajectory alongside
+    its feature-assignment probability, shown in the panel title.}
 }
 }
 \examples{

@@ -46,7 +46,7 @@ signal amplitude.}
 
 \item{monotone_power_range}{Length-2 positive range controlling the power-like
 basis shapes used in the monotone family. The monotone generator mixes
-several increasing bases internally to create more varied monotone curves.}
+several increasing bases to create varied monotone curves.}
 
 \item{quadratic_curvature_range}{Length-2 positive range for quadratic
 curvature magnitudes.}
@@ -55,7 +55,7 @@ curvature magnitudes.}
 quadratic vertex.}
 
 \item{intercept_sd}{Standard deviation of feature-specific intercept shifts.
-Defaults to \code{0} to preserve the historical simulation baseline.}
+Defaults to \code{0}, giving no intercept shifts.}
 
 \item{sinusoid_freq}{Integer vector of admissible sinusoid frequencies.}
 

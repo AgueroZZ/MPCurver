@@ -1,10 +1,10 @@
 ---
-title: "Getting Started with MPCurver CAVI"
+title: "Getting Started with MPCurver"
 output:
   rmarkdown::html_vignette:
     toc: true
 vignette: >
-  %\VignetteIndexEntry{Getting Started with MPCurver CAVI}
+  %\VignetteIndexEntry{Getting Started with MPCurver}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -25,10 +25,10 @@ library(MPCurver)
 set.seed(42)
 ```
 
-`MPCurver` now uses a CAVI backend through the public `fit_mpcurve()` and
-`do_mpcurve()` interface. This vignette introduces the statistical model, the
-variational algorithm, and then walks through a larger but still easy spiral
-example.
+`MPCurver` estimates an ordering of samples and smooth feature trajectories
+along that ordering. This vignette introduces the statistical model and its
+coordinate-ascent variational inference (CAVI) algorithm, then uses a simulated
+spiral to show how to fit a model, assess convergence, and interpret pseudotime.
 
 ## 1  Statistical model
 
@@ -36,7 +36,7 @@ We observe a data matrix
 \[
 X = (x_{ij}) \in \mathbb{R}^{n \times d},
 \]
-where row \(i\) is one cell and column \(j\) is one feature.
+where row \(i\) is one sample (for example, a cell) and column \(j\) is one feature.
 
 The single-ordering MPCurve model assumes:
 
@@ -56,24 +56,27 @@ The single-ordering MPCurve model assumes:
 4. and each trajectory is regularized by a Gaussian Markov random field prior
    along the component axis:
    \[
-   \boldsymbol{u}_j \sim N\!\left(0, (\lambda_j Q_K)^{-1}\right),
+   p(\boldsymbol{u}_j\mid\lambda_j)
+   \propto \exp\!\left(-\frac{\lambda_j}{2}
+   \boldsymbol{u}_j^\top Q_K\boldsymbol{u}_j\right),
    \]
    where \(Q_K\) is the random-walk precision matrix on the \(K\) bins.
+   The default intrinsic prior penalizes differences along the trajectory;
+   the likelihood identifies directions left unpenalized by the prior.
 
-In the current `cavi` implementation:
+The model estimates a separate noise variance \(\sigma_j^2\) and smoothness
+parameter \(\lambda_j\) for each feature. The noise variance is shared across
+grid positions. To describe uncertainty in positions and trajectories, CAVI
+uses the variational family
 
-- `sigma_j^2` is feature-specific,
-- `lambda_j` is feature-specific,
-- the covariance model is homoskedastic across components,
-- and the posterior is approximated with a mean-field family
-  \[
-  q(C,U) = \prod_{i=1}^n q_i(c_i)\prod_{j=1}^d q_j(\boldsymbol{u}_j).
-  \]
+\[
+q(C,U) = \prod_{i=1}^n q_i(c_i)\prod_{j=1}^d q_j(\boldsymbol{u}_j).
+\]
 
 ## 2  Variational algorithm
 
-The backend used by `fit_mpcurve()` performs coordinate-ascent variational
-inference on an explicit ELBO. Write
+`fit_mpcurve()` alternates between updates of the posterior distributions and
+model parameters to maximize the evidence lower bound (ELBO). Write
 \[
 r_{ik} := q_i(c_i = k),
 \qquad
@@ -113,8 +116,13 @@ r_{ik}
 \right].
 \]
 
-This is the quantity recorded in `elbo_trace`. The updates used by the public
-backend are obtained by maximizing this ELBO one block at a time.
+This objective, including its additive constants, is recorded in `elbo_trace`.
+For the intrinsic prior, normalization uses the rank and generalized
+determinant of \(Q_K\), with a fixed reference measure on its null space.
+It provides a within-model fitting objective. The updates below maximize it
+one block at a time, with estimated noise, adaptive position probabilities,
+and no additional smoothness-parameter prior. Parameter estimates are
+restricted to the configured bounds.
 
 ### 2.1  Update for \(q(\boldsymbol{u}_j)\)
 
@@ -146,8 +154,10 @@ S_j = A_j^{-1},
 \boldsymbol{m}_j = S_j \boldsymbol{b}_j.
 \]
 
-This is exactly the linear-algebra step implemented by the backend behind
-`fit_mpcurve()`.
+The diagonal likelihood term supplies information at the grid positions,
+while the random-walk precision shares information between neighboring
+positions. Their combination determines both the fitted trajectory and its
+uncertainty.
 
 ### 2.2  Update for \(q(c_i)\)
 
@@ -155,7 +165,7 @@ Fix \(q(U)\), \(\pi\), and \(\sigma_j^2\). Collecting the ELBO terms involving
 the row \(r_{i\cdot}\) gives
 \[
 \log r_{ik}
-\propto
+= a_i +
 \log \pi_k
 - \frac12 \sum_{j=1}^d
 \left[
@@ -168,10 +178,11 @@ So the cell-position posterior is updated by a row-wise softmax:
 \[
 r_{i\cdot} \leftarrow \operatorname{softmax}\!\big(\ell_{i1},\dots,\ell_{iK}\big),
 \]
-with \(\ell_{ik}\) equal to the right-hand side above.
+with \(\ell_{ik}\) equal to the position-specific terms above and \(a_i\)
+the normalizing constant.
 
-The extra \(S_{j,kk}\) term is the uncertainty correction that distinguishes
-this update from a pure plug-in EM step.
+The \(S_{j,kk}\) term accounts for trajectory uncertainty when assigning a
+sample to a grid position.
 
 ### 2.3  Update for \(\pi_k\)
 
@@ -215,21 +226,22 @@ Setting the derivative to zero yields
 {\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j + \operatorname{tr}(Q_K S_j)}.
 \]
 
-### 2.6  Why the ELBO is monotone here
+### 2.6  Assessing convergence
 
-Each of the five updates above is the exact optimizer of one ELBO block while
-holding the others fixed. That is why the current `cavi` implementation has a
-clean monotonicity story: the recorded `elbo_trace` should be nondecreasing up
-to numerical tolerance.
+Each update maximizes one objective block while holding the others fixed, so
+`elbo_trace` should be nondecreasing up to numerical tolerance. A plateau
+indicates that successive iterations are making small improvements. Because
+the objective can have multiple optima, compare several initializations when
+the trajectory is complex or weakly identified.
 
 ## 3  Simulated spiral example
 
-We use a larger and more stable spiral than the older vignette examples:
+We simulate a two-dimensional spiral with:
 
 - `n = 1000` cells,
-- a shorter latent range `t in [1.5*pi, 4.5*pi]`,
-- lower noise,
-- and a finer mixture grid `K = 60`.
+- latent range `t in [1.5*pi, 4.5*pi]`,
+- measurement standard deviation `sigma = 0.12`,
+- and a fitting grid of `K = 60` positions.
 
 ```{r simulate}
 sim <- simulate_swiss_roll_1d_2d(
@@ -246,7 +258,7 @@ cat("Data dimensions:", nrow(X), "x", ncol(X), "\n")
 cat("t range:", round(range(t_true), 3), "\n")
 ```
 
-```{r plot-data, fig.cap="Shorter spiral used in the introductory CAVI example."}
+```{r plot-data, fig.cap="Simulated spiral observations, colored by the generating latent position."}
 pal <- grDevices::colorRampPalette(
   c("#1F3A5F", "#2E8A99", "#F2C14E", "#E76F51")
 )(256)
@@ -257,7 +269,7 @@ plot(X, col = col_true, pch = 19, cex = 0.55,
      main = "Observed spiral, coloured by true pseudotime")
 ```
 
-## 4  Fit the default public interface
+## 4  Fit the model
 
 ```{r fit-cavi}
 fit <- fit_mpcurve(
@@ -279,7 +291,7 @@ summary(fit)
 
 ## 5  Check convergence and recovery
 
-The default `cavi` fit should have a nondecreasing ELBO trace.
+First, check whether the variational objective increases throughout fitting.
 
 ```{r check-elbo}
 stopifnot(all(diff(fit$elbo_trace) >= -1e-8))
@@ -313,7 +325,8 @@ plot(X, col = col_fit, pch = 19, cex = 0.5,
 par(op)
 ```
 
-The built-in `mpcurve` plotting methods work directly on the fitted object.
+The fitted object also provides plots of the objective and posterior mean
+trajectory.
 
 ```{r plot-trace, fig.cap="CAVI trace plot from the fitted mpcurve object."}
 plot(fit, plot_type = "elbo")
@@ -323,11 +336,19 @@ plot(fit, plot_type = "elbo")
 plot(fit, plot_type = "mu")
 ```
 
-## 7  Takeaway
+## 7  Using the results
 
-For this easier spiral regime, the public CAVI workflow is:
+The ordering-recovery statistic above compares estimated sample positions
+with the generating latent variable. Its absolute value accounts for the
+arbitrary direction of an inferred ordering. In an application, use known
+sample annotations to help interpret that direction and assess whether
+nearby samples have similar feature profiles.
 
-- fast enough to use as the default frontend algorithm,
-- explicit about its optimization target through the ELBO,
-- and able to recover the ordering very accurately on a moderately large
-  example with a fairly fine grid.
+Normalized positions are available in `fit$locations$mean$pseudotime`,
+trajectory means in `fit$params$mu`, and trajectory covariance matrices in
+`fit$fit$posterior$cov`. If the objective is still increasing at the iteration
+limit, continue with `fit <- do_mpcurve(fit, iter = 100)`.
+
+When different feature groups may follow different sample orderings, see the
+[feature-partitioning tutorial](partition.html). For data with supplied
+measurement uncertainty, see the [fitness analysis](fitness.html).

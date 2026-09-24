@@ -36,7 +36,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
-    <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver CAVI</a></li>
+    <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver</a></li>
     <li><a class="dropdown-item" href="../articles/partition.html">Feature Partitioning with MPCurver</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Case studies</h6></li>
@@ -74,9 +74,10 @@
 <div class="section level2">
 <h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h2>
-<p>This vignette shows how to use the public <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code>
-interface on the eLife fitness dataset. The goal is not just to produce
-a fit, but to explain the modeling logic step by step.</p>
+<p>This vignette uses MPCurver to study how mutant fitness varies across
+environments. It develops an analysis from a single latent ordering to a
+two-ordering feature partition, and examines how smoothing and
+measurement uncertainty affect the fitted trajectories.</p>
 <p>We will use <code>MPCurver</code> to answer three practical
 questions:</p>
 <ol style="list-style-type: decimal">
@@ -84,12 +85,10 @@ questions:</p>
 environments?</li>
 <li>If we encourage smoother trajectories, do we keep the same ordering
 while improving interpretability?</li>
-<li>What feature partition and conditional trajectories appear under a
-scientifically chosen fixed two-ordering model, with and without known
-measurement error?</li>
+<li>Which environments follow similar mutant orderings, and how does
+accounting for measurement uncertainty affect those groups and
+trajectories?</li>
 </ol>
-<p>The recommended workflow throughout is the default <code>cavi</code>
-backend exposed by <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code>.</p>
 </div>
 <div class="section level2">
 <h2 id="load-package-and-data">Load package and data<a class="anchor" aria-label="anchor" href="#load-package-and-data"></a>
@@ -134,8 +133,12 @@ backend exposed by <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">S</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">sub</a></span><span class="op">(</span><span class="st">"_error$"</span>, <span class="st">""</span>, <span class="va">error_cols</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">meta</span> <span class="op">&lt;-</span> <span class="va">dat</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"barcode"</span>, <span class="st">"gene"</span>, <span class="st">"type"</span>, <span class="st">"ploidy"</span>, <span class="st">"class"</span>, <span class="st">"mutation_type"</span><span class="op">)</span>, drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span></span></code></pre></div>
-<p>Just using the error columns as the true SEs might be too risky, so
-we will adjust the SEs using t-statistics-adjustment:</p>
+<p>For this illustration, we calibrate the reported errors using a
+Student’s <span class="math inline">t</span> distribution with four
+degrees of freedom. For each ratio <span class="math inline">z_t=X/S</span>, we find the Gaussian score <span class="math inline">z_n=\Phi^{-1}\{F_{t_4}(z_t)\}</span> with the same
+cumulative probability and use the adjusted scale <span class="math inline">\widetilde S=S z_t/z_n</span>. The choice of four
+degrees of freedom is an analysis assumption; the resulting scales are
+treated as fixed measurement standard deviations in the fits below.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">t_adjust_se</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">Y</span>, <span class="va">S</span>, <span class="va">nu</span>, <span class="va">tol</span> <span class="op">=</span> <span class="fl">1e-12</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">is.matrix</a></span><span class="op">(</span><span class="va">Y</span><span class="op">)</span> <span class="op">||</span> <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">is.numeric</a></span><span class="op">(</span><span class="va">Y</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
@@ -199,8 +202,8 @@ we will adjust the SEs using t-statistics-adjustment:</p>
 <li>each column is an environment;</li>
 <li>each matrix entry is a fitness score;</li>
 <li>and the paired <code>*_error</code> columns provide
-observation-level measurement standard deviations that we can optionally
-pass to <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> via <code>S</code>.</li>
+observation-level measurement error estimates used to construct the
+adjusted standard deviations <code>S</code>.</li>
 </ul>
 </div>
 <div class="section level2">
@@ -285,7 +288,7 @@ prefer different orderings.</p>
 </h2>
 <p>We start with the simplest question: can one latent ordering explain
 the main structure in the dataset?</p>
-<p>The call below uses the main user-facing API:</p>
+<p>The fitting choices are:</p>
 <ul>
 <li>
 <code>method = "isomap"</code> supplies the initialization;</li>
@@ -306,8 +309,8 @@ smooth trajectories.</li>
 <div class="section level3">
 <h3 id="check-convergence">Check convergence<a class="anchor" aria-label="anchor" href="#check-convergence"></a>
 </h3>
-<p>For the default <code>cavi</code> backend, the main quantity to
-inspect is the ELBO trace.</p>
+<p>The ELBO trace shows progress in fitting the variational model. A
+plateau indicates small improvements between successive iterations.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="fitness_files/figure-html/uni-convergence-1.png" class="r-plt" alt="ELBO trace for the single-ordering CAVI fit, showing convergence over iterations." width="100%"></p>
@@ -370,8 +373,8 @@ Larger values encourage smoother trajectories.</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>These curves are easier to read: the global ordering remains, but the
 fitted environment trajectories are less wiggly.</p>
-<p>A useful sanity check is whether smoothing changes the inferred
-mutant ordering itself, or mainly changes the trajectory estimates.</p>
+<p>A useful comparison is whether smoothing changes the inferred mutant
+ordering itself, or mainly changes the trajectory estimates.</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span></span>
 <span>  <span class="va">fit_unidir_smooth</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span>,</span>
@@ -387,28 +390,26 @@ mutant ordering itself, or mainly changes the trajectory estimates.</p>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span>, lty <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
 <p><img src="fitness_files/figure-html/compare-single-orderings-1.png" class="r-plt" alt="Scatter plot comparing inferred mutant pseudotime between the default and smoothed single-ordering fits." width="100%"></p>
-<p>In this dataset the two fits stay close, which is reassuring:
-stronger regularization mostly improves interpretability rather than
-changing the basic ordering story.</p>
+<p>The correlation and scatterplot show how closely the two mutant
+orderings agree. Together with the trajectory plots, they help
+distinguish a change in curve smoothness from a change in sample
+ordering.</p>
 </div>
 <div class="section level2">
-<h2 id="step-3-explore-a-fixed-two-ordering-representation">Step 3: Explore a fixed two-ordering representation<a class="anchor" aria-label="anchor" href="#step-3-explore-a-fixed-two-ordering-representation"></a>
+<h2 id="step-3-explore-two-orderings-and-environment-groups">Step 3: Explore two orderings and environment groups<a class="anchor" aria-label="anchor" href="#step-3-explore-two-orderings-and-environment-groups"></a>
 </h2>
 <p>The single-ordering fit assumes that every environment varies
-smoothly along the same latent mutant axis. As a scientifically
-motivated sensitivity analysis, we can instead ask how the environments
-partition under two fixed latent orderings. This is an exploratory
-representation, not an automatic test that <span class="math inline">M=2</span> is preferable to <span class="math inline">M=1</span>.</p>
-<p>To examine that idea, we fit a structural partition model with a
-scientifically chosen fixed value <span class="math inline">M=2</span>.
-The structural ELBO is a fitting objective for a given <span class="math inline">M</span>; it is not used here as an automatic
-complexity penalty for choosing among different values of <span class="math inline">M</span>.</p>
-<p>For every <code>intrinsic_dim &gt;= 2</code>, the fitted object has
-one canonical <span class="math inline">q(C)q(Z)q(U\mid Z)</span> state.
-Estimated feature variances form one shared length-<span class="math inline">d</span> <code>params$sigma2</code> vector across
-orderings. There are no active/inactive, freeze, or drop states, and
-greedy cross-<span class="math inline">M</span> selection is currently
-unavailable.</p>
+smoothly along the same latent mutant axis. A two-ordering model lets
+groups of environments follow different axes. We specify
+<code>intrinsic_dim = 2</code> and jointly estimate two mutant
+orderings, environment-assignment probabilities, and trajectories
+conditional on each assignment.</p>
+<p>Structural variational inference keeps the dependence between an
+environment’s assignment and its trajectory. Each environment has one
+estimated noise variance shared across orderings, while its smoothness
+can differ between orderings. This analysis explores a two-axis
+representation; choosing the number of axes would require a separate
+model-selection assessment.</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_partition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
 <span>  <span class="va">X</span>,</span>
@@ -433,14 +434,13 @@ unavailable.</p>
 <span><span class="co">#&gt;   Objective (last): 12946.251465</span></span>
 <span><span class="co">#&gt;   Converged      : TRUE</span></span></code></pre></div>
 <div class="section level3">
-<h3 id="inspect-conditional-structural-trajectories">Inspect conditional structural trajectories<a class="anchor" aria-label="anchor" href="#inspect-conditional-structural-trajectories"></a>
+<h3 id="inspect-trajectories-under-each-ordering">Inspect trajectories under each ordering<a class="anchor" aria-label="anchor" href="#inspect-trajectories-under-each-ordering"></a>
 </h3>
-<p>For <code>plot_type = "mu"</code>, each ordering panel shows the
-canonical conditional posterior mean <span class="math inline">E[U_j\mid
-Z_j=m]</span>. The title also reports the feature-assignment probability
-<span class="math inline">q(Z_j=m)</span>. These are conditional
-alternatives, so the plotted trajectory is not multiplied by its
-assignment probability.</p>
+<p>For <code>plot_type = "mu"</code>, each panel shows the conditional
+posterior mean <span class="math inline">E[U_j\mid Z_j=m]</span>: the
+estimated environment trajectory if it follows ordering <span class="math inline">m</span>. The title reports the assignment
+probability <span class="math inline">q(Z_j=m)</span>, indicating the
+support for that interpretation.</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
 <p><img src="fitness_files/figure-html/partition-plot-1.png" class="r-plt" alt="Conditional posterior mean trajectory for environment dimension 1 under each of two fixed orderings." width="100%"></p>
@@ -448,6 +448,9 @@ assignment probability.</p>
 <div class="section level3">
 <h3 id="which-environments-were-assigned-to-which-ordering">Which environments were assigned to which ordering?<a class="anchor" aria-label="anchor" href="#which-environments-were-assigned-to-which-ordering"></a>
 </h3>
+<p>The table lists each environment’s most probable ordering. To examine
+uncertain assignments, inspect the corresponding row of
+<code>fit_partition$partition$pi_weights</code>.</p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">assignment_tbl</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  environment <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">X</span><span class="op">)</span>,</span>
@@ -696,6 +699,10 @@ assignment probability.</p>
 <div class="section level3">
 <h3 id="how-similar-are-the-inferred-orderings">How similar are the inferred orderings?<a class="anchor" aria-label="anchor" href="#how-similar-are-the-inferred-orderings"></a>
 </h3>
+<p>Compare the inferred mutant positions across orderings. A correlation
+near <span class="math inline">1</span> or <span class="math inline">-1</span> indicates similar positions after allowing
+for reversal of the axis; smaller absolute correlations indicate more
+distinct orderings.</p>
 <div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ordering_names</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">locations</span><span class="op">)</span></span>
 <span><span class="va">ordering_names</span> <span class="op">&lt;-</span> <span class="va">ordering_names</span><span class="op">[</span><span class="va">ordering_names</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">assign</span><span class="op">)</span><span class="op">]</span></span>
@@ -731,15 +738,13 @@ assignment probability.</p>
 </div>
 </div>
 <div class="section level2">
-<h2 id="step-4-refit-with-known-measurement-error">Step 4: Refit with known measurement error<a class="anchor" aria-label="anchor" href="#step-4-refit-with-known-measurement-error"></a>
+<h2 id="step-4-account-for-measurement-uncertainty">Step 4: Account for measurement uncertainty<a class="anchor" aria-label="anchor" href="#step-4-account-for-measurement-uncertainty"></a>
 </h2>
-<p>The raw file includes paired <code>*_error</code> columns, and
-<code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> can use them directly through the
-<code>S</code> argument. In the public API, <code>S</code> is
-interpreted as a matrix of known measurement standard deviations.</p>
-<p>This matters here because ignoring heterogeneous measurement error
-can make a fixed multi-ordering fit attribute noisy columns to
-apparently distinct trajectory structure.</p>
+<p>We now supply the adjusted measurement standard deviations computed
+above through <code>S</code>. This gives more precise observations
+greater influence in the likelihood. Comparing these fits with the
+estimated-noise fits shows how the supplied measurement precision
+affects orderings and trajectories.</p>
 <div class="section level3">
 <h3 id="single-ordering-fit-with-known-measurement-sd">Single-ordering fit with known measurement SD<a class="anchor" aria-label="anchor" href="#single-ordering-fit-with-known-measurement-sd"></a>
 </h3>
@@ -768,12 +773,12 @@ apparently distinct trajectory structure.</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="fixed-two-ordering-fit-with-known-measurement-sd">Fixed two-ordering fit with known measurement SD<a class="anchor" aria-label="anchor" href="#fixed-two-ordering-fit-with-known-measurement-sd"></a>
+<h3 id="two-ordering-fit-with-supplied-measurement-sd">Two-ordering fit with supplied measurement SD<a class="anchor" aria-label="anchor" href="#two-ordering-fit-with-supplied-measurement-sd"></a>
 </h3>
-<p>We now refit the same fixed <span class="math inline">M=2</span>
-structural model while accounting for measurement error. This isolates
-the effect of known noise without mixing it with a separate
-dimension-selection procedure.</p>
+<p>We refit the two-ordering model with the same smoothing settings and
+the supplied standard deviations. Examine both the trajectories and
+assignment probabilities to see how the environment groups respond to
+this noise model.</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_partition_known_sd</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
 <span>  <span class="va">X</span>,</span>
@@ -814,13 +819,13 @@ ordering.</li>
 <li>Use <code>lambda_sd_prior_rate</code> when the ordering looks
 sensible but the fitted trajectories are too rough to interpret
 comfortably.</li>
-<li>Use a fixed <code>intrinsic_dim</code> to study a scientifically
-plausible number of ordering systems; assess different values through
-stability or external validation rather than the raw structural ELBO
-alone.</li>
-<li>If measurement error is available, pass it through <code>S</code>;
-otherwise a fixed multi-ordering fit may interpret noisy environments as
-distinct trajectory structure.</li>
+<li>Use <code>intrinsic_dim</code> to explore multiple orderings.
+Interpret the environment groups together with their assignment
+probabilities and fitted trajectories.</li>
+<li>When measurement standard deviations are available, supply them
+through <code>S</code> and examine how the inferred structure changes.
+Document any calibration assumptions used to obtain those standard
+deviations.</li>
 </ol>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
