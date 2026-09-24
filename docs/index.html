@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -114,23 +114,45 @@
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="reference/figures/README-unnamed-chunk-3-2.png" width="100%"></p>
-<p>We can compare several initialization strategies under the same <code>cavi</code> model:</p>
+<p>We can compare several initialization strategies under the same <code>cavi</code> model. The explicit serial loop below is reproducible on platforms where forked parallel numerical libraries are unavailable:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">fits</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  X <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">obs</span><span class="op">)</span>,</span>
-<span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PCA"</span>, <span class="st">"fiedler"</span>, <span class="st">"isomap"</span><span class="op">)</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">40</span>,</span>
-<span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  iter <span class="op">=</span> <span class="fl">150</span>,</span>
-<span>  discretization <span class="op">=</span> <span class="st">"equal"</span>,</span>
-<span>  tol <span class="op">=</span> <span class="fl">1e-8</span>,</span>
-<span>  num_cores <span class="op">=</span> <span class="fl">1</span></span>
+<code class="sourceCode R"><span><span class="va">init_methods</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PCA"</span>, <span class="st">"fiedler"</span>, <span class="st">"isomap"</span><span class="op">)</span></span>
+<span><span class="va">fits</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/setNames.html" class="external-link">setNames</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">init_methods</span>, <span class="kw">function</span><span class="op">(</span><span class="va">init_method</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
+<span>      X <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">obs</span><span class="op">)</span>,</span>
+<span>      method <span class="op">=</span> <span class="va">init_method</span>,</span>
+<span>      K <span class="op">=</span> <span class="fl">40</span>,</span>
+<span>      rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>      iter <span class="op">=</span> <span class="fl">150</span>,</span>
+<span>      discretization <span class="op">=</span> <span class="st">"equal"</span>,</span>
+<span>      tol <span class="op">=</span> <span class="fl">1e-8</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">}</span><span class="op">)</span>,</span>
+<span>  <span class="va">init_methods</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">fits</span>, <span class="st">"summary"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; NULL</span></span></code></pre></div>
-<p><code><a href="reference/fit_mpcurve.html">fit_mpcurve()</a></code> returns either a single <code>mpcurve</code> fit or a list of fits. Each fit keeps the unified <code>params</code>, <code>gamma</code>, <code>elbo_trace</code>, <code>loglik_trace</code>, and the underlying backend fit in <code>$fit</code>.</p>
-<p>For multi-ordering analyses, use <code>fit_mpcurve(..., intrinsic_dim = 2)</code> or more generally <code>fit_mpcurve(..., intrinsic_dim = M)</code>. The same <code>mpcurve</code> methods continue to work for both single-ordering and partition fits.</p>
+<span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">fits</span><span class="op">)</span>,</span>
+<span>  elbo_last <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">fits</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">tail</a></span><span class="op">(</span><span class="va">x</span><span class="op">$</span><span class="va">elbo_trace</span>, <span class="fl">1</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt;    method elbo_last</span></span>
+<span><span class="co">#&gt; 1     PCA -424.1734</span></span>
+<span><span class="co">#&gt; 2 fiedler -375.5500</span></span>
+<span><span class="co">#&gt; 3  isomap -376.9430</span></span></code></pre></div>
+<p>Each fit keeps the unified <code>params</code>, <code>gamma</code>, <code>elbo_trace</code>, <code>loglik_trace</code>, and the underlying backend fit in <code>$fit</code>.</p>
+<p>For multi-ordering analyses, use <code>fit_mpcurve(..., intrinsic_dim = 2)</code> or more generally <code>fit_mpcurve(..., intrinsic_dim = M)</code> with a fixed, user-chosen <code>M &gt;= 2</code>.</p>
+</div>
+<div class="section level2">
+<h2 id="fixed-m-structural-partition-models">Fixed-M structural partition models<a class="anchor" aria-label="anchor" href="#fixed-m-structural-partition-models"></a>
+</h2>
+<p>Multi-ordering fits use the structural variational family</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>C</mi><mo stretchy="true" form="postfix">)</mo></mrow><munder><mo>∏</mo><mi>j</mi></munder><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Z</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>U</mi><mi>j</mi></msub><mo>∣</mo><msub><mi>Z</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mrow><annotation encoding="application/x-tex">
+q(C)\prod_j q(Z_j)q(U_j \mid Z_j),
+</annotation></semantics></math></p>
+<p>so each trajectory posterior is conditional on the feature assignment rather than treated as an independent potential trajectory. Estimated feature variances are represented by one shared length-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>d</mi><annotation encoding="application/x-tex">d</annotation></semantics></math><code>params$sigma2</code> vector across all orderings. The fitted <code>mpcurve</code> object stores one canonical structural state, including the named ordering-specific <code>gamma</code> matrices, <code>conditional_posterior</code>, <code>lambda_mat</code>, and <code>partition$pi_weights</code>; <code>$fits</code> is a derived compatibility view, not an independent fitting state.</p>
+<p>There are no active/inactive, freeze, or drop states in this model. Automatic <code>greedy = "forward"</code> and <code>greedy = "backward"</code> selection is temporarily unavailable because the raw fixed-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math> structural ELBO is not a complexity-penalized criterion for comparing different values of <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>. Choose <code>M</code> from scientific context and assess alternatives through stability or external validation.</p>
+<p>The same <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>, <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, and <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> interface works for both single-ordering and structural partition fits. For a partition fit, <code>plot(fit, plot_type = "mu", dims = j)</code> displays the conditional posterior mean <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi><mrow><mo stretchy="true" form="prefix">[</mo><msub><mi>U</mi><mi>j</mi></msub><mo>∣</mo><msub><mi>Z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo stretchy="true" form="postfix">]</mo></mrow></mrow><annotation encoding="application/x-tex">E[U_j \mid Z_j=m]</annotation></semantics></math> separately for every ordering <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>.</p>
 </div>
 </div>
   </main><aside class="col-md-3"></aside>

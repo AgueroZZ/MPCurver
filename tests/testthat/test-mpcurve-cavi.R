@@ -187,6 +187,7 @@ test_that("fit_mpcurve and do_mpcurve preserve known measurement sd", {
 })
 
 test_that("greedy forward selection uses fixed-M comparison semantics", {
+  skip("Greedy cross-M selection is retired while structural VI supports fixed M only.")
   sim <- simulate_intrinsic_trajectories(
     n = 100,
     d_signal = c(4, 4),
@@ -220,6 +221,7 @@ test_that("greedy forward selection uses fixed-M comparison semantics", {
 })
 
 test_that("greedy backward can compact after internal comparison search", {
+  skip("Greedy cross-M selection is retired while structural VI supports fixed M only.")
   sim <- simulate_intrinsic_trajectories(
     n = 100,
     d_signal = c(4, 4),
@@ -258,6 +260,7 @@ test_that("greedy backward can compact after internal comparison search", {
 })
 
 test_that("forward greedy rejects a collapsed candidate that is not larger after compaction", {
+  skip("Active/compaction semantics do not exist in structural VI.")
   prepare_fit <- getFromNamespace(".mpcurve_prepare_greedy_fit", "MPCurver")
   compare_candidate <- getFromNamespace(".mpcurve_greedy_compare_candidate", "MPCurver")
 
@@ -373,6 +376,7 @@ test_that("forward greedy rejects a collapsed candidate that is not larger after
 })
 
 test_that("do_mpcurve preserves similarity provenance for greedy-selected 1D fits", {
+  skip("Greedy cross-M selection is retired while structural VI supports fixed M only.")
   sim <- simulate_cavi_toy(
     n = 80,
     d = 8,

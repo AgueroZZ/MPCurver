@@ -30,6 +30,18 @@ public_articles <- c(
   "fitness"
 )
 
+# Execute vignette code against the current checkout rather than a potentially
+# stale installed copy of MPCurver. This mirrors the source-loading step used by
+# the ordinary pkgdown build while preserving the curated public-site surface.
+pkgload::load_all(
+  ".",
+  quiet = TRUE,
+  export_all = FALSE,
+  helpers = FALSE,
+  attach_testthat = FALSE,
+  warn_conflicts = FALSE
+)
+
 rewrite_pkgdown_metadata <- function(path, public_articles) {
   if (!file.exists(path)) {
     return(invisible(NULL))

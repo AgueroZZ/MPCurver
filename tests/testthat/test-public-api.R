@@ -19,10 +19,11 @@ test_that("public namespace exports the curated mpcurve-first API", {
     )
   )
 
-  namespace_text <- paste(
-    readLines(testthat::test_path("..", "..", "NAMESPACE")),
-    collapse = "\n"
-  )
+  namespace_path <- testthat::test_path("..", "..", "NAMESPACE")
+  if (!file.exists(namespace_path)) {
+    namespace_path <- system.file("NAMESPACE", package = "MPCurver")
+  }
+  namespace_text <- paste(readLines(namespace_path), collapse = "\n")
 
   expect_false(grepl("S3method\\(print,cavi\\)", namespace_text, fixed = FALSE))
   expect_false(grepl("S3method\\(summary,cavi\\)", namespace_text, fixed = FALSE))
@@ -142,7 +143,35 @@ test_that("print.mpcurve is shorter than summary for single and partition fits",
     "partition",
     "objective_history",
     "convergence_info",
+    "sigma2",
+    "measurement_sd",
+    "variational_family",
     "greedy_selection"
   ) %in% names(partition_summary_obj)))
+  expect_false("underlying" %in% names(partition_summary_obj))
+  expect_identical(partition_summary_obj$variational_family, "structured")
+  expect_equal(partition_summary_obj$sigma2, fit_partition$params$sigma2)
+  expect_equal(partition_summary_obj$active_intrinsic_dim,
+               fit_partition$intrinsic_dim)
+  expect_equal(partition_summary_obj$displayed_intrinsic_dim,
+               fit_partition$intrinsic_dim)
+  expect_match(partition_summary, "structural VI", fixed = TRUE)
+  expect_match(partition_summary, "Shared sigma2 range", fixed = TRUE)
+  expect_match(partition_summary, "fixed-M structural ELBO", fixed = TRUE)
+
+  position_prior <- fitted_prior(fit_partition, type = "position")
+  expect_named(position_prior, names(fit_partition$gamma))
+  expect_true(all(vapply(position_prior, length, integer(1)) == fit_partition$K))
+  expect_equal(
+    fitted_prior(fit_partition, type = "position", ordering = names(position_prior)[1]),
+    position_prior[[1]]
+  )
+  partition_prior <- fitted_prior(fit_partition, type = "partition")
+  expect_named(partition_prior$omega, names(fit_partition$gamma))
+  expect_equal(sum(partition_prior$omega), 1, tolerance = 1e-12)
+  expect_equal(
+    fitted_prior(fit_partition, type = "partition", ordering = 1L),
+    unname(partition_prior$omega[1])
+  )
   expect_snapshot_output(print(fit_partition))
 })

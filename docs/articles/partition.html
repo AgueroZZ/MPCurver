@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -76,179 +76,230 @@
 <div class="section level2">
 <h2 id="the-feature-partition-problem">The feature-partition problem<a class="anchor" aria-label="anchor" href="#the-feature-partition-problem"></a>
 </h2>
-<p>The single-ordering model from <code><a href="../articles/mpcurve_intro.html">vignette("mpcurve_intro")</a></code>
-assumes that all features share one latent sample ordering. In many
-applications, however, different groups of features may reflect
-<strong>different</strong> underlying processes, each with its own
-ordering.</p>
-<p>The partition model with
+<p>The single-ordering model assumes that all features share one latent
+sample ordering. The partition model instead uses a fixed number
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
-orderings introduces:</p>
-<ul>
-<li>a feature-level assignment
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>z</mi><mi>j</mi></msub><mo>∈</mo><mo stretchy="false" form="prefix">{</mo><mn>1</mn><mo>,</mo><mi>…</mi><mo>,</mo><mi>M</mi><mo stretchy="false" form="postfix">}</mo></mrow><annotation encoding="application/x-tex">z_j \in \{1,\dots,M\}</annotation></semantics></math>,</li>
-<li>
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
-independent latent orderings
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msubsup><mi>c</mi><mi>i</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo>∈</mo><mo stretchy="false" form="prefix">{</mo><mn>1</mn><mo>,</mo><mi>…</mi><mo>,</mo><mi>K</mi><mo stretchy="false" form="postfix">}</mo></mrow><annotation encoding="application/x-tex">c_i^{(m)} \in \{1,\dots,K\}</annotation></semantics></math>,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>m</mi><mo>=</mo><mn>1</mn><mo>,</mo><mi>…</mi><mo>,</mo><mi>M</mi></mrow><annotation encoding="application/x-tex">m = 1,\dots,M</annotation></semantics></math>,</li>
-<li>and
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
-sets of smooth trajectories
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msubsup><mi>𝐮</mi><mi>j</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo>∈</mo><msup><mi>ℝ</mi><mi>K</mi></msup></mrow><annotation encoding="application/x-tex">\boldsymbol{u}_j^{(m)} \in \mathbb{R}^K</annotation></semantics></math>.</li>
-</ul>
-<p>The observation model becomes:
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>∣</mo><msub><mi>z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo>,</mo><mspace width="0.278em"></mspace><msubsup><mi>c</mi><mi>i</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo>=</mo><mi>k</mi><mo>,</mo><mspace width="0.278em"></mspace><msubsup><mi>𝐮</mi><mi>j</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mspace width="0.278em"></mspace><mo>∼</mo><mspace width="0.278em"></mspace><mi>N</mi><mspace width="-0.167em"></mspace><mo minsize="1.2" maxsize="1.2" stretchy="false" form="prefix">(</mo><msubsup><mi>u</mi><mrow><mi>j</mi><mi>k</mi></mrow><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo>,</mo><mspace width="0.278em"></mspace><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><mo minsize="1.2" maxsize="1.2" stretchy="false" form="postfix">)</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">
-x_{ij} \mid z_j = m,\; c_i^{(m)} = k,\; \boldsymbol{u}_j^{(m)}
-\;\sim\;
-N\!\bigl(u_{jk}^{(m)},\; \sigma_j^2\bigr).
-</annotation></semantics></math></p>
-<p>Each trajectory retains the GMRF prior:
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msubsup><mi>𝐮</mi><mi>j</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo>∼</mo><mi>N</mi><mspace width="-0.167em"></mspace><mo minsize="1.2" maxsize="1.2" stretchy="false" form="prefix">(</mo><mn>0</mn><mo>,</mo><mspace width="0.278em"></mspace><msup><mrow><mo stretchy="true" form="prefix">(</mo><msubsup><mi>λ</mi><mi>j</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><msub><mi>Q</mi><mi>K</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mrow><mi>−</mi><mn>1</mn></mrow></msup><mo minsize="1.2" maxsize="1.2" stretchy="false" form="postfix">)</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">
-\boldsymbol{u}_j^{(m)} \sim N\!\bigl(0,\; (\lambda_j^{(m)} Q_K)^{-1}\bigr).
-</annotation></semantics></math></p>
-<p>The goal is to recover both the <strong>partition</strong> (which
-features belong to which ordering) and the <strong>orderings</strong>
-themselves.</p>
-<p>This generalises the <code>intrinsic_dim</code> concept from
-<code><a href="../articles/mpcurve_intro.html">vignette("mpcurve_intro")</a></code>: a model with
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
-orderings has <strong>intrinsic dimension
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math></strong>.
-The standard single-ordering fit is the special case
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">M = 1</annotation></semantics></math>.</p>
-</div>
-<div class="section level2">
-<h2 id="the-partition-cavi-algorithm">The partition-CAVI algorithm<a class="anchor" aria-label="anchor" href="#the-partition-cavi-algorithm"></a>
-</h2>
-<p><code>MPCurver</code> uses a soft partition approach: rather than
-assigning each feature to exactly one ordering, it maintains
-probabilistic weights
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>∈</mo><mrow><mo stretchy="true" form="prefix">[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="true" form="postfix">]</mo></mrow></mrow><annotation encoding="application/x-tex">w_{jm} \in [0,1]</annotation></semantics></math>
-(with
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mo>∑</mo><mi>m</mi></msub><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\sum_m w_{jm} = 1</annotation></semantics></math>)
-describing how much feature
+of candidate orderings and a feature-level assignment
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>Z</mi><mi>j</mi></msub><mo>∈</mo><mo stretchy="false" form="prefix">{</mo><mn>1</mn><mo>,</mo><mi>…</mi><mo>,</mo><mi>M</mi><mo stretchy="false" form="postfix">}</mo></mrow><annotation encoding="application/x-tex">Z_j \in \{1,\ldots,M\}</annotation></semantics></math>.
+If feature
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math>
 belongs to ordering
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>.</p>
-<div class="section level3">
-<h3 id="per-feature-likelihood-scores">Per-feature likelihood scores<a class="anchor" aria-label="anchor" href="#per-feature-likelihood-scores"></a>
-</h3>
-<p>For each feature
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math>
-and ordering
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>,
-the assignment update uses the <strong>expected log-likelihood
-score</strong>
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msubsup><mo>ℓ</mo><mrow><mi>j</mi><mi>m</mi></mrow><mrow><mi mathvariant="normal">l</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">k</mi><mi mathvariant="normal">e</mi></mrow></msubsup><mo>=</mo><msub><mi>𝔼</mi><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msup><mi>C</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msubsup><mi>𝐮</mi><mi>j</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo stretchy="true" form="postfix">)</mo></mrow></mrow></msub><mo minsize="1.2" maxsize="1.2" stretchy="false" form="prefix">[</mo><mo>log</mo><mi>p</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>x</mi><mrow><mi>⋅</mi><mi>j</mi></mrow></msub><mo>∣</mo><msub><mi>z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo>,</mo><mspace width="0.278em"></mspace><msup><mi>C</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo>,</mo><mspace width="0.278em"></mspace><msubsup><mi>𝐮</mi><mi>j</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><mo minsize="1.2" maxsize="1.2" stretchy="false" form="postfix">]</mo><mo>,</mo></mrow><annotation encoding="application/x-tex">
-\ell_{jm}^{\mathrm{like}}
-=
-\mathbb{E}_{q(C^{(m)}) q(\boldsymbol{u}_j^{(m)})}
-\big[
-\log p(x_{\cdot j} \mid z_j = m,\; C^{(m)},\; \boldsymbol{u}_j^{(m)})
-\big],
-</annotation></semantics></math> which expands to
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msubsup><mo>ℓ</mo><mrow><mi>j</mi><mi>m</mi></mrow><mrow><mi mathvariant="normal">l</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">k</mi><mi mathvariant="normal">e</mi></mrow></msubsup><mo>=</mo><munder><mo>∑</mo><mrow><mi>i</mi><mo>,</mo><mi>k</mi></mrow></munder><msubsup><mi>r</mi><mrow><mi>i</mi><mi>k</mi></mrow><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mrow><mo stretchy="true" form="prefix">[</mo><mi>−</mi><mfrac displaystyle="false"><mn>1</mn><mn>2</mn></mfrac><mo>log</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mi>π</mi><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><mfrac><mrow><msup><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>−</mo><msubsup><mi>m</mi><mrow><mi>j</mi><mi>k</mi></mrow><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><mn>2</mn></msup><mo>+</mo><msubsup><mi>S</mi><mrow><mi>j</mi><mo>,</mo><mi>k</mi><mi>k</mi></mrow><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup></mrow><mrow><mn>2</mn><mspace width="0.167em"></mspace><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup></mrow></mfrac><mo stretchy="true" form="postfix">]</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
-\ell_{jm}^{\mathrm{like}}
-=
-\sum_{i,k} r_{ik}^{(m)}
-  \left[
-    -\tfrac{1}{2}\log(2\pi\sigma_j^2)
-    - \frac{(x_{ij} - m_{jk}^{(m)})^2 + S_{j,kk}^{(m)}}{2\,\sigma_j^2}
-  \right].
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>,</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>∣</mo><msub><mi>Z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo>,</mo><mspace width="0.278em"></mspace><msubsup><mi>C</mi><mi>i</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo>=</mo><mi>k</mi><mo>,</mo><mspace width="0.278em"></mspace><msub><mi>U</mi><mi>j</mi></msub><mo>∼</mo><mi>N</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>u</mi><mrow><mi>j</mi><mi>k</mi></mrow></msub><mo>,</mo><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+x_{ij} \mid Z_j=m,\; C_i^{(m)}=k,\; U_j
+\sim N(u_{jk},\sigma_j^2).
 </annotation></semantics></math></p>
+<p>The feature variance
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><annotation encoding="application/x-tex">\sigma_j^2</annotation></semantics></math>
+is shared across orderings. Each conditional trajectory has an
+ordering-specific smoothness parameter,</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>U</mi><mi>j</mi></msub><mo>∣</mo><msub><mi>Z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo>∼</mo><mi>N</mi><mspace width="-0.167em"></mspace><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>λ</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><msub><mi>Q</mi><mi>K</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mrow><mi>−</mi><mn>1</mn></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+U_j \mid Z_j=m
+\sim N\!\left(0,(\lambda_{jm}Q_K)^{-1}\right).
+</annotation></semantics></math></p>
+<p>The public interface uses <code>intrinsic_dim = M</code>. Version
+0.3.0 supports fitting a user-specified fixed
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>;
+automatic greedy selection of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
+is temporarily unavailable because the
+fixed-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
+variational objective is not itself a complexity-penalized
+model-selection criterion.</p>
 </div>
-<div class="section level3">
-<h3 id="soft-weights-via-annealed-softmax">Soft weights via annealed softmax<a class="anchor" aria-label="anchor" href="#soft-weights-via-annealed-softmax"></a>
-</h3>
-<p>Under the default fixed-uniform assignment prior, the feature weights
-are updated via a softmax at temperature
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math>:
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mspace width="0.278em"></mspace><mo>∝</mo><mspace width="0.278em"></mspace><mo>exp</mo><mspace width="-0.167em"></mspace><mo minsize="1.2" maxsize="1.2" stretchy="false" form="prefix">(</mo><msubsup><mo>ℓ</mo><mrow><mi>j</mi><mi>m</mi></mrow><mrow><mi mathvariant="normal">l</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">k</mi><mi mathvariant="normal">e</mi></mrow></msubsup><mi>/</mi><mi>T</mi><mo minsize="1.2" maxsize="1.2" stretchy="false" form="postfix">)</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">
-w_{jm} \;\propto\; \exp\!\bigl(\ell_{jm}^{\mathrm{like}} / T\bigr).
-</annotation></semantics></math></p>
-<p>If <code>assignment_prior = "dirichlet"</code>, the score is
-augmented by the current variational expectation of the ordering-usage
-weights:
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mspace width="0.278em"></mspace><mo>∝</mo><mspace width="0.278em"></mspace><mo>exp</mo><mspace width="-0.167em"></mspace><mrow><mo stretchy="true" form="prefix">(</mo><mo minsize="1.2" maxsize="1.2" stretchy="false" form="prefix">[</mo><msubsup><mo>ℓ</mo><mrow><mi>j</mi><mi>m</mi></mrow><mrow><mi mathvariant="normal">l</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">k</mi><mi mathvariant="normal">e</mi></mrow></msubsup><mo>+</mo><msub><mi>𝔼</mi><mi>q</mi></msub><mo>log</mo><msub><mi>ω</mi><mi>m</mi></msub><mo minsize="1.2" maxsize="1.2" stretchy="false" form="postfix">]</mo><mi>/</mi><mi>T</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mrow><annotation encoding="application/x-tex">
-w_{jm} \;\propto\; \exp\!\left(
-\bigl[\ell_{jm}^{\mathrm{like}} + \mathbb{E}_q \log \omega_m\bigr] / T
-\right),
-</annotation></semantics></math> with
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>ω</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mo>Dirichlet</mo><mspace width="-0.167em"></mspace><mrow><mo stretchy="true" form="prefix">(</mo><mi>α</mi><mo>+</mo><munder><mo>∑</mo><mi>j</mi></munder><msub><mi>w</mi><mrow><mi>j</mi><mn>1</mn></mrow></msub><mo>,</mo><mi>…</mi><mo>,</mo><mi>α</mi><mo>+</mo><munder><mo>∑</mo><mi>j</mi></munder><msub><mi>w</mi><mrow><mi>j</mi><mi>M</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
-q(\omega)
+<div class="section level2">
+<h2 id="structural-variational-family">Structural variational family<a class="anchor" aria-label="anchor" href="#structural-variational-family"></a>
+</h2>
+<p>For every
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>≥</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">M \geq 2</annotation></semantics></math>,
+MPCurver uses</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>C</mi><mo>,</mo><mi>Z</mi><mo>,</mo><mi>U</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><munderover><mo>∏</mo><mrow><mi>m</mi><mo>=</mo><mn>1</mn></mrow><mi>M</mi></munderover><munderover><mo>∏</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msubsup><mi>C</mi><mi>i</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><munderover><mo>∏</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>d</mi></munderover><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Z</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>U</mi><mi>j</mi></msub><mo>∣</mo><msub><mi>Z</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+q(C,Z,U)
 =
-\operatorname{Dirichlet}\!\left(
-\alpha + \sum_j w_{j1},\dots,\alpha + \sum_j w_{jM}
-\right).
+\prod_{m=1}^M\prod_{i=1}^n q(C_i^{(m)})
+\prod_{j=1}^d q(Z_j)q(U_j\mid Z_j).
 </annotation></semantics></math></p>
-<p>Each CAVI ordering update uses feature-weighted responsibilities: the
-contribution of feature
+<p>Write</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msubsup><mi>C</mi><mi>i</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo>=</mo><mi>k</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>r</mi><mrow><mi>i</mi><mi>m</mi><mi>k</mi></mrow></msub><mo>,</mo><mspace width="2.0em"></mspace><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>,</mo></mrow><annotation encoding="application/x-tex">
+q(C_i^{(m)}=k)=r_{imk},\qquad
+q(Z_j=m)=w_{jm},
+</annotation></semantics></math></p>
+<p>and</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>U</mi><mi>j</mi></msub><mo>∣</mo><msub><mi>Z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mi>N</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>μ</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>,</mo><msub><mi>V</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+q(U_j\mid Z_j=m)=N(\mu_{jm},V_{jm}).
+</annotation></semantics></math></p>
+<p>This dependence is important: the
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
+Gaussian factors for feature
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math>
-to ordering
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>
-is scaled by
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><annotation encoding="application/x-tex">w_{jm}</annotation></semantics></math>.</p>
-<p>The <strong>annealing schedule</strong> starts at
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi><mo>=</mo><msub><mi>T</mi><mtext mathvariant="normal">start</mtext></msub></mrow><annotation encoding="application/x-tex">T = T_\text{start}</annotation></semantics></math>
-and decreases geometrically to
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi><mo>=</mo><msub><mi>T</mi><mtext mathvariant="normal">end</mtext></msub></mrow><annotation encoding="application/x-tex">T = T_\text{end}</annotation></semantics></math>.
-At high temperature, all features contribute more evenly across
-orderings; as
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi><mo>→</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">T \to 1</annotation></semantics></math>,
-the weights sharpen toward hard assignments.</p>
-</div>
+are conditional alternatives under
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>Z</mi><mi>j</mi></msub><annotation encoding="application/x-tex">Z_j</annotation></semantics></math>,
+rather than
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
+independent potential trajectories that all exist simultaneously.</p>
 <div class="section level3">
-<h3 id="full-variational-objective">Full variational objective<a class="anchor" aria-label="anchor" href="#full-variational-objective"></a>
+<h3 id="conditional-trajectory-update">Conditional trajectory update<a class="anchor" aria-label="anchor" href="#conditional-trajectory-update"></a>
 </h3>
-<p>Under the default fixed-uniform prior, the partition objective is
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>ℒ</mi><mtext mathvariant="normal">partition</mtext></msub><mo>=</mo><mi>−</mi><mi>d</mi><mo>log</mo><mi>M</mi><mo>+</mo><mi>T</mi><mspace width="0.167em"></mspace><mi>H</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>w</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>+</mo><munderover><mo>∑</mo><mrow><mi>m</mi><mo>=</mo><mn>1</mn></mrow><mi>M</mi></munderover><mo minsize="1.8" maxsize="1.8" stretchy="false" form="prefix">[</mo><msub><mi>𝔼</mi><mi>q</mi></msub><mo>log</mo><mi>p</mi><mrow><mo stretchy="true" form="prefix">(</mo><msup><mi>C</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo>∣</mo><msup><mi>π</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mo>+</mo><mi>H</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msup><mi>C</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mo stretchy="true" form="postfix">)</mo></mrow><mo minsize="1.8" maxsize="1.8" stretchy="false" form="postfix">]</mo><mo>+</mo><munder><mo>∑</mo><mi>j</mi></munder><munderover><mo>∑</mo><mrow><mi>m</mi><mo>=</mo><mn>1</mn></mrow><mi>M</mi></munderover><mo minsize="1.8" maxsize="1.8" stretchy="false" form="prefix">[</mo><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mspace width="0.167em"></mspace><msubsup><mo>ℓ</mo><mrow><mi>j</mi><mi>m</mi></mrow><mrow><mi mathvariant="normal">l</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">k</mi><mi mathvariant="normal">e</mi></mrow></msubsup><mo>−</mo><mrow><mi mathvariant="normal">K</mi><mi mathvariant="normal">L</mi></mrow><mspace width="-0.167em"></mspace><mo minsize="1.2" maxsize="1.2" stretchy="false" form="prefix">(</mo><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msubsup><mi>𝐮</mi><mi>j</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><mspace width="0.167em"></mspace><mo stretchy="false" form="postfix">∥</mo><mspace width="0.167em"></mspace><mi>p</mi><mrow><mo stretchy="true" form="prefix">(</mo><msubsup><mi>𝐮</mi><mi>j</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><mo minsize="1.2" maxsize="1.2" stretchy="false" form="postfix">)</mo><mo minsize="1.8" maxsize="1.8" stretchy="false" form="postfix">]</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">
-\mathcal{L}_\text{partition}
-= - d \log M
-  + T\,H(w)
-  + \sum_{m=1}^M
-    \Big[
-      \mathbb{E}_q \log p(C^{(m)} \mid \pi^{(m)})
-      + H(q(C^{(m)}))
-    \Big]
-  + \sum_j \sum_{m=1}^M
-    \Big[
-      w_{jm}\,\ell_{jm}^{\mathrm{like}}
-      - \mathrm{KL}\!\bigl(q(\boldsymbol{u}_j^{(m)}) \,\|\, p(\boldsymbol{u}_j^{(m)})\bigr)
-    \Big].
-</annotation></semantics></math></p>
-<p>With <code>assignment_prior = "dirichlet"</code>, the fixed term
-<code>-d log M + T H(w)</code> is replaced by the full variational
-assignment block
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><munder><mo>∑</mo><mrow><mi>j</mi><mo>,</mo><mi>m</mi></mrow></munder><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mspace width="0.167em"></mspace><msub><mi>𝔼</mi><mi>q</mi></msub><mo>log</mo><msub><mi>ω</mi><mi>m</mi></msub><mo>+</mo><mi>T</mi><mspace width="0.167em"></mspace><mi>H</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>w</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><mrow><mi mathvariant="normal">K</mi><mi mathvariant="normal">L</mi></mrow><mspace width="-0.167em"></mspace><mo minsize="1.2" maxsize="1.2" stretchy="false" form="prefix">(</mo><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>ω</mi><mo stretchy="true" form="postfix">)</mo></mrow><mspace width="0.167em"></mspace><mo stretchy="false" form="postfix">∥</mo><mspace width="0.167em"></mspace><mi>p</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>ω</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo minsize="1.2" maxsize="1.2" stretchy="false" form="postfix">)</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">
-\sum_{j,m} w_{jm}\,\mathbb{E}_q \log \omega_m
-+ T\,H(w)
-- \mathrm{KL}\!\bigl(q(\omega) \,\|\, p(\omega)\bigr).
-</annotation></semantics></math></p>
-<p>In both cases, if <code>lambda_sd_prior_rate &gt; 0</code>, the
-recorded objective also includes the induced prior contribution
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><munder><mo>∑</mo><mrow><mi>j</mi><mo>,</mo><mi>m</mi></mrow></munder><mo>log</mo><mi>p</mi><mrow><mo stretchy="true" form="prefix">(</mo><msubsup><mi>λ</mi><mi>j</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><mspace width="2.0em"></mspace><mo>log</mo><mi>p</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>λ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mo>log</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>ρ</mi><mi>/</mi><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><mfrac displaystyle="false"><mn>3</mn><mn>2</mn></mfrac><mo>log</mo><mi>λ</mi><mo>−</mo><mi>ρ</mi><msup><mi>λ</mi><mrow><mi>−</mi><mn>1</mn><mi>/</mi><mn>2</mn></mrow></msup><mo>,</mo></mrow><annotation encoding="application/x-tex">
-\sum_{j,m} \log p(\lambda_j^{(m)}),
+<p>Let
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>N</mi><mrow><mi>m</mi><mi>k</mi></mrow></msub><mo>=</mo><msub><mo>∑</mo><mi>i</mi></msub><msub><mi>r</mi><mrow><mi>i</mi><mi>m</mi><mi>k</mi></mrow></msub></mrow><annotation encoding="application/x-tex">N_{mk}=\sum_i r_{imk}</annotation></semantics></math>.
+With estimated feature variance,</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>A</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>=</mo><msub><mi>λ</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><msub><mi>Q</mi><mi>K</mi></msub><mo>+</mo><mo>diag</mo><mspace width="-0.167em"></mspace><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><msub><mi>N</mi><mi>m</mi></msub><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><mspace width="2.0em"></mspace><msub><mi>b</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>=</mo><mfrac><mrow><msup><mrow><mo stretchy="true" form="prefix">(</mo><msup><mi>R</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mi>T</mi></msup><msub><mi>X</mi><mrow><mi>⋅</mi><mi>j</mi></mrow></msub></mrow><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup></mfrac><mo>,</mo></mrow><annotation encoding="application/x-tex">
+A_{jm}
+=
+\lambda_{jm}Q_K
++\operatorname{diag}\!\left(\frac{N_m}{\sigma_j^2}\right),
 \qquad
-\log p(\lambda) =
-\log(\rho/2) - \tfrac{3}{2}\log \lambda - \rho \lambda^{-1/2},
-</annotation></semantics></math> so the stored
-<code>objective_history</code> remains aligned with the actual penalized
-updates.</p>
+b_{jm}
+=
+\frac{(R^{(m)})^T X_{\cdot j}}{\sigma_j^2},
+</annotation></semantics></math></p>
+<p>and</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>V</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>=</mo><msubsup><mi>A</mi><mrow><mi>j</mi><mi>m</mi></mrow><mrow><mi>−</mi><mn>1</mn></mrow></msubsup><mo>,</mo><mspace width="2.0em"></mspace><msub><mi>μ</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>=</mo><msub><mi>V</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><msub><mi>b</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
+V_{jm}=A_{jm}^{-1},\qquad \mu_{jm}=V_{jm}b_{jm}.
+</annotation></semantics></math></p>
+<p>The feature-assignment probability
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><annotation encoding="application/x-tex">w_{jm}</annotation></semantics></math>
+does <strong>not</strong> occur in either the precision or the
+right-hand side. Therefore a small or zero
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><annotation encoding="application/x-tex">w_{jm}</annotation></semantics></math>
+does not drive the conditional posterior back toward a singular
+intrinsic prior.</p>
+<p>If known observation-level variances
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>v</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><annotation encoding="application/x-tex">v_{ij}</annotation></semantics></math>
+are supplied through <code>S</code>, the likelihood terms become</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>A</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>=</mo><msub><mi>λ</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><msub><mi>Q</mi><mi>K</mi></msub><mo>+</mo><msub><mo>diag</mo><mi>k</mi></msub><munder><mo>∑</mo><mi>i</mi></munder><mfrac><msub><mi>r</mi><mrow><mi>i</mi><mi>m</mi><mi>k</mi></mrow></msub><msub><mi>v</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub></mfrac><mo>,</mo><mspace width="2.0em"></mspace><msub><mi>b</mi><mrow><mi>j</mi><mi>m</mi><mi>k</mi></mrow></msub><mo>=</mo><munder><mo>∑</mo><mi>i</mi></munder><mfrac><mrow><msub><mi>r</mi><mrow><mi>i</mi><mi>m</mi><mi>k</mi></mrow></msub><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub></mrow><msub><mi>v</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+A_{jm}
+=
+\lambda_{jm}Q_K
++\operatorname{diag}_k\sum_i\frac{r_{imk}}{v_{ij}},
+\qquad
+b_{jmk}=\sum_i\frac{r_{imk}x_{ij}}{v_{ij}}.
+</annotation></semantics></math></p>
+</div>
+<div class="section level3">
+<h3 id="ordering-responsibilities">Ordering responsibilities<a class="anchor" aria-label="anchor" href="#ordering-responsibilities"></a>
+</h3>
+<p>The ordering-specific sample responsibilities still average over
+feature assignments:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>log</mo><msub><mi>r</mi><mrow><mi>i</mi><mi>m</mi><mi>k</mi></mrow></msub><mover><mo>=</mo><mo accent="false">+</mo></mover><mo>log</mo><msub><mi>π</mi><mrow><mi>m</mi><mi>k</mi></mrow></msub><mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><munder><mo>∑</mo><mi>j</mi></munder><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mfrac><mrow><msup><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>−</mo><msub><mi>μ</mi><mrow><mi>j</mi><mi>m</mi><mi>k</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mn>2</mn></msup><mo>+</mo><msub><mi>V</mi><mrow><mi>j</mi><mi>m</mi><mo>,</mo><mi>k</mi><mi>k</mi></mrow></msub></mrow><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\log r_{imk}
+\stackrel{+}{=}
+\log\pi_{mk}
+-\frac12\sum_j w_{jm}
+\frac{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}}{\sigma_j^2}.
+</annotation></semantics></math></p>
+<p>Thus
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><annotation encoding="application/x-tex">w_{jm}</annotation></semantics></math>
+affects how strongly feature
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math>
+informs ordering
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>,
+while it does not change the definition of the conditional trajectory
+posterior.</p>
+</div>
+<div class="section level3">
+<h3 id="shared-feature-variance">Shared feature variance<a class="anchor" aria-label="anchor" href="#shared-feature-variance"></a>
+</h3>
+<p>For estimated noise, define</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>E</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>=</mo><munder><mo>∑</mo><mrow><mi>i</mi><mo>,</mo><mi>k</mi></mrow></munder><msub><mi>r</mi><mrow><mi>i</mi><mi>m</mi><mi>k</mi></mrow></msub><mrow><mo stretchy="true" form="prefix">[</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>−</mo><msub><mi>μ</mi><mrow><mi>j</mi><mi>m</mi><mi>k</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mn>2</mn></msup><mo>+</mo><msub><mi>V</mi><mrow><mi>j</mi><mi>m</mi><mo>,</mo><mi>k</mi><mi>k</mi></mrow></msub><mo stretchy="true" form="postfix">]</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+E_{jm}
+=
+\sum_{i,k}r_{imk}
+\left[(x_{ij}-\mu_{jmk})^2+V_{jm,kk}\right].
+</annotation></semantics></math></p>
+<p>The single shared variance update is</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><mo>=</mo><mfrac><mn>1</mn><mi>n</mi></mfrac><munderover><mo>∑</mo><mrow><mi>m</mi><mo>=</mo><mn>1</mn></mrow><mi>M</mi></munderover><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><msub><mi>E</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\sigma_j^2
+=
+\frac1n\sum_{m=1}^M w_{jm}E_{jm}.
+</annotation></semantics></math></p>
+<p>Consequently, a partition fit exposes one
+length-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>d</mi><annotation encoding="application/x-tex">d</annotation></semantics></math>
+vector in <code>fit$params$sigma2</code>. When <code>S</code> is known,
+this field is <code>NULL</code>.</p>
+</div>
+<div class="section level3">
+<h3 id="feature-assignment-and-local-elbo">Feature assignment and local ELBO<a class="anchor" aria-label="anchor" href="#feature-assignment-and-local-elbo"></a>
+</h3>
+<p>The feature assignment uses the complete conditional local ELBO, not
+only the expected likelihood. Let</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>G</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>=</mo><msubsup><mi>μ</mi><mrow><mi>j</mi><mi>m</mi></mrow><mi>T</mi></msubsup><msub><mi>Q</mi><mi>K</mi></msub><msub><mi>μ</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>+</mo><mo>tr</mo><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Q</mi><mi>K</mi></msub><msub><mi>V</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+G_{jm}=\mu_{jm}^TQ_K\mu_{jm}+\operatorname{tr}(Q_KV_{jm}).
+</annotation></semantics></math></p>
+<p>For an intrinsic precision with rank
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>r</mi><annotation encoding="application/x-tex">r</annotation></semantics></math>
+and generalized determinant
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mrow><mo stretchy="true" form="prefix">|</mo><msub><mi>Q</mi><mi>K</mi></msub><mo stretchy="true" form="postfix">|</mo></mrow><mo>+</mo></msub><annotation encoding="application/x-tex">|Q_K|_+</annotation></semantics></math>,
+the local block
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>B</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><annotation encoding="application/x-tex">B_{jm}</annotation></semantics></math>
+contains the expected likelihood, the trajectory prior, the optional
+lambda prior, and the Gaussian entropy:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>B</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>=</mo><mspace width="0.278em"></mspace></mtd><mtd columnalign="left" style="text-align: left"><mi>−</mi><mfrac><mi>n</mi><mn>2</mn></mfrac><mo>log</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mi>π</mi><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><mfrac><msub><mi>E</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mrow><mn>2</mn><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup></mrow></mfrac></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"></mtd><mtd columnalign="left" style="text-align: left"><mi>+</mi><mfrac><mn>1</mn><mn>2</mn></mfrac><mrow><mo stretchy="true" form="prefix">[</mo><mi>r</mi><mo stretchy="false" form="prefix">{</mo><mo>log</mo><msub><mi>λ</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>−</mo><mo>log</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mi>π</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo stretchy="false" form="postfix">}</mo><mo>+</mo><mo>log</mo><msub><mrow><mo stretchy="true" form="prefix">|</mo><msub><mi>Q</mi><mi>K</mi></msub><mo stretchy="true" form="postfix">|</mo></mrow><mo>+</mo></msub><mo>−</mo><msub><mi>λ</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><msub><mi>G</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo stretchy="true" form="postfix">]</mo></mrow></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"></mtd><mtd columnalign="left" style="text-align: left"><mi>+</mi><mo>log</mo><mi>p</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>λ</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo>+</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mrow><mo stretchy="true" form="prefix">[</mo><mi>K</mi><mo>log</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mi>π</mi><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>+</mo><mo>log</mo><mrow><mo stretchy="true" form="prefix">|</mo><msub><mi>V</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo stretchy="true" form="postfix">|</mo></mrow><mo stretchy="true" form="postfix">]</mo></mrow><mi>.</mi></mtd></mtr></mtable><annotation encoding="application/x-tex">
+\begin{aligned}
+B_{jm}
+=\;&amp;-\frac n2\log(2\pi\sigma_j^2)
+-\frac{E_{jm}}{2\sigma_j^2}\\
+&amp;+\frac12\left[
+r\{\log\lambda_{jm}-\log(2\pi)\}
++\log|Q_K|_+
+-\lambda_{jm}G_{jm}
+\right]\\
+&amp;+\log p(\lambda_{jm})
++\frac12\left[K\log(2\pi e)+\log|V_{jm}|\right].
+\end{aligned}
+</annotation></semantics></math></p>
+<p>At temperature
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math>,</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>∝</mo><mo>exp</mo><mrow><mo stretchy="true" form="prefix">{</mo><mfrac><mrow><mi>𝔼</mi><mo>log</mo><msub><mi>ω</mi><mi>m</mi></msub><mo>+</mo><msub><mi>B</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub></mrow><mi>T</mi></mfrac><mo stretchy="true" form="postfix">}</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+w_{jm}
+\propto
+\exp\left\{
+\frac{\mathbb E\log\omega_m+B_{jm}}{T}
+\right\}.
+</annotation></semantics></math></p>
+<p>At
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">T=1</annotation></semantics></math>,
+<code>objective_history</code> records the
+fixed-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
+structural ELBO. Objective values at different annealing temperatures
+are not directly comparable; only the
+fixed-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math>
+segment should be checked for coordinate-ascent monotonicity.</p>
 </div>
 </div>
 <div class="section level2">
-<h2 id="fitting-via-fit_mpcurve">Fitting via <code>fit_mpcurve()</code><a class="anchor" aria-label="anchor" href="#fitting-via-fit_mpcurve"></a>
+<h2 id="intrinsic-prior-with-ridge-0">Intrinsic prior with <code>ridge = 0</code><a class="anchor" aria-label="anchor" href="#intrinsic-prior-with-ridge-0"></a>
 </h2>
-<p>The main entry point for partition models is
-<code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> with <code>intrinsic_dim = M</code>. This
-returns an <code>mpcurve</code> object with the full S3 interface, just
-like a single-ordering fit.</p>
-<div class="section level3">
-<h3 id="simulated-example">Simulated example<a class="anchor" aria-label="anchor" href="#simulated-example"></a>
-</h3>
-<p>We simulate a dataset where 8 features follow ordering A and 8 follow
-ordering B:</p>
+<p>For an intrinsic random-walk prior,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>Q</mi><mi>K</mi></msub><annotation encoding="application/x-tex">Q_K</annotation></semantics></math>
+is rank deficient. The conditional posterior precision is
+nevertheless</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>λ</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><msub><mi>Q</mi><mi>K</mi></msub><mo>+</mo><msub><mi>D</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><mo>,</mo></mrow><annotation encoding="application/x-tex">
+\lambda_{jm}Q_K+D_{jm},
+</annotation></semantics></math></p>
+<p>where
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>D</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><annotation encoding="application/x-tex">D_{jm}</annotation></semantics></math>
+is supplied by the likelihood and does not vanish with
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><annotation encoding="application/x-tex">w_{jm}</annotation></semantics></math>.
+This is the same posterior-identification mechanism used by the
+single-ordering CAVI fit. The algorithm does not use feature-weight
+floors, automatic precision jitter, active/inactive orderings, or
+freeze/drop states.</p>
+<p><code>ridge</code> remains available as an explicit modelling choice.
+A positive value makes the trajectory prior proper, but it is not
+required merely to rescue the conditional posterior from a small
+feature-assignment weight.</p>
+<p>With <code>ridge = 0</code>, the trajectory prior normalization uses
+the rank and generalized determinant of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>Q</mi><mi>K</mi></msub><annotation encoding="application/x-tex">Q_K</annotation></semantics></math>.
+Accordingly, the recorded value follows the package’s intrinsic or
+pseudo-ELBO convention; structural VI fixes the posterior singularity
+caused by the old fractional update, but it does not turn an improper
+intrinsic prior into a proper marginal likelihood.</p>
+</div>
+<div class="section level2">
+<h2 id="fitting-a-fixed-number-of-orderings">Fitting a fixed number of orderings<a class="anchor" aria-label="anchor" href="#fitting-a-fixed-number-of-orderings"></a>
+</h2>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simulate_dual_trajectory.html">simulate_dual_trajectory</a></span><span class="op">(</span></span>
 <span>  n <span class="op">=</span> <span class="fl">500</span>,</span>
@@ -261,20 +312,7 @@ ordering B:</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">sim</span><span class="op">$</span><span class="va">X</span></span>
-<span><span class="va">truth</span> <span class="op">&lt;-</span> <span class="va">sim</span><span class="op">$</span><span class="va">true_assign</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Data dimensions:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">X</span><span class="op">)</span>, <span class="st">"x"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">X</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Data dimensions: 500 x 20</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"True partition:\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; True partition:</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">truth</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; truth</span></span>
-<span><span class="co">#&gt;  A  B </span></span>
-<span><span class="co">#&gt; 10 10</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="fitting-with-intrinsic_dim-2">Fitting with <code>intrinsic_dim = 2</code><a class="anchor" aria-label="anchor" href="#fitting-with-intrinsic_dim-2"></a>
-</h3>
+<span><span class="va">truth</span> <span class="op">&lt;-</span> <span class="va">sim</span><span class="op">$</span><span class="va">true_assign</span></span></code></pre></div>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_partition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
 <span>  <span class="va">X</span>,</span>
@@ -282,411 +320,207 @@ ordering B:</p>
 <span>  method <span class="op">=</span> <span class="st">"PCA"</span>,</span>
 <span>  K <span class="op">=</span> <span class="fl">50</span>,</span>
 <span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  ridge <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>The result is an <code>mpcurve</code> object with
-<code>intrinsic_dim = 2</code>, containing:</p>
+<p>The returned <code>mpcurve</code> object has one canonical structural
+state:</p>
 <ul>
 <li>
-<code>$fits</code>: list of 2 single-ordering <code>mpcurve</code>
-fits</li>
+<code>params$sigma2</code>: shared
+length-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>d</mi><annotation encoding="application/x-tex">d</annotation></semantics></math>
+variance vector, or <code>NULL</code> with known <code>S</code>;</li>
 <li>
-<code>$partition$pi_weights</code>:
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>d</mi><mo>×</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">d \times 2</annotation></semantics></math>
-matrix of soft feature weights</li>
+<code>gamma</code>: named list of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
+responsibility matrices;</li>
 <li>
-<code>$partition$assign</code>: hard assignment for each feature
-(<code>"A"</code> or <code>"B"</code>)</li>
+<code>conditional_posterior</code>: conditional means and
+covariances for every ordering;</li>
 <li>
-<code>$objective_history</code>: partition objective trace</li>
+<code>lambda_mat</code>:
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>d</mi><mo>×</mo><mi>M</mi></mrow><annotation encoding="application/x-tex">d\times M</annotation></semantics></math>
+smoothness matrix;</li>
+<li>
+<code>partition$pi_weights</code>:
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>d</mi><mo>×</mo><mi>M</mi></mrow><annotation encoding="application/x-tex">d\times M</annotation></semantics></math>
+feature-assignment probabilities;</li>
+<li>
+<code>partition$assign</code>: hard labels obtained from the largest
+probability;</li>
+<li>
+<code>objective_history</code> and <code>temperature_history</code>:
+fitting diagnostics.</li>
 </ul>
+<p><code>fits</code> remains available only as a derived compatibility
+view for existing read-only code. These child objects are regenerated
+from the canonical state; they are not independent fitting states and
+are not used by <code><a href="../reference/do_mpcurve.html">do_mpcurve()</a></code>.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
-<img src="partition_files/figure-html/visualize-mpcurve-1.png" class="r-plt" alt="Visualising the fitted `mpcurve` object." width="672"><p class="caption">
-Visualising the fitted <code>mpcurve</code> object.
+<img src="partition_files/figure-html/visualize-mpcurve-1.png" class="r-plt" alt="Inspecting the fixed-M structural objective and the ordering-specific pseudotime views." width="672"><p class="caption">
+Inspecting the fixed-M structural objective and the ordering-specific
+pseudotime views.
 </p>
 </div>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, dims <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
-<img src="partition_files/figure-html/visualize-mpcurve-2.png" class="r-plt" alt="Visualising the fitted `mpcurve` object." width="672"><p class="caption">
-Visualising the fitted <code>mpcurve</code> object.
+<img src="partition_files/figure-html/visualize-mpcurve-2.png" class="r-plt" alt="Inspecting the fixed-M structural objective and the ordering-specific pseudotime views." width="672"><p class="caption">
+Inspecting the fixed-M structural objective and the ordering-specific
+pseudotime views.
 </p>
 </div>
-</div>
 <div class="section level3">
-<h3 id="checking-the-objective">Checking the objective<a class="anchor" aria-label="anchor" href="#checking-the-objective"></a>
+<h3 id="plotting-structural-trajectory-means">Plotting structural trajectory means<a class="anchor" aria-label="anchor" href="#plotting-structural-trajectory-means"></a>
 </h3>
-<p>For a fixed <code>intrinsic_dim = M</code>, the recorded partition
-objective is the main trace to inspect. Away from freeze events it
-should behave monotonically under the phase-2 updates. If an iteration
-freezes one or more weak orderings, the objective for that step is still
-recorded, but that step is skipped for convergence accounting and can
-show a small decrease.</p>
+<p>For a partition fit, <code>plot_type = "mu"</code> reads the
+canonical conditional posterior directly. With one selected feature,
+panel
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>
+displays</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi><mrow><mo stretchy="true" form="prefix">[</mo><msub><mi>U</mi><mi>j</mi></msub><mo>∣</mo><msub><mi>Z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo stretchy="true" form="postfix">]</mo></mrow></mrow><annotation encoding="application/x-tex">
+E[U_j \mid Z_j=m]
+</annotation></semantics></math></p>
+<p>against normalized latent position for every fixed ordering
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>.
+The panel title reports
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(Z_j=m)</annotation></semantics></math>,
+which helps distinguish a well-supported conditional trajectory from a
+low-probability alternative. The trajectory itself is not multiplied by
+this assignment probability: it is the mean of the conditional Gaussian
+branch.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">has_drop</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/any.html" class="external-link">any</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diff.html" class="external-link">diff</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">objective_history</span><span class="op">)</span> <span class="op">&lt;</span> <span class="op">-</span><span class="fl">1e-8</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Any recorded decreases:"</span>, <span class="va">has_drop</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Any recorded decreases: FALSE</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">convergence_info</span><span class="op">)</span></span>
-<span><span class="co">#&gt; $criterion</span></span>
-<span><span class="co">#&gt; [1] "phase-2 rel_delta &lt; 1.0e-05 for 3 consecutive nonnegative steps after at least 3 phase-2 iterations"</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $tol_outer</span></span>
-<span><span class="co">#&gt; [1] 1e-05</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $phase2_iters</span></span>
-<span><span class="co">#&gt; [1] 100</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $last_delta</span></span>
-<span><span class="co">#&gt; [1] 0.1527344</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $last_rel_delta</span></span>
-<span><span class="co">#&gt; [1] 1.266074e-05</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $consecutive_small_steps</span></span>
-<span><span class="co">#&gt; [1] 0</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $min_phase2_iter</span></span>
-<span><span class="co">#&gt; [1] 3</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $consecutive_required</span></span>
-<span><span class="co">#&gt; [1] 3</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $converged</span></span>
-<span><span class="co">#&gt; [1] FALSE</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $reason</span></span>
-<span><span class="co">#&gt; [1] "Stopped after 100 phase-2 iterations without meeting the 3-step convergence rule (last rel_delta=1.266e-05)."</span></span></code></pre></div>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">objective_history</span>, type <span class="op">=</span> <span class="st">"b"</span>, pch <span class="op">=</span> <span class="fl">19</span>, cex <span class="op">=</span> <span class="fl">0.7</span>,</span>
-<span>     xlab <span class="op">=</span> <span class="st">"Iteration"</span>,</span>
-<span>     ylab <span class="op">=</span> <span class="st">"Variational objective"</span>,</span>
-<span>     main <span class="op">=</span> <span class="st">"Soft partition objective"</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
-<img src="partition_files/figure-html/plot-soft-obj-1.png" class="r-plt" alt="Variational objective over iterations." width="672"><p class="caption">
-Variational objective over iterations.
+<img src="partition_files/figure-html/structural-mu-one-dimensional-1.png" class="r-plt" alt="Conditional posterior mean trajectory for feature 4 under each of the two fixed orderings." width="672"><p class="caption">
+Conditional posterior mean trajectory for feature 4 under each of the
+two fixed orderings.
 </p>
 </div>
-<p>The absolute value of <code>$objective_history</code> is most useful
-when comparing fits under the <strong>same prior settings</strong>. Its
-interpretation now depends on <code>drop_unused_ordering</code>:</p>
-<ul>
-<li>If <code>drop_unused_ordering = FALSE</code>, the stored objective
-is the fixed-requested-<code>M</code> comparison objective. Frozen
-orderings keep their preserved feature-assignment weights and
-cell-ordering block, while their trajectory <code>U</code> contribution
-is neutralized to zero. This is the mode to use when comparing fits
-across requested values of <code>intrinsic_dim</code>.</li>
-<li>If <code>drop_unused_ordering = TRUE</code>, the stored objective is
-the post-drop fitting objective of the active model. It is useful for
-monitoring that fit, but should not be compared across requested values
-of <code>intrinsic_dim</code>.</li>
-</ul>
-<p>Even in comparison mode, <code>$objective_history</code> is still a
-variational objective, not a calibrated marginal likelihood.</p>
+<p>When <code>dims</code> contains two features, each panel instead
+plots the two conditional mean coordinates against one another along the
+latent grid. This is useful for comparing the geometric paths implied by
+the same pair of features under the different ordering assignments.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">14</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<div class="figure">
+<img src="partition_files/figure-html/structural-mu-two-dimensional-1.png" class="r-plt" alt="Two-dimensional conditional posterior mean paths for features 4 and 14 under each fixed ordering." width="672"><p class="caption">
+Two-dimensional conditional posterior mean paths for features 4 and 14
+under each fixed ordering.
+</p>
+</div>
+<p>Both forms use <code>conditional_posterior$mean</code>, not an
+independently updated child fit. Consequently, the displayed paths are
+exactly the
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>U</mi><mi>j</mi></msub><mo>∣</mo><msub><mi>Z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(U_j\mid Z_j=m)</annotation></semantics></math>
+means used by the structural coordinate updates.</p>
 </div>
 <div class="section level3">
-<h3 id="visualising-both-orderings">Visualising both orderings<a class="anchor" aria-label="anchor" href="#visualising-both-orderings"></a>
+<h3 id="inspecting-the-fixed-temperature-objective">Inspecting the fixed-temperature objective<a class="anchor" aria-label="anchor" href="#inspecting-the-fixed-temperature-objective"></a>
 </h3>
-<p><code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> shows one panel per ordering, each coloured by
-that ordering’s pseudotime. The title annotates the mean feature weight
-for the plotted dimensions:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<div class="figure">
-<img src="partition_files/figure-html/plot-partition-1.png" class="r-plt" alt="Both orderings side by side." width="960"><p class="caption">
-Both orderings side by side.
-</p>
-</div>
+<code class="sourceCode R"><span><span class="va">t1</span> <span class="op">&lt;-</span> <span class="va">fit_partition</span><span class="op">$</span><span class="va">temperature_history</span> <span class="op">==</span> <span class="fl">1</span></span>
+<span><span class="va">delta_t1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/diff.html" class="external-link">diff</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">objective_history</span><span class="op">[</span><span class="va">t1</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Largest T=1 decrease:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="va">delta_t1</span><span class="op">)</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Largest T=1 decrease: 0</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="partition-accuracy">Partition accuracy<a class="anchor" aria-label="anchor" href="#partition-accuracy"></a>
 </h3>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">pred_assign</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">assign</span><span class="op">)</span></span>
-<span><span class="va">truth_assign</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">truth</span><span class="op">)</span></span>
-<span><span class="va">soft_acc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">pred_assign</span> <span class="op">==</span> <span class="va">truth_assign</span><span class="op">)</span>,</span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">pred_assign</span> <span class="op">!=</span> <span class="va">truth_assign</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Soft partition accuracy:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">soft_acc</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Soft partition accuracy: 1</span></span></code></pre></div>
-<p>Compute the correlation between the inferred pseudotimes and the true
-orderings:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">cor1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">fits</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span> , <span class="va">sim</span><span class="op">$</span><span class="va">t2</span><span class="op">)</span></span>
-<span><span class="va">cor2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">fits</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span>, <span class="va">sim</span><span class="op">$</span><span class="va">t1</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Correlation with true orderings:\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Correlation with true orderings:</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Ordering 1:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">cor1</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Ordering 1: 0.0454</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Ordering 2:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">cor2</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Ordering 2: 0.0362</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">pred</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">assign</span><span class="op">)</span></span>
+<span><span class="va">truth</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">truth</span><span class="op">)</span></span>
+<span><span class="va">accuracy</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">pred</span> <span class="op">==</span> <span class="va">truth</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">pred</span> <span class="op">!=</span> <span class="va">truth</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Partition accuracy:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">accuracy</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Partition accuracy: 1</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="continuing-a-fit">Continuing a fit<a class="anchor" aria-label="anchor" href="#continuing-a-fit"></a>
 </h3>
-<p>Use <code><a href="../reference/do_mpcurve.html">do_mpcurve()</a></code> to run additional convergence
-iterations at
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi><mo>=</mo><msub><mi>T</mi><mtext mathvariant="normal">end</mtext></msub></mrow><annotation encoding="application/x-tex">T = T_\text{end}</annotation></semantics></math>:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_partition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/do_mpcurve.html">do_mpcurve</a></span><span class="op">(</span><span class="va">fit_partition</span>, iter <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></code></pre></div>
-<p>This extends <code>$objective_history</code> in place, just like for
-single-ordering fits.</p>
+<p>Continuation uses only the canonical structural state and appends
+exact
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">T=1</annotation></semantics></math>
+coordinate sweeps to <code>objective_history</code>.</p>
 </div>
 </div>
 <div class="section level2">
-<h2 id="initialisation-and-methods">Initialisation and methods<a class="anchor" aria-label="anchor" href="#initialisation-and-methods"></a>
+<h2 id="initialization">Initialization<a class="anchor" aria-label="anchor" href="#initialization"></a>
 </h2>
-<p>By default, partition fits now use
-<code>partition_init = "similarity"</code>, which first clusters
-features and then initializes one ordering per feature block.</p>
-<p>If you explicitly choose
-<code>partition_init = "ordering_methods"</code>, ordering 1 uses the
-<code>method</code> argument (same as <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> for
-<code>intrinsic_dim = 1</code>), and orderings 2, 3, … use successive
-PCA components (PC2, PC3, …) to ensure diverse initialisation rather
-than duplicating the first axis.</p>
-<p>You can specify independent methods for each ordering:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Ordering 1: fiedler, ordering 2: PCA (PC1)</span></span>
-<span><span class="va">fit2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span><span class="va">X</span>, intrinsic_dim <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>                    method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"fiedler"</span>, <span class="st">"PCA"</span><span class="op">)</span>,</span>
-<span>                    K <span class="op">=</span> <span class="fl">16</span><span class="op">)</span></span></code></pre></div>
-<p>For
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>&gt;</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">M &gt; 2</annotation></semantics></math>,
-extend the vector accordingly:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Three orderings with different initialisations</span></span>
-<span><span class="va">fit3</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span><span class="va">X</span>, intrinsic_dim <span class="op">=</span> <span class="fl">3</span>,</span>
-<span>                    method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"fiedler"</span>, <span class="st">"PCA"</span>, <span class="st">"PCA"</span><span class="op">)</span>,</span>
-<span>                    K <span class="op">=</span> <span class="fl">16</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="greedy-dimension-selection">Greedy dimension selection<a class="anchor" aria-label="anchor" href="#greedy-dimension-selection"></a>
-</h2>
-<p>Dimension selection is now unified under the partition-CAVI workflow
-through <code>fit_mpcurve(greedy = ...)</code>.</p>
-<ul>
-<li>
-<code>greedy = "forward"</code> treats <code>intrinsic_dim</code> as
-an upper bound and compares <code>M</code> versus <code>M + 1</code>
-sequentially starting from <code>M = 1</code>.</li>
-<li>
-<code>greedy = "backward"</code> first fits the upper bound, then
-removes one active ordering at a time and compares <code>M</code> versus
-<code>M - 1</code>.</li>
-</ul>
-<p>Both greedy modes always compare models using the
-fixed-requested-<code>M</code> comparison objective, so they internally
-run with <code>drop_unused_ordering = FALSE</code> even if you ask for a
-compact final returned view.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">fit_forward</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
+<p>The default <code>partition_init = "similarity"</code> clusters
+features and initializes one ordering per feature block. Alternatively,
+<code>partition_init = "ordering_methods"</code> accepts one method per
+ordering:</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fit3</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
 <span>  <span class="va">X</span>,</span>
-<span>  intrinsic_dim <span class="op">=</span> <span class="fl">4</span>,</span>
-<span>  greedy <span class="op">=</span> <span class="st">"forward"</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">16</span>,</span>
-<span>  drop_unused_ordering <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">fit_backward</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  <span class="va">X</span>,</span>
-<span>  intrinsic_dim <span class="op">=</span> <span class="fl">4</span>,</span>
-<span>  greedy <span class="op">=</span> <span class="st">"backward"</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">16</span>,</span>
-<span>  drop_unused_ordering <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  intrinsic_dim <span class="op">=</span> <span class="fl">3</span>,</span>
+<span>  partition_init <span class="op">=</span> <span class="st">"ordering_methods"</span>,</span>
+<span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"fiedler"</span>, <span class="st">"PCA"</span>, <span class="st">"PCA"</span><span class="op">)</span>,</span>
+<span>  K <span class="op">=</span> <span class="fl">16</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">summary_tbl</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  fit <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"soft (fixed M=2)"</span>, <span class="st">"greedy forward"</span>, <span class="st">"greedy backward"</span><span class="op">)</span>,</span>
-<span>  displayed_dim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>    <span class="va">fit_partition</span><span class="op">$</span><span class="va">intrinsic_dim</span>,</span>
-<span>    <span class="va">fit_forward</span><span class="op">$</span><span class="va">intrinsic_dim</span>,</span>
-<span>    <span class="va">fit_backward</span><span class="op">$</span><span class="va">intrinsic_dim</span></span>
-<span>  <span class="op">)</span>,</span>
-<span>  selected_dim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>    <span class="va">fit_partition</span><span class="op">$</span><span class="va">requested_intrinsic_dim</span>,</span>
-<span>    <span class="va">fit_forward</span><span class="op">$</span><span class="va">greedy_selection</span><span class="op">$</span><span class="va">selected_intrinsic_dim</span>,</span>
-<span>    <span class="va">fit_backward</span><span class="op">$</span><span class="va">greedy_selection</span><span class="op">$</span><span class="va">selected_intrinsic_dim</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">summary_tbl</span>, row.names <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co">#&gt;               fit displayed_dim selected_dim</span></span>
-<span><span class="co">#&gt;  soft (fixed M=2)             2            2</span></span>
-<span><span class="co">#&gt;    greedy forward             2            2</span></span>
-<span><span class="co">#&gt;   greedy backward             2            2</span></span></code></pre></div>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">assignment_heatmap</span><span class="op">(</span></span>
-<span>  truth    <span class="op">=</span> <span class="va">truth</span>,</span>
-<span>  soft     <span class="op">=</span> <span class="va">fit_partition</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">assign</span>,</span>
-<span>  forward  <span class="op">=</span> <span class="va">fit_forward</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">assign</span>,</span>
-<span>  backward <span class="op">=</span> <span class="va">fit_backward</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">assign</span>,</span>
-<span>  main <span class="op">=</span> <span class="st">"Feature partition comparison"</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<div class="figure">
-<img src="partition_files/figure-html/plot-assignments-1.png" class="r-plt" alt="True vs inferred feature partitions." width="672"><p class="caption">
-True vs inferred feature partitions.
-</p>
-</div>
+<p>For estimated noise, <code>sigma2_init</code> is a scalar or
+length-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>d</mi><annotation encoding="application/x-tex">d</annotation></semantics></math>
+shared variance vector. <code>lambda</code> initializes all entries of
+<code>lambda_mat</code>; use <code>fix_lambda = TRUE</code> to keep them
+fixed. <code>sigma2_init</code> cannot be combined with known
+measurement standard deviations <code>S</code>.</p>
 </div>
 <div class="section level2">
-<h2 id="key-parameters">Key parameters<a class="anchor" aria-label="anchor" href="#key-parameters"></a>
+<h2 id="deprecated-transition-arguments">Deprecated transition arguments<a class="anchor" aria-label="anchor" href="#deprecated-transition-arguments"></a>
 </h2>
-<div class="section level3">
-<h3 id="fit_mpcurve-with-intrinsic_dim-2">
-<code>fit_mpcurve()</code> with
-<code>intrinsic_dim &gt;= 2</code><a class="anchor" aria-label="anchor" href="#fit_mpcurve-with-intrinsic_dim-2"></a>
-</h3>
-<table class="table">
-<colgroup>
-<col width="33%">
-<col width="33%">
-<col width="33%">
-</colgroup>
-<thead><tr class="header">
-<th>Parameter</th>
-<th>Default</th>
-<th>Description</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td><code>intrinsic_dim</code></td>
-<td><code>1</code></td>
-<td>Number of orderings
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>;
-in greedy modes this is an upper bound</td>
-</tr>
-<tr class="even">
-<td><code>greedy</code></td>
-<td><code>"none"</code></td>
-<td>Optional dimension-selection mode: <code>"forward"</code> or
-<code>"backward"</code>
-</td>
-</tr>
-<tr class="odd">
-<td><code>method</code></td>
-<td><code>"PCA"</code></td>
-<td>Length-1 or
-length-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
-vector of initialisation methods per ordering</td>
-</tr>
-<tr class="even">
-<td><code>K</code></td>
-<td>auto</td>
-<td>Number of grid points per ordering</td>
-</tr>
-<tr class="odd">
-<td><code>n_outer</code></td>
-<td><code>25</code></td>
-<td>Annealing iterations
-(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math>
-decreases geometrically)</td>
-</tr>
-<tr class="even">
-<td><code>max_converge_iter</code></td>
-<td><code>100</code></td>
-<td>Post-annealing iterations at
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi><mo>=</mo><msub><mi>T</mi><mtext mathvariant="normal">end</mtext></msub></mrow><annotation encoding="application/x-tex">T = T_\text{end}</annotation></semantics></math>
-</td>
-</tr>
-<tr class="odd">
-<td><code>tol_outer</code></td>
-<td><code>1e-5</code></td>
-<td>Phase-2 relative objective tolerance; requires 3 consecutive small
-nonnegative steps</td>
-</tr>
-<tr class="even">
-<td>
-<code>T_start</code> / <code>T_end</code>
-</td>
-<td>
-<code>5</code> / <code>1</code>
-</td>
-<td>Temperature schedule endpoints</td>
-</tr>
-<tr class="odd">
-<td><code>inner_iter</code></td>
-<td><code>1</code></td>
-<td>Weighted CAVI sweeps per outer step</td>
-</tr>
-</tbody>
-</table>
-</div>
+<p>The former augmented algorithm exposed
+<code>freeze_unused_ordering</code>, <code>freeze_feature</code>, their
+thresholds, and <code>drop_unused_ordering</code>. They are no longer
+part of the fitting algorithm. During the 0.3.x transition they remain
+accepted by <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> and <code><a href="../reference/do_mpcurve.html">do_mpcurve()</a></code>
+only to issue a deprecation warning; their values are ignored and new
+objects do not store active, frozen, effective-weight, or
+dropped-ordering state.</p>
 </div>
 <div class="section level2">
-<h2 id="tips">Tips<a class="anchor" aria-label="anchor" href="#tips"></a>
+<h2 id="practical-guidance">Practical guidance<a class="anchor" aria-label="anchor" href="#practical-guidance"></a>
 </h2>
 <ul>
+<li>Choose a fixed, scientifically plausible <code>intrinsic_dim</code>
+and compare the resulting partitions through stability or external
+validation.</li>
+<li>Do not use the raw structural ELBO alone to select
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>:
+with an adaptive ordering prior, an extra nearly empty ordering is not
+automatically charged a model-complexity penalty.</li>
 <li>
-<strong>Use <code>fit_mpcurve(intrinsic_dim = M)</code> as the main
-entry point.</strong> It returns a unified <code>mpcurve</code> object
-and handles all initialisation automatically.</li>
-<li>
-<strong>Use <code>greedy = "forward"</code> or
-<code>"backward"</code> when <code>intrinsic_dim</code> is only an upper
-bound.</strong> Greedy search always compares models with the
-fixed-<code>M</code> objective.</li>
-<li>
-<strong>Start with <code>intrinsic_dim = 2</code>.</strong> If the
-partition is unclear, consider
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>=</mo><mn>3</mn></mrow><annotation encoding="application/x-tex">M = 3</annotation></semantics></math>
-to allow a third ordering to capture residual structure.</li>
-<li>
-<strong>Specify independent init methods.</strong>
-<code>method = c("fiedler", "PCA")</code> uses a spectral ordering for
-the first axis and PC1 for the second explicit PCA-based ordering. If
-you want later PCA axes as explicit starts, pass
-<code>pca_components</code> directly.</li>
-<li>
-<strong>Non-monotone features are harder.</strong> When many
-features have non-monotone relationships with the latent ordering,
-results become more initialisation-sensitive.</li>
-<li>
-<strong>Partitioning is easier than trajectory recovery.</strong>
-Even when the inferred orderings are imperfect, the feature partition
-can still be accurate.</li>
-<li>
-<strong>Check the objective trace.</strong> Within one fixed
-<code>intrinsic_dim</code>, sustained decreases are a red flag; a
-one-step drop on a freeze-affected iteration is possible and is excluded
-from convergence accounting.</li>
-<li>
-<strong>Compare across <code>intrinsic_dim</code> only with
-<code>drop_unused_ordering = FALSE</code>.</strong> In that mode the
-stored objective keeps the fixed requested-<code>M</code> comparison
-semantics. With <code>drop_unused_ordering = TRUE</code>, it becomes a
-post-drop fit objective and should not be compared across requested
-dimensions.</li>
+<code>ridge = 0</code> is the default intrinsic-prior path. Use
+positive <code>ridge</code> only when a properized trajectory prior is
+part of the intended model.</li>
+<li>Inspect only
+fixed-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math>
+segments for monotonicity.</li>
+<li>Use multiple initializations when trajectories are non-monotone or
+weakly separated.</li>
 </ul>
 </div>
 <div class="section level2">
 <h2 id="summary">Summary<a class="anchor" aria-label="anchor" href="#summary"></a>
 </h2>
 <ul>
-<li>
-<code>fit_mpcurve(X, intrinsic_dim = M)</code> is the primary entry
-point for partition models, returning an <code>mpcurve</code> with
-<code>intrinsic_dim = M</code>.</li>
-<li>
-<code>fit_mpcurve(..., greedy = "forward")</code> and
-<code>fit_mpcurve(..., greedy = "backward")</code> provide the unified
-dimension selection workflow going forward.</li>
-<li>
-<code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>, <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, and
-<code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> all work out of the box: <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> shows
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
-panels, one per ordering, coloured by pseudotime.</li>
-<li>
-<code><a href="../reference/do_mpcurve.html">do_mpcurve()</a></code> continues fitting at
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi><mo>=</mo><msub><mi>T</mi><mtext mathvariant="normal">end</mtext></msub></mrow><annotation encoding="application/x-tex">T = T_\text{end}</annotation></semantics></math>
-and extends the objective history, identical to the single-ordering
-interface.</li>
-<li>All methods build on the same CAVI trajectory model from
-<code><a href="../articles/mpcurve_intro.html">vignette("mpcurve_intro")</a></code>.</li>
+<li>All fixed
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>≥</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">M\ge2</annotation></semantics></math>
+fits use structural VI,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>C</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>Z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>U</mi><mo>∣</mo><mi>Z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(C)q(Z)q(U\mid Z)</annotation></semantics></math>.</li>
+<li>Conditional trajectory precision is independent of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>w</mi><mrow><mi>j</mi><mi>m</mi></mrow></msub><annotation encoding="application/x-tex">w_{jm}</annotation></semantics></math>.</li>
+<li>Estimated
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><annotation encoding="application/x-tex">\sigma_j^2</annotation></semantics></math>
+is shared across orderings.</li>
+<li>New fits have one canonical state; <code>$fits</code> is a derived
+compatibility view.</li>
+<li>Freeze/drop machinery is retired, and greedy
+cross-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
+selection is temporarily unavailable.</li>
 </ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

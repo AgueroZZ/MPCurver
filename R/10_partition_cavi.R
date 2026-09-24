@@ -3993,12 +3993,12 @@ init_m_trajectories_cavi <- function(X,
 }
 
 
-#' Soft M-ordering partition using mean-field CAVI
+#' Legacy augmented M-ordering partition CAVI
 #'
 #' @description
-#' Generalised soft partition routine supporting \eqn{M \ge 2} orderings.
-#' Features are assigned probabilistic weights across orderings via
-#' temperature-annealed softmax on per-feature ELBO scores.
+#' Archived fully-factorized implementation retained for read-only historical
+#' comparison. New fits use the structural backend defined in
+#' `10_partition_structural_cavi.R`.
 #'
 #' @param X Numeric matrix (\code{n x d}).
 #' @param M Integer >= 2. Number of orderings.
@@ -4041,7 +4041,7 @@ init_m_trajectories_cavi <- function(X,
 #'   number of groups, MPCurver falls back to equal-width bins.
 #' @param T_start,T_end Annealing temperatures.
 #' @param n_outer Number of annealing steps.
-#' @param inner_iter Number of weighted CAVI sweeps per outer step.
+#' @param inner_iter Number of structural coordinate sweeps per outer step.
 #' @param max_converge_iter Maximum number of post-annealing iterations at
 #'   \code{T = T_end}.
 #' @param tol_outer Relative objective tolerance for the phase-2 convergence
@@ -4056,12 +4056,11 @@ init_m_trajectories_cavi <- function(X,
 #'   the same way; it is only an alias for "no penalty" and does not
 #'   correspond to a literal exponential prior with rate zero.
 #' @param lambda_min,lambda_max Lambda bounds.
-#' @param sigma_min,sigma_max Bounds for \code{sigma_j^2}. These are used both
-#'   in the weighted CAVI updates and by the \code{"smooth_fit"} similarity
-#'   metric when \code{partition_init = "similarity"}.
+#' @param sigma_min,sigma_max Bounds for the shared-across-ordering
+#'   \code{sigma_j^2} vector.
 #' @param position_prior Either \code{"adaptive"} or \code{"fixed"} for the
-#'   within-ordering component prior \code{pi}. When fixed, the weighted CAVI
-#'   updates keep each ordering's \code{pi} constant.
+#'   within-ordering component prior \code{pi}. When fixed, each ordering's
+#'   \code{pi} remains constant.
 #' @param position_prior_init Optional length-\code{K} initial/fixed vector for
 #'   the within-ordering component prior \code{pi}. When
 #'   \code{position_prior = "fixed"} and this is \code{NULL}, a uniform prior
@@ -4069,12 +4068,11 @@ init_m_trajectories_cavi <- function(X,
 #'   orderings.
 #' @param partition_prior Either \code{"adaptive"} or \code{"fixed"} for the
 #'   ordering-usage prior \code{omega}. The adaptive mode uses an empirical-
-#'   Bayes update over the active orderings; exact zero-mass orderings are
-#'   dropped from the active set before the next prior/objective evaluation.
+#'   Bayes update over the fixed set of \eqn{M} orderings.
 #' @param partition_prior_init Optional length-\code{M} initial/fixed vector for
 #'   the ordering prior \code{omega}. Used only when
 #'   \code{partition_prior = "fixed"}. When omitted, the fixed prior defaults
-#'   to uniform over the active orderings.
+#'   to uniform over all \eqn{M} orderings.
 #' @param assignment_prior Deprecated compatibility argument for the old
 #'   partition-prior API. \code{"uniform"} maps to
 #'   \code{partition_prior = "fixed"} with a uniform prior. \code{"dirichlet"}
@@ -4082,59 +4080,21 @@ init_m_trajectories_cavi <- function(X,
 #' @param ordering_alpha Deprecated compatibility argument used only for the
 #'   legacy \code{assignment_prior = "dirichlet"} path.
 #' @param hard_assign_final Logical; make hard assignments at the end?
-#' @param freeze_unused_ordering Logical; if \code{TRUE}, orderings whose
-#'   feature-posterior mass falls below
-#'   \code{freeze_unused_ordering_threshold} are frozen and no longer updated.
-#' @param freeze_unused_ordering_threshold Non-negative threshold on the summed
-#'   feature-posterior mass \code{sum(pi_weights[, m])} used to decide whether
-#'   an ordering is effectively unused.
-#' @param freeze_feature Logical; if \code{TRUE}, feature-ordering pairs with
-#'   posterior weight below \code{freeze_feature_weight_threshold} are frozen,
-#'   their trajectory \code{U}-block is no longer updated, and their
-#'   feature-trajectory contribution is neutralized to zero.
-#' @param freeze_feature_weight_threshold Non-negative threshold on
-#'   \code{w_{jm}} used to decide whether a feature-ordering pair is
-#'   effectively unused.
-#' @param drop_unused_ordering Logical; if \code{TRUE}, the user-facing
-#'   \code{mpcurve} wrapper returned by \code{fit_mpcurve()} drops frozen
-#'   orderings from its displayed partition view. Internally, fitting still
-#'   proceeds by freezing rather than deleting orderings. When
-#'   \code{drop_unused_ordering = FALSE}, the exposed \code{$objective_history}
-#'   is a fixed-requested-\code{M} comparison objective: frozen orderings keep
-#'   their preserved feature-assignment weights and cell-ordering block, while
-#'   their trajectory \code{U}-block contribution is neutralized to zero. When
-#'   \code{drop_unused_ordering = TRUE}, the exposed \code{$objective_history}
-#'   is the post-drop fitting objective of the active model and should not be
-#'   compared across requested values of \code{M}. Fixed-\code{M} fits may
-#'   still contain frozen orderings; greedy model selection is responsible for
-#'   normalizing cross-\code{M} comparisons to the active dimension.
+#' @param freeze_unused_ordering,freeze_unused_ordering_threshold Deprecated
+#'   no-op compatibility arguments.
+#' @param freeze_feature,freeze_feature_weight_threshold Deprecated no-op
+#'   compatibility arguments.
+#' @param drop_unused_ordering Deprecated no-op compatibility argument. The
+#'   requested fixed \eqn{M} is always retained.
 #' @param verbose Logical.
 #'
-#' @return An object of class \code{"soft_partition_cavi"} with fields:
-#'   \code{$fits} (list of M cavi fits), \code{$pi_weights} (d x M matrix),
-#'   \code{$assign} (character vector), \code{$M}, \code{$objective_history},
-#'   \code{$score_history}, \code{$weight_history}, \code{$T_schedule},
-#'   \code{$n_anneal}, \code{$converged}, \code{$convergence_info},
-#'   \code{$active_orderings},
-#'   \code{$active_feature_pairs}, \code{$frozen_orderings},
-#'   \code{$ordering_events}, \code{$feature_events}, and \code{$control},
-#'   plus optional initialisation diagnostics \code{$init_info} and
-#'   \code{$ordering_similarity}, and optional similarity metadata
-#'   \code{$similarity_init}. When similarity initialisation is used,
-#'   \code{$similarity_init} stores the full symmetric similarity matrix
-#'   \code{S}, \code{distance = 1 - S}, and for
-#'   \code{similarity_metric = "smooth_fit"} the raw directional score
-#'   diagnostics used to construct \code{S}, including directional
-#'   \code{lambda} and \code{sigma^2} estimates. The exposed
-#'   \code{$objective_history} has two user-facing semantics. If
-#'   \code{drop_unused_ordering = FALSE}, it is the fixed-requested-\code{M}
-#'   comparison objective intended for comparing fits across requested
-#'   \code{M}; frozen orderings may still be present in that fixed-\code{M}
-#'   state. If \code{drop_unused_ordering = TRUE}, it is the post-drop fitting
-#'   objective of the active model and is not intended for cross-\code{M}
-#'   comparison.
+#' @return An object of class \code{"soft_partition_cavi"} with one canonical
+#'   structural state: shared \code{$params$sigma2}, named \code{$gamma},
+#'   \code{$conditional_posterior}, \code{$lambda_mat}, \code{$pi_weights},
+#'   and objective histories. \code{$fits} contains derived read-only
+#'   compatibility views and is never used as continuation state.
 #' @noRd
-soft_partition_cavi <- function(X,
+.soft_partition_cavi_augmented_legacy <- function(X,
                                 S = NULL,
                                 M = 2L,
                                 fits_init = NULL,
@@ -4599,21 +4559,11 @@ soft_partition_cavi <- function(X,
 #' @param ordering_alpha Deprecated compatibility argument used only for the
 #'   legacy \code{assignment_prior = "dirichlet"} path.
 #' @param hard_assign_final Logical.
-#' @param freeze_unused_ordering Logical; if \code{TRUE}, unused orderings may
-#'   be frozen and skipped in subsequent updates.
-#' @param freeze_unused_ordering_threshold Non-negative feature-mass threshold
-#'   used when \code{freeze_unused_ordering = TRUE}.
-#' @param freeze_feature Logical; if \code{TRUE}, feature-ordering pairs with
-#'   sufficiently small posterior weight are frozen and their trajectory
-#'   contribution is neutralized.
-#' @param freeze_feature_weight_threshold Non-negative threshold on
-#'   \code{w_{jm}} used when \code{freeze_feature = TRUE}.
-#' @param drop_unused_ordering Logical; if \code{TRUE}, user-facing wrappers may
-#'   compact the returned partition view to the active orderings after fitting.
-#'   With \code{FALSE}, the exposed \code{$objective_history} keeps the
-#'   fixed-requested-\code{M} comparison semantics of
-#'   \code{\link{soft_partition_cavi}}; with \code{TRUE}, it becomes the
-#'   post-drop fitting objective of the active model.
+#' @param freeze_unused_ordering,freeze_unused_ordering_threshold Deprecated
+#'   no-op compatibility arguments.
+#' @param freeze_feature,freeze_feature_weight_threshold Deprecated no-op
+#'   compatibility arguments.
+#' @param drop_unused_ordering Deprecated no-op compatibility argument.
 #' @param verbose Logical.
 #'
 #' @return An object of class \code{"soft_partition_cavi"} with fields:
@@ -4651,11 +4601,11 @@ soft_two_trajectory_cavi <- function(X,
                                      assignment_prior = NULL,
                                      ordering_alpha = NULL,
                                      hard_assign_final = FALSE,
-                                     freeze_unused_ordering = TRUE,
-                                     freeze_unused_ordering_threshold = 0.5,
-                                     freeze_feature = TRUE,
-                                     freeze_feature_weight_threshold = 0.1,
-                                     drop_unused_ordering = FALSE,
+                                     freeze_unused_ordering = NULL,
+                                     freeze_unused_ordering_threshold = NULL,
+                                     freeze_feature = NULL,
+                                     freeze_feature_weight_threshold = NULL,
+                                     drop_unused_ordering = NULL,
                                      verbose = TRUE) {
   init_method <- match.arg(init_method)
   init_method1 <- match.arg(init_method1)

@@ -21,45 +21,71 @@
 \item{plot_type}{One of \code{"scatterplot"} (default), \code{"elbo"},
 \code{"mu"}.}
 
-\item{dims}{Integer vector of length 2 (or 1). Columns of the data matrix to
-use for the scatter plot.  Defaults to \code{c(1, 2)}.}
+\item{dims}{Integer vector of length one or two identifying feature columns.
+It determines the scatterplot axes and the trajectory coordinates used by
+\code{plot_type = "mu"}. Defaults to \code{c(1, 2)}.}
 
-\item{data}{Optional numeric matrix (n x d).  If \code{NULL} (default), uses
-\code{x$fit$data}.  Must be supplied if the data were not stored at fit
-time.}
+\item{data}{Optional numeric \code{n x d} matrix used by scatterplots. If
+\code{NULL}, data stored on \code{x} are used. It is not required for
+\code{plot_type = "elbo"} or \code{plot_type = "mu"}.}
 
 \item{pal}{Colour palette (length-256 character vector) used to map
-pseudotime to point colors.  Defaults to the classic pseudotime rainbow
+pseudotime to point colours. Defaults to the classic pseudotime rainbow
 (navy \eqn{\to} cyan \eqn{\to} green \eqn{\to} gold \eqn{\to} red),
 which avoids white and is easy to read against a white background.}
 
 \item{add_legend}{Logical; draw a gradient color-bar legend?  Default
 \code{TRUE}.}
 
-\item{...}{Further arguments forwarded to \code{plot_EM_embedding2D} (for
-\code{"scatterplot"}) or the underlying algorithm's \code{plot} method
-(for \code{"elbo"} / \code{"mu"}).}
+\item{...}{Additional base-graphics arguments. For single-ordering
+non-scatter plots these are forwarded to the underlying CAVI plot method.}
 }
 \value{
 Invisibly returns \code{x}.
 }
 \description{
-Visualise an \code{mpcurve} fit. The default (\code{plot_type="scatterplot"})
-colors each observation by its estimated pseudotime position along the
-inferred trajectory, mapped to a \eqn{[0, 1]} scale where component \eqn{k}
-occupies position \eqn{(k-1)/(K-1)}.  The pseudotime for observation \eqn{i}
-is the responsibility-weighted average
+Visualise an \code{mpcurve} fit. Pseudotime is mapped to \eqn{[0,1]}, with
+grid component \eqn{k} at \eqn{(k-1)/(K-1)}. For a responsibility row
+\eqn{\gamma_i}, the posterior-mean pseudotime is
 \deqn{t_i = \sum_{k=1}^{K} \gamma_{ik} \cdot \frac{k-1}{K-1}.}
-Component means are overlaid as orange stars connected by arrows.
-A vertical gradient color bar is drawn in the top-right corner of the plot.
+
+For a fixed-\code{M} structural partition fit, scatterplots contain one
+panel per ordering. Panel \eqn{m} uses that ordering's
+\eqn{q(C^{(m)})} responsibilities for pseudotime and overlays the
+conditional trajectory mean from \eqn{q(U_j\mid Z_j=m)}. The fitted
+feature-assignment probabilities for the selected dimensions are shown in
+each panel title.
 
 \describe{
   \item{\code{"scatterplot"}}{Scatter of two chosen dimensions, colored by
-    pseudotime (default).}
-  \item{\code{"elbo"}}{ELBO / log-likelihood / collapsed-ML traces.
-    Delegates to the underlying \code{plot.cavi}, \code{plot.csmooth_em},
-    or \code{plot.smooth_em}.}
-  \item{\code{"mu"}}{Component-means-only plot.
-    Delegates to the underlying fit's plot method.}
+    pseudotime, with posterior means overlaid as an orange path. For a
+    structural partition fit, draws one panel per fixed ordering.}
+  \item{\code{"elbo"}}{For a single-ordering fit, delegates to the
+    underlying CAVI trace plot. For a structural partition fit, plots the
+    single fixed-\code{M} structural objective history. Values recorded at
+    different annealing temperatures are not directly comparable; the
+    exact \eqn{T=1} segment is the monotonicity diagnostic.}
+  \item{\code{"mu"}}{Posterior-mean trajectory only. With one selected
+    dimension, plots the feature mean against normalized latent position;
+    with two dimensions, plots the posterior-mean path in that feature
+    plane. Structural partition fits draw one panel per ordering directly
+    from the canonical \code{$conditional_posterior$mean}, representing
+    \eqn{E[U_j\mid Z_j=m]}; derived \code{$fits} are not the data source.}
+}
+}
+\examples{
+\dontrun{
+sim <- simulate_dual_trajectory(n = 100, d1 = 3, d2 = 3, seed = 1)
+fit <- fit_mpcurve(
+  sim$X,
+  intrinsic_dim = 2,
+  K = 8,
+  n_outer = 3,
+  max_converge_iter = 3
+)
+plot(fit, plot_type = "scatterplot", dims = c(1, 4))
+plot(fit, plot_type = "mu", dims = 1)
+plot(fit, plot_type = "mu", dims = c(1, 4))
+plot(fit, plot_type = "elbo")
 }
 }

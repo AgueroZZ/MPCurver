@@ -1,0 +1,637 @@
+---
+title: "Mathematical Details of the Single-Ordering MPCurver CAVI Algorithm"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    mathjax: default
+vignette: >
+  %\VignetteIndexEntry{Mathematical Details of the Single-Ordering MPCurver CAVI Algorithm}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r load}
+library(MPCurver)
+```
+
+This note gives the supplementary-methods derivation for the current
+single-ordering `cavi()` implementation.  It covers both estimated feature
+variance and known measurement standard deviations, proper and intrinsic
+random-walk precisions, fixed and adaptive position priors, and the optional
+prior on trajectory scale.
+
+The fixed-$M$ multi-ordering extension is derived separately in
+`partition_coherent_elbo_derivation.Rmd`.  Its variational family is
+$q(C)\prod_jq(Z_j)q(U_j\mid Z_j)$.  The present note concerns its mathematical
+$M=1$ reduction, for which no feature-assignment variable is needed.
+
+## 1  Notation and model
+
+Let
+
+- $i=1,\ldots,n$ index observations;
+- $j=1,\ldots,d$ index features; and
+- $k=1,\ldots,K$ index ordered mixture positions.
+
+The observed matrix is $X=(x_{ij})\in\mathbb R^{n\times d}$.  Each observation
+has a latent position
+
+\[
+C_i\in\{1,\ldots,K\},
+\qquad
+C_i\mid\pi\sim\operatorname{Categorical}(\pi),
+\qquad
+\sum_{k=1}^K\pi_k=1.
+\]
+
+Feature $j$ has a latent trajectory
+
+\[
+U_j=(U_{j1},\ldots,U_{jK})^\top\in\mathbb R^K.
+\]
+
+### 1.1  Estimated feature variance
+
+When `S = NULL`, the observation model is
+
+\[
+x_{ij}\mid C_i=k,U_j,\sigma_j^2
+\sim N(U_{jk},\sigma_j^2).
+\]
+
+There is one fitted variance $\sigma_j^2$ for feature $j$, shared across all
+observations and positions.
+
+### 1.2  Known measurement standard deviations
+
+When `S` is supplied, it contains standard deviations.  A length-$d$ vector
+specifies $s_{ij}=s_j$ for every observation; an $n\times d$ matrix specifies
+$s_{ij}$ separately.  Then
+
+\[
+x_{ij}\mid C_i=k,U_j,S
+\sim N(U_{jk},s_{ij}^2).
+\]
+
+Write $\tau_{ij}=s_{ij}^{-2}$.  Supplied values are finite and nonnegative;
+the implementation applies a small standard-deviation floor before inversion.
+No $\sigma_j^2$ parameter is estimated in this mode.  The full known-noise
+derivation and its fixed-$M$ extension are also given in
+`known_noise_cavi_derivation.Rmd`.
+
+### 1.3  Random-walk trajectory prior
+
+Let $Q_K$ be the unit-scale RW$(q)$ precision.  Define
+
+\[
+r_Q=\operatorname{rank}(Q_K),
+\qquad
+\log|Q_K|_+=\sum_{\nu_\ell>0}\log\nu_\ell.
+\]
+
+The trajectory prior contribution is represented as
+
+\[
+\log p(U_j\mid\lambda_j)
+=\frac12\left\{
+r_Q(\log\lambda_j-\log(2\pi))
++\log|Q_K|_+
+\right\}
+-\frac{\lambda_j}{2}U_j^\top Q_KU_j.
+\]
+
+With the default intrinsic prior (`ridge = 0`), $Q_K$ has nullity $q$ and
+$r_Q=K-q$.  The expression above is an intrinsic log density under the
+package's fixed pseudo-determinant and null-space reference convention.  It is
+not a normalized density on all of $\mathbb R^K$.
+
+If a positive ridge makes $Q_K$ full rank, then $r_Q=K$,
+$|Q_K|_+$ is the ordinary determinant, and the expression is the proper
+Gaussian log density.
+
+### 1.4  Optional prior on trajectory scale
+
+The smoothness $\lambda_j$ is a point-estimated parameter.  By default there
+is no additional penalty.  If `lambda_sd_prior_rate = rho > 0`, the model
+places an exponential prior on
+
+\[
+T_j=\lambda_j^{-1/2},
+\qquad
+T_j\sim\operatorname{Exp}(\rho).
+\]
+
+The induced log-prior contribution is
+
+\[
+g_\rho(\lambda_j)
+=\log(\rho/2)-\frac32\log\lambda_j
+-\rho\lambda_j^{-1/2}.
+\]
+
+When the option is `NULL`, $g_\rho$ is zero.  For backward compatibility, an
+explicit numeric zero also means that the penalty is absent; it is not treated
+as a literal exponential distribution with rate zero.
+
+## 2  Variational family and posterior summaries
+
+The single-ordering mean-field family is
+
+\[
+q(C,U)
+=\prod_{i=1}^nq_i(C_i)\prod_{j=1}^dq_j(U_j).
+\]
+
+Write
+
+\[
+r_{ik}=q_i(C_i=k),
+\qquad
+\sum_{k=1}^Kr_{ik}=1,
+\qquad
+N_k=\sum_{i=1}^nr_{ik}.
+\]
+
+Each trajectory factor is Gaussian:
+
+\[
+q_j(U_j)=N(\mu_j,V_j).
+\]
+
+The second moment appearing in the trajectory prior is
+
+\[
+A_j
+:=\mathbb E_q[U_j^\top Q_KU_j]
+=\mu_j^\top Q_K\mu_j+\operatorname{tr}(Q_KV_j).
+\]
+
+The Gaussian entropy is
+
+\[
+\mathcal H_j
+=H\{q_j(U_j)\}
+=\frac12\{K\log(2\pi e)+\log|V_j|\}.
+\]
+
+The parameters $\pi$, $\lambda$, and, when present, $\sigma^2$ are optimized
+as point-parameter blocks rather than assigned variational factors.
+
+## 3  Exact objective represented by `elbo_trace`
+
+### 3.1  Position block
+
+The expected position-prior contribution plus categorical entropy is
+
+\[
+\mathcal C
+=\sum_{i=1}^n\sum_{k=1}^Kr_{ik}\log\pi_k
+-\sum_{i=1}^n\sum_{k=1}^Kr_{ik}\log r_{ik}.
+\]
+
+### 3.2  Estimated-noise likelihood
+
+Since
+
+\[
+\mathbb E_q\{(x_{ij}-U_{jk})^2\}
+=(x_{ij}-\mu_{jk})^2+V_{j,kk},
+\]
+
+the expected log likelihood is
+
+\[
+\mathcal D^{\mathrm{est}}
+=-\frac12\sum_{i=1}^n\sum_{k=1}^K\sum_{j=1}^d
+r_{ik}
+\left[
+\log(2\pi\sigma_j^2)
++\frac{(x_{ij}-\mu_{jk})^2+V_{j,kk}}{\sigma_j^2}
+\right].
+\]
+
+### 3.3  Known-noise likelihood
+
+With supplied measurement standard deviations,
+
+\[
+\mathcal D^S
+=-\frac12\sum_{i=1}^n\sum_{k=1}^K\sum_{j=1}^d
+r_{ik}
+\left[
+\log(2\pi s_{ij}^2)
++\frac{(x_{ij}-\mu_{jk})^2+V_{j,kk}}{s_{ij}^2}
+\right].
+\]
+
+The observation-specific normalizing constants are retained in the recorded
+objective even though they cancel from the position softmax.
+
+### 3.4  Trajectory-prior block
+
+For feature $j$,
+
+\[
+\mathcal P_j
+=\frac12\left\{
+r_Q(\log\lambda_j-\log(2\pi))
++\log|Q_K|_+
+\right\}
+-\frac{\lambda_j}{2}A_j.
+\]
+
+The complete objective is
+
+\[
+\boxed{
+\mathcal L
+=\mathcal C+\mathcal D
++\sum_{j=1}^d
+\{\mathcal P_j+g_\rho(\lambda_j)+\mathcal H_j\},
+}
+\]
+
+where $\mathcal D=\mathcal D^{\mathrm{est}}$ or $\mathcal D^S$ according to
+the noise specification.  This is exactly the quantity represented in
+`elbo_trace`, including the Gaussian normalizing constants and the optional
+lambda prior.
+
+### 3.5  ELBO versus intrinsic pseudo-ELBO
+
+If $Q_K$ is proper, then for fixed point parameters and without changing the
+optional parameter-prior interpretation,
+
+\[
+\log p(X\mid\theta)
+=\operatorname{ELBO}(q;\theta)
++\operatorname{KL}\{q(C,U)\|p(C,U\mid X,\theta)\}.
+\]
+
+Thus the unpenalized $\mathcal L$ is an ordinary lower bound on the marginal
+log likelihood.  Adding $g_\rho(\lambda)$ yields the corresponding penalized
+or joint parameter-prior objective.
+
+For an intrinsic $Q_K$, the prior is improper on its null space, so a
+normalized $p(X\mid\theta)$ and the KL identity above are not available
+without an explicit constraint or properization.  In that case $\mathcal L$
+is a pseudo-ELBO under one fixed intrinsic reference convention.  Coordinate
+comparisons within that convention remain meaningful, but the numeric value
+must not be described as normalized model evidence.
+
+## 4  Conditional Gaussian update
+
+### 4.1  Estimated feature variance
+
+Define
+
+\[
+D_j
+=\operatorname{diag}\left(
+N_1/\sigma_j^2,\ldots,N_K/\sigma_j^2
+\right),
+\]
+
+\[
+b_{jk}
+=\frac1{\sigma_j^2}\sum_{i=1}^nr_{ik}x_{ij}.
+\]
+
+Completing the square gives
+
+\[
+P_j=\lambda_jQ_K+D_j,
+\qquad
+P_j\mu_j=b_j,
+\qquad
+V_j=P_j^{-1}.
+\]
+
+### 4.2  Known measurement standard deviations
+
+Set $\tau_{ij}=s_{ij}^{-2}$.  Then
+
+\[
+D_j
+=\operatorname{diag}\left(
+\sum_ir_{i1}\tau_{ij},\ldots,
+\sum_ir_{iK}\tau_{ij}
+\right),
+\]
+
+\[
+b_{jk}=\sum_{i=1}^nr_{ik}\tau_{ij}x_{ij},
+\]
+
+and the same Gaussian equations apply:
+
+\[
+P_j=\lambda_jQ_K+D_j,
+\qquad
+P_j\mu_j=b_j,
+\qquad
+V_j=P_j^{-1}.
+\]
+
+If `S` is a length-$d$ vector, these expressions reduce to
+$D_{j,kk}=N_k/s_j^2$ and
+$b_{jk}=s_j^{-2}\sum_ir_{ik}x_{ij}$.
+
+### 4.3  Numerical empty-component protection
+
+The theoretical estimated-noise coordinate uses the exact $N_k$.  In the
+single-ordering implementation, values below $10^{-8}$ are replaced by
+$10^{-8}$ only inside the estimated-noise Gaussian solve.  This protects the
+Cholesky factorization if floating-point responsibilities create an exactly
+empty position.  It is a likelihood-diagonal stabilization, not a ridge added
+to $Q_K$, and it is normally inactive because finite categorical logits give
+positive responsibilities.
+
+The known-noise solve uses the precision-weighted masses directly.  If a
+conditional precision is not positive definite, the implementation reports a
+detailed precision failure rather than silently adding Cholesky jitter.
+
+## 5  Position-responsibility update
+
+### 5.1  Estimated feature variance
+
+For observation $i$,
+
+\[
+\log r_{ik}
+\stackrel{+c}{=}
+\log\pi_k
+-\frac12\sum_{j=1}^d
+\left[
+\log(2\pi\sigma_j^2)
++\frac{(x_{ij}-\mu_{jk})^2+V_{j,kk}}{\sigma_j^2}
+\right].
+\]
+
+### 5.2  Known measurement standard deviations
+
+With known noise,
+
+\[
+\log r_{ik}
+\stackrel{+c}{=}
+\log\pi_k
+-\frac12\sum_{j=1}^d
+\left[
+\log(2\pi s_{ij}^2)
++\frac{(x_{ij}-\mu_{jk})^2+V_{j,kk}}{s_{ij}^2}
+\right].
+\]
+
+In both cases the row is normalized by a log-sum-exp.  The posterior-variance
+term $V_{j,kk}$ is the uncertainty correction that distinguishes CAVI from a
+plug-in EM position update.
+
+## 6  Point-parameter updates
+
+### 6.1  Position prior
+
+If `position_prior = "adaptive"`, the coordinate maximizer is
+
+\[
+\pi_k=\frac{N_k}{n}.
+\]
+
+The implementation applies a machine-precision floor and renormalizes the
+result.  If `position_prior = "fixed"`, the supplied or initialized $\pi$ is
+not updated.
+
+### 6.2  Estimated feature variance
+
+For `S = NULL`, differentiating the $\sigma_j^2$ block gives
+
+\[
+\boxed{
+\sigma_j^2
+=\frac1n\sum_{i=1}^n\sum_{k=1}^Kr_{ik}
+\{(x_{ij}-\mu_{jk})^2+V_{j,kk}\}.
+}
+\]
+
+This is projected onto `[sigma_min, sigma_max]`.  With known `S`, this block
+does not exist and `params$sigma2` is `NULL`.
+
+### 6.3  Smoothness without the optional scale prior
+
+Let
+
+\[
+A_j=\mu_j^\top Q_K\mu_j+\operatorname{tr}(Q_KV_j).
+\]
+
+When $g_\rho=0$, the unconstrained maximizer is
+
+\[
+\boxed{
+\lambda_j=\frac{r_Q}{A_j}.
+}
+\]
+
+The implementation protects a numerically zero denominator and then projects
+onto `[lambda_min, lambda_max]`.
+
+### 6.4  Smoothness with the induced exponential prior
+
+When $\rho>0$, the lambda-dependent objective is
+
+\[
+h_j(\lambda_j)
+=\frac{r_Q-3}{2}\log\lambda_j
+-\frac{A_j}{2}\lambda_j
+-\rho\lambda_j^{-1/2}.
+\]
+
+The implementation maximizes $h_j$ in $\eta_j=\log\lambda_j$ within the
+lambda bounds.  Its derivative is
+
+\[
+\frac{d h_j(e^{\eta_j})}{d\eta_j}
+=\frac{r_Q-3}{2}
+-\frac{A_j}{2}e^{\eta_j}
++\frac{\rho}{2}e^{-\eta_j/2},
+\]
+
+which is strictly decreasing.  The unique interior root is found when it
+falls within the allowed interval; otherwise the appropriate boundary is the
+maximizer.
+
+If `fix_lambda = TRUE`, neither lambda update is performed.  A lambda value
+explicitly supplied to continuation is also held fixed thereafter.
+
+## 7  Sweep order and monotonicity
+
+After the initialization objective is recorded, one `cavi()` sweep updates:
+
+1. $q(C)$ from the current trajectory posterior;
+2. adaptive $\pi$, if requested;
+3. $\sigma^2$, only for estimated noise;
+4. $\lambda$, unless fixed; and
+5. $q(U)$ from the updated parameters.
+
+The code then recomputes the complete objective $\mathcal L$.  Subject to the
+explicit bounds, each mathematical block update is a coordinate maximizer of
+the same proper ELBO, penalized ELBO, or intrinsic pseudo-ELBO described in
+Section 3.  Therefore `elbo_trace` is the primary monotonicity diagnostic and
+should be nondecreasing up to numerical tolerance.
+
+Two numerical qualifications are important:
+
+1. the estimated-noise Gaussian solve uses the empty-component mass floor in
+   Section 4.3 if needed; and
+2. finite-precision linear algebra and lower/upper bounds can produce tiny
+   numerical differences.
+
+The implementation checks every new objective value and warns if it decreases
+beyond its tolerance.  By default, `do_cavi()` and single-ordering
+`do_mpcurve()` append sweeps using the stored noise specification and objective
+controls.  If a caller explicitly changes the lambda-prior rate during
+continuation, the objective definition changes at that continuation boundary.
+
+### 7.1  The plug-in log-likelihood is not the objective
+
+`loglik_trace` evaluates the observed mixture likelihood after replacing each
+trajectory by its posterior mean:
+
+\[
+\ell_{\mathrm{plug\mbox{-}in}}
+=\sum_{i=1}^n\log
+\left[
+\sum_{k=1}^K\pi_k
+\prod_{j=1}^d
+N(x_{ij};\mu_{jk},v_{ij})
+\right],
+\]
+
+where $v_{ij}=\sigma_j^2$ for estimated noise and $v_{ij}=s_{ij}^2$ for known
+noise.  It omits $V_j$ and does not integrate over $U$.  It is neither the
+marginal log likelihood nor the monotonicity certificate; it is a diagnostic
+only.
+
+## 8  Intrinsic-prior posterior identifiability
+
+With an intrinsic precision, the conditional posterior precision
+
+\[
+P_j=\lambda_jQ_K+D_j
+\]
+
+is positive definite if and only if
+
+\[
+\operatorname{null}(Q_K)\cap\operatorname{null}(D_j)=\{0\}.
+\]
+
+Positive position mass across the relevant components ordinarily makes $D_j$
+identify the random-walk null space, so `ridge = 0` is valid.  The
+estimated-noise mass floor further prevents floating-point empty positions
+from creating a degenerate solve.  Under known noise, positive supplied
+precisions and positive position responsibilities play the analogous role.
+
+If the likelihood genuinely does not identify a null-space direction, the
+posterior remains singular and fitting stops with an informative error.  An
+explicit positive ridge changes the prior to a proper full-rank model; it is a
+modeling choice rather than an automatically inserted repair.
+
+## 9  Stored `cavi` state
+
+The derivation maps to the fitted object as follows:
+
+| Mathematical quantity | Fitted-object field |
+|---|---|
+| $\pi$ | `params$pi` |
+| $\sigma_j^2$ | `params$sigma2[j]`, or `NULL` with known `S` |
+| supplied $S$ | `measurement_sd` |
+| $r_{ik}$ | `gamma[i, k]` |
+| $\mu_{jk}$ | `posterior$mean[j, k]` |
+| $V_j$ | `posterior$cov[[j]]` |
+| $V_{j,kk}$ | `posterior$var[j, k]` or `posterior$diag[j, k]` |
+| $\lambda_j$ | `lambda_vec[j]` |
+| $Q_K$ | `Q_K` |
+| objective sequence | `elbo_trace` |
+| plug-in likelihood diagnostic | `loglik_trace` |
+
+`control$prior_proper`, `control$prior_rank`, and `control$prior_logdet`
+record whether the trajectory precision was proper and which determinant
+convention entered the objective.  `control$noise_model` records the selected
+noise mode.
+
+## 10  Relationship to the fixed-$M$ structural model
+
+The multi-ordering structural family is
+
+\[
+q(C)\prod_{j=1}^dq(Z_j)q(U_j\mid Z_j).
+\]
+
+When $M=1$, $q(Z_j=1)=1$, assignment entropy vanishes, and each conditional
+factor $q(U_j\mid Z_j=1)$ becomes the $q_j(U_j)$ derived here.  The structural
+expected residual is
+
+\[
+E_{jm}=\sum_{i,k}r_{imk}
+\{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}\},
+\]
+
+and its shared-variance update
+
+\[
+\sigma_j^2=\frac1n\sum_{m=1}^Mw_{jm}E_{jm}
+\]
+
+reduces to the single-ordering residual update in Section 6.2.  Likewise, the
+structural conditional Gaussian, position, lambda, and known-noise formulas
+reduce exactly to Sections 4--6.
+
+The important distinction for $M\geq2$ is that the conditional trajectory is
+retained as dependent on $Z_j$.  The fixed-$M$ derivation should therefore be
+used for partition fits rather than extrapolating a collection of independent
+single-ordering `cavi` objects.
+
+## 11  Summary
+
+The current single-ordering algorithm is defined by
+
+\[
+q(C,U)=\prod_iq_i(C_i)\prod_jq_j(U_j),
+\]
+
+\[
+P_j=\lambda_jQ_K+D_j,
+\qquad
+P_j\mu_j=b_j,
+\]
+
+\[
+\log r_{ik}
+\stackrel{+c}{=}
+\log\pi_k
++\sum_j\mathbb E_{q_j}[\log p(x_{ij}\mid C_i=k,U_j)],
+\]
+
+and, for estimated noise,
+
+\[
+\sigma_j^2
+=\frac1n\sum_{i,k}r_{ik}
+\{(x_{ij}-\mu_{jk})^2+V_{j,kk}\}.
+\]
+
+The smoothness update is $r_Q/A_j$ without a lambda prior and a bounded
+one-dimensional optimum when the induced exponential prior is active.  The
+recorded `elbo_trace` is a proper ELBO only for a proper $Q_K$; with the
+default intrinsic prior it is a fixed-convention pseudo-ELBO.  This distinction
+does not change the coordinate formulas, but it is essential when interpreting
+the objective as evidence or comparing statistical models.

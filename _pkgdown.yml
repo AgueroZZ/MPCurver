@@ -12,6 +12,7 @@ reference:
       - fit_mpcurve
       - do_mpcurve
       - fitted_prior
+      - mpcurve
   - title: Inspection and visualization
     contents:
       - print.mpcurve

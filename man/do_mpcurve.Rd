@@ -32,8 +32,11 @@ do_mpcurve(
 \item{iter}{Integer >= 1. Maximum number of additional CAVI sweeps (single
 ordering) or exact \code{T = 1} partition steps.}
 
-\item{lambda}{Optional scalar or d-vector. For single-ordering CAVI only:
-fix \code{lambda_j} at this value for the continuation run.}
+\item{lambda}{Optional positive smoothness value(s). A single-ordering fit
+accepts a scalar or length-\code{d} vector. A structural partition fit
+accepts a scalar, a length-\code{d} vector broadcast across orderings, a
+flattened length-\code{d * M} vector, or a \code{d x M} matrix; this
+resets \code{lambda_mat} before continuation.}
 
 \item{S}{Optional known measurement standard deviations. If \code{NULL},
 reuse the value stored on \code{object}. Supplying a new \code{S} is only
@@ -57,37 +60,21 @@ prior with rate zero.}
 \item{tol_outer}{For partition fits only: relative objective tolerance used
 by the phase-2 convergence rule. If \code{NULL}, reuse the stored value.}
 
-\item{freeze_unused_ordering}{For partition fits only: if \code{TRUE},
-inactive orderings remain frozen and skipped in subsequent weighted
-updates. If \code{NULL}, reuse the stored value.}
+\item{freeze_unused_ordering, freeze_unused_ordering_threshold}{Deprecated
+no-op compatibility arguments. Explicit values emit a warning for either
+a single-ordering or structural continuation.}
 
-\item{freeze_unused_ordering_threshold}{For partition fits only: non-negative
-feature-mass threshold used to decide when an ordering is effectively
-unused. If \code{NULL}, reuse the stored value.}
+\item{freeze_feature, freeze_feature_weight_threshold}{Deprecated no-op
+compatibility arguments. Structural conditional trajectories are not
+frozen by assignment weight.}
 
-\item{freeze_feature}{For partition fits only: if \code{TRUE},
-feature-ordering pairs with sufficiently small posterior weight are frozen
-and their trajectory contribution is neutralized. If \code{NULL}, reuse
-the stored value.}
+\item{drop_unused_ordering}{Deprecated no-op compatibility argument. The
+fitted fixed \eqn{M} is retained.}
 
-\item{freeze_feature_weight_threshold}{For partition fits only: non-negative
-threshold on \code{w_{jm}} used when \code{freeze_feature = TRUE}. If
-\code{NULL}, reuse the stored value.}
-
-\item{drop_unused_ordering}{For partition fits only: if \code{TRUE}, the
-returned \code{mpcurve} view may compact away frozen orderings. If
-\code{NULL}, reuse the stored value. When \code{FALSE}, the reported
-partition \code{$objective_history} retains fixed-requested-\code{M}
-comparison semantics; when \code{TRUE}, it becomes the post-drop fitting
-objective of the active model.}
-
-\item{assignment_prior}{Deprecated compatibility argument for continuing old
-partition fits that still store the legacy assignment-prior interface. If
-\code{NULL}, \code{do_mpcurve()} reuses the stored prior mode.}
-
-\item{ordering_alpha}{Deprecated compatibility argument used only for the
-legacy \code{assignment_prior = "dirichlet"} path. If \code{NULL},
-\code{do_mpcurve()} reuses the stored value.}
+\item{assignment_prior, ordering_alpha}{Deprecated no-op compatibility
+arguments. Structural continuation always reuses the partition-prior
+state stored in the canonical fit; explicitly supplying either argument
+emits a warning and does not change that state.}
 
 \item{verbose}{Logical. Print per-iteration progress?}
 }
@@ -97,11 +84,27 @@ An updated \code{mpcurve} object.
 \description{
 Public continuation wrapper for MPCurve's recommended CAVI paths. For
 single-ordering fits, this continues the underlying CAVI backend. For
-partition fits, it continues the exact \eqn{T = 1} phase of the stored
-partition-CAVI fit using the existing frozen-ordering and assignment-prior
-controls.
+structural partition fits, it continues exact \eqn{T = 1} coordinate
+sweeps from the canonical state. Legacy augmented partition fits remain
+readable but must be refitted before continuation.
 }
 \details{
 Legacy smoothEM/csmoothEM continuation is not part of this high-level
 interface.
+
+
+Structural continuation uses only the canonical fields stored on the raw
+fit: \code{$gamma}, \code{$params$pi}, the shared
+\code{$params$sigma2} (when noise is estimated),
+\code{$conditional_posterior}, \code{$lambda_mat}, and
+\code{$partition$pi_weights}. The derived compatibility view
+\code{$fits} is never used as continuation state.
+
+The additional structural sweeps run at exactly \eqn{T=1}. Their objective
+values are appended to \code{$objective_history}, and the corresponding
+entries of \code{$temperature_history} are \code{1}. Consequently,
+monotonicity should be checked within this exact-temperature segment rather
+than across the earlier annealing schedule. The fitted value of \eqn{M} is
+fixed throughout continuation, and a shared estimated \eqn{\sigma_j^2}
+remains shared across all conditional ordering branches.
 }

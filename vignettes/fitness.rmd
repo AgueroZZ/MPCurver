@@ -31,8 +31,9 @@ We will use `MPCurver` to answer three practical questions:
 1. Can a single latent ordering explain mutant fitness across environments?
 2. If we encourage smoother trajectories, do we keep the same ordering while
    improving interpretability?
-3. Do the data support multiple ordering systems, or does a single ordering
-   remain sufficient once we account for measurement error?
+3. What feature partition and conditional trajectories appear under a
+   scientifically chosen fixed two-ordering model, with and without known
+   measurement error?
 
 The recommended workflow throughout is the default `cavi` backend exposed by
 `fit_mpcurve()`.
@@ -188,64 +189,6 @@ plot_ordered_heatmap <- function(X, order_idx, env_idx = seq_len(ncol(X)),
   box()
 }
 
-plot_representative_trajectories <- function(X, fit_partition, which_assign = "A",
-                                             n_show = 6L, main_prefix = "") {
-  ord_idx <- match(which_assign, names(fit_partition$fits))
-  if (is.na(ord_idx)) {
-    return(invisible(NULL))
-  }
-
-  fit_ord <- fit_partition$fits[[ord_idx]]$fit
-  pt_map <- fit_partition$locations[[which_assign]]$map$index
-  pt_mean <- fit_partition$locations[[which_assign]]$mean$pseudotime
-  assign_vec <- fit_partition$partition$assign
-
-  env_idx <- which(assign_vec == which_assign)
-  if (!length(env_idx)) {
-    return(invisible(NULL))
-  }
-
-  cor_vec <- vapply(env_idx, function(j) {
-    suppressWarnings(cor(X[, j], pt_mean, method = "spearman"))
-  }, numeric(1))
-  env_idx <- env_idx[order(abs(cor_vec), decreasing = TRUE)]
-  env_idx <- env_idx[seq_len(min(n_show, length(env_idx)))]
-
-  mu <- fit_ord$posterior$mean[env_idx, , drop = FALSE]
-  K <- ncol(mu)
-  obs_mean <- t(vapply(env_idx, function(j) {
-    out <- rep(NA_real_, K)
-    for (k in seq_len(K)) {
-      idx <- which(pt_map == k)
-      if (length(idx)) out[k] <- mean(X[idx, j])
-    }
-    out
-  }, numeric(K)))
-
-  nr <- ceiling(length(env_idx) / 2)
-  op <- par(mfrow = c(nr, 2), mar = c(3.5, 3.5, 2.5, 1))
-  on.exit(par(op), add = TRUE)
-  for (ii in seq_along(env_idx)) {
-    jj <- env_idx[ii]
-    ylim <- range(c(mu[ii, ], obs_mean[ii, ]), na.rm = TRUE)
-    plot(
-      seq_len(K), obs_mean[ii, ],
-      type = "o",
-      pch = 16,
-      col = "#666666",
-      ylim = ylim,
-      xlab = "Latent position",
-      ylab = "Fitness",
-      main = paste0(main_prefix, colnames(X)[jj])
-    )
-    lines(seq_len(K), mu[ii, ], type = "o", pch = 19, col = "#D95F02", lwd = 2)
-    legend("topleft",
-      legend = c("Observed bin mean", "Posterior mean"),
-      col = c("#666666", "#D95F02"),
-      lty = 1, pch = c(16, 19), bty = "n", cex = 0.8
-    )
-  }
-}
 ```
 
 ```{r data-summary}
@@ -368,24 +311,31 @@ In this dataset the two fits stay close, which is reassuring: stronger
 regularization mostly improves interpretability rather than changing the basic
 ordering story.
 
-## Step 3: Ask whether one ordering is enough
+## Step 3: Explore a fixed two-ordering representation
 
 The single-ordering fit assumes that every environment varies smoothly along
-the same latent mutant axis. That may be too restrictive. Some environments may
-reflect a different adaptation program and therefore prefer a different latent
-ordering.
+the same latent mutant axis. As a scientifically motivated sensitivity
+analysis, we can instead ask how the environments partition under two fixed
+latent orderings. This is an exploratory representation, not an automatic test
+that $M=2$ is preferable to $M=1$.
 
-To test that idea, we let `fit_mpcurve()` search over up to four latent
-ordering systems using greedy backward selection. 
-The model starts with four orderings and prunes back to the optimal number based on the ELBO.
+To examine that idea, we fit a structural partition model with a scientifically
+chosen fixed value $M=2$. The structural ELBO is a fitting objective for a
+given $M$; it is not used here as an automatic complexity penalty for choosing
+among different values of $M$.
+
+For every `intrinsic_dim >= 2`, the fitted object has one canonical
+$q(C)q(Z)q(U\mid Z)$ state. Estimated feature variances form one shared
+length-$d$ `params$sigma2` vector across orderings. There are no
+active/inactive, freeze, or drop states, and greedy cross-$M$ selection is
+currently unavailable.
 
 ```{r partition-fit}
 fit_partition <- fit_mpcurve(
   X,
   method = "isomap",
-  intrinsic_dim = 4,
-  greedy = "backward",
-  ridge = 1e-6,
+  intrinsic_dim = 2,
+  ridge = 0,
   K = 50,
   iter = 500,
   rw_q = 2,
@@ -398,13 +348,15 @@ fit_partition <- fit_mpcurve(
 fit_partition
 ```
 
-### Look at some fitted orderings
+### Inspect conditional structural trajectories
 
-```{r partition-plot, out.width = "100%", fig.alt = "Two panels showing fitted partition-CAVI trajectories for environment dimensions 1 and 27."}
-par(mfrow = c(2, 1), mar = c(4, 4, 3, 1))
-plot(fit_partition, dims = 1)
-plot(fit_partition, dims = 27)
-par(mfrow = c(1, 1))
+For `plot_type = "mu"`, each ordering panel shows the canonical conditional
+posterior mean $E[U_j\mid Z_j=m]$. The title also reports the feature-assignment
+probability $q(Z_j=m)$. These are conditional alternatives, so the plotted
+trajectory is not multiplied by its assignment probability.
+
+```{r partition-plot, out.width = "100%", fig.alt = "Conditional posterior mean trajectory for environment dimension 1 under each of two fixed orderings."}
+plot(fit_partition, plot_type = "mu", dims = 1)
 ```
 
 ### Which environments were assigned to which ordering?
@@ -446,8 +398,9 @@ The raw file includes paired `*_error` columns, and `fit_mpcurve()` can use
 them directly through the `S` argument. In the public API, `S` is interpreted
 as a matrix of known measurement standard deviations.
 
-This matters here because ignoring heterogeneous measurement error can make the
-model over-explain noisy columns by introducing extra orderings.
+This matters here because ignoring heterogeneous measurement error can make a
+fixed multi-ordering fit attribute noisy columns to apparently distinct
+trajectory structure.
 
 ### Single-ordering fit with known measurement SD
 
@@ -477,19 +430,19 @@ plot(fit_unidir_known_sd, dims = 45)
 par(mfrow = c(1, 1))
 ```
 
-### Greedy search with known measurement SD
+### Fixed two-ordering fit with known measurement SD
 
-We first try forward selection to see whether the data support multiple orderings once we account for measurement error.
-This approach starts with a single ordering and adds orderings until the ELBO stops improving.
+We now refit the same fixed $M=2$ structural model while accounting for
+measurement error. This isolates the effect of known noise without mixing it
+with a separate dimension-selection procedure.
 
 ```{r partition-fit-known-sd}
 fit_partition_known_sd <- fit_mpcurve(
   X,
   S = S,
   method = "isomap",
-  intrinsic_dim = 4,
-  greedy = "forward",
-  ridge = 1e-6,
+  intrinsic_dim = 2,
+  ridge = 0,
   K = 50,
   iter = 500,
   rw_q = 2,
@@ -500,58 +453,8 @@ fit_partition_known_sd <- fit_mpcurve(
 fit_partition_known_sd
 ```
 
-It is also useful to check the same question from the other direction by
-starting from the upper bound and pruning redundant orderings.
-
-```{r partition-fit-known-sd-backward}
-fit_partition_known_sd_backward <- fit_mpcurve(
-  X,
-  S = S,
-  method = "isomap",
-  intrinsic_dim = 4,
-  greedy = "backward",
-  ridge = 1e-6,
-  K = 50,
-  iter = 500,
-  rw_q = 2,
-  lambda_sd_prior_rate = 1e4,
-  verbose = FALSE
-)
-
-fit_partition_known_sd_backward
-```
-
-When both forward and backward selection collapse back to a single ordering,
-that is strong evidence that the earlier higher-dimensional fit was mainly
-absorbing noise heterogeneity rather than revealing genuinely distinct latent
-systems.
-
-### Compare the forward and backward single-ordering solutions
-
-```{r compare-known-sd-orderings, out.width = "100%", fig.alt = "Scatter plot comparing inferred pseudotime between forward and backward greedy search with known measurement SDs."}
-cor(
-  fit_partition_known_sd$locations$mean$pseudotime,
-  fit_partition_known_sd_backward$locations$mean$pseudotime
-)
-
-plot(
-  fit_partition_known_sd$locations$mean$pseudotime,
-  fit_partition_known_sd_backward$locations$mean$pseudotime,
-  xlab = "Latent position (forward search)",
-  ylab = "Latent position (backward search)"
-)
-abline(0, 1, lty = 2)
-```
-
-Though both methods find a single ordering.
-
-```{r compare-known-sd-trajectories, fig.height = 8, out.width = "100%", fig.alt = "Four panels comparing fitted trajectories from forward and backward greedy search with known measurement SDs."}
-par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
-plot(fit_partition_known_sd, dims = 1)
-plot(fit_partition_known_sd, dims = 30)
-plot(fit_partition_known_sd_backward, dims = 1)
-plot(fit_partition_known_sd_backward, dims = 30)
-par(mfrow = c(1, 1))
+```{r known-sd-partition-trajectories, fig.height = 5.5, out.width = "100%", fig.alt = "Conditional posterior mean trajectory for environment dimension 31 under each of two fixed orderings with known measurement SDs."}
+plot(fit_partition_known_sd, plot_type = "mu", dims = 31)
 ```
 
 
@@ -563,8 +466,9 @@ This dataset gives a useful template for real-world `fit_mpcurve()` analyses.
 1. Start with a single-ordering fit to establish the basic latent ordering.
 2. Use `lambda_sd_prior_rate` when the ordering looks sensible but the fitted
    trajectories are too rough to interpret comfortably.
-3. Use `intrinsic_dim` together with greedy search to test whether the data
-   support multiple ordering systems.
-4. If measurement error is available, pass it through `S`; otherwise the model
-   may over-split noisy environments into extra orderings.
-
+3. Use a fixed `intrinsic_dim` to study a scientifically plausible number of
+   ordering systems; assess different values through stability or external
+   validation rather than the raw structural ELBO alone.
+4. If measurement error is available, pass it through `S`; otherwise a fixed
+   multi-ordering fit may interpret noisy environments as distinct trajectory
+   structure.

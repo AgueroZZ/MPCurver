@@ -1,0 +1,716 @@
+---
+title: "Known Measurement Noise in Single-Ordering CAVI and Fixed-M Structural CAVI"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    mathjax: default
+vignette: >
+  %\VignetteIndexEntry{Known Measurement Noise in Single-Ordering CAVI and Fixed-M Structural CAVI}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r load}
+library(MPCurver)
+```
+
+This note derives CAVI when measurement standard deviations are known.  It
+covers both the ordinary single-ordering model and the current fixed-$M$
+structural partition model
+
+\[
+q(C)\prod_{j=1}^d q(Z_j)q(U_j\mid Z_j).
+\]
+
+The notation matches
+`partition_coherent_elbo_derivation.Rmd`.  In particular,
+
+\[
+r_{imk}=q(C_i^{(m)}=k),
+\qquad
+w_{jm}=q(Z_j=m),
+\]
+
+and
+
+\[
+q(U_j\mid Z_j=m)=N(\mu_{jm},V_{jm}).
+\]
+
+The central conclusion is simple but important:
+
+> Supplying `S` changes the likelihood sufficient statistics and removes the
+> variance update.  It does not change the structural dependence between
+> $Z_j$ and $U_j$, and it does not place assignment weights inside a
+> conditional trajectory's Gaussian system.
+
+## 1  Noise specifications accepted by the model
+
+`S` contains standard deviations.  The three supported modes are:
+
+| `S` | Statistical model | Stored noise label |
+|---|---|---|
+| `NULL` | estimate one $\sigma_j^2$ for feature $j$, shared across orderings | `estimated_feature_variance` |
+| length-$d$ vector | known $s_j$, shared across observations and orderings | `known_feature_sd` |
+| $n\times d$ matrix | known $s_{ij}$ for every observation and feature | `known_observation_sd` |
+
+For known noise, write
+
+\[
+\tau_{ij}=s_{ij}^{-2}.
+\]
+
+The observation model is
+
+\[
+x_{ij}\mid C_i=k,U_j,S
+\sim N(U_{jk},s_{ij}^2)
+\]
+
+for a single ordering, and
+
+\[
+x_{ij}\mid Z_j=m,C_i^{(m)}=k,U_j,S
+\sim N(U_{jk},s_{ij}^2)
+\]
+
+for the structural partition model.  The same supplied $s_{ij}$ is used under
+every possible ordering because it describes measurement error for the
+observed entry $x_{ij}$, not residual lack of fit to a particular ordering.
+
+Supplied standard deviations must be finite and nonnegative.  Internally they
+are bounded below by a numerical standard-deviation floor before inversion.
+This protects arithmetic involving $\tau_{ij}$; it is unrelated to the
+trajectory precision or to random-walk regularization.
+
+## 2  Single-ordering CAVI with known measurement noise
+
+### 2.1  Model and variational family
+
+For one ordering,
+
+\[
+C_i\mid\pi\sim\operatorname{Categorical}(\pi),
+\]
+
+\[
+p(U_j\mid\lambda_j)
+\propto
+\lambda_j^{r_Q/2}|Q_K|_+^{1/2}
+\exp\left(-\frac{\lambda_j}{2}U_j^\top Q_KU_j\right),
+\]
+
+where $r_Q=\operatorname{rank}(Q_K)$ and $|Q_K|_+$ is the
+pseudo-determinant.  The mean-field family is
+
+\[
+q(C,U)=\prod_{i=1}^nq_i(C_i)\prod_{j=1}^dq_j(U_j),
+\]
+
+with
+
+\[
+r_{ik}=q(C_i=k),
+\qquad
+q_j(U_j)=N(\mu_j,V_j).
+\]
+
+Define
+
+\[
+A_j
+=\mu_j^\top Q_K\mu_j+\operatorname{tr}(Q_KV_j).
+\]
+
+### 2.2  Complete expected likelihood
+
+The expected observation log likelihood is
+
+\[
+\mathcal D^S
+=-\frac12\sum_{i=1}^n\sum_{k=1}^K\sum_{j=1}^d
+r_{ik}
+\left[
+\log(2\pi s_{ij}^2)
++\tau_{ij}\left\{(x_{ij}-\mu_{jk})^2+V_{j,kk}\right\}
+\right].
+\]
+
+The $V_{j,kk}$ term is the posterior uncertainty correction
+
+\[
+\mathbb E_{q_j}\{(x_{ij}-U_{jk})^2\}
+=(x_{ij}-\mu_{jk})^2+V_{j,kk}.
+\]
+
+Even though $\log(2\pi s_{ij}^2)$ is constant in $k$, retaining it is
+necessary when evaluating the full ELBO.
+
+### 2.3  Full single-ordering objective
+
+Let
+
+\[
+\mathcal C
+=\sum_{i,k}r_{ik}\log\pi_k
+-\sum_{i,k}r_{ik}\log r_{ik}.
+\]
+
+For feature $j$, the expected intrinsic-prior term is
+
+\[
+\mathcal P_j
+=\frac12\left\{
+r_Q(\log\lambda_j-\log(2\pi))
++\log|Q_K|_+
+\right\}
+-\frac{\lambda_j}{2}A_j,
+\]
+
+and its Gaussian entropy is
+
+\[
+\mathcal H_j
+=\frac12\{K\log(2\pi e)+\log|V_j|\}.
+\]
+
+If `lambda_sd_prior_rate` is a positive value $\rho$, add
+
+\[
+g_\rho(\lambda_j)
+=\log(\rho/2)-\frac32\log\lambda_j
+-\rho\lambda_j^{-1/2};
+\]
+
+otherwise set $g_\rho=0$.  The objective is
+
+\[
+\mathcal L_1^S
+=\mathcal C+\mathcal D^S
++\sum_{j=1}^d\{\mathcal P_j+g_\rho(\lambda_j)+\mathcal H_j\}.
+\]
+
+With an intrinsic $Q_K$, this is a pseudo-ELBO under the package's fixed
+pseudo-determinant convention.  With a full-rank precision it is the ordinary
+ELBO.
+
+### 2.4  Gaussian update
+
+For each feature, define
+
+\[
+D_j
+=\operatorname{diag}(d_{j1},\ldots,d_{jK}),
+\qquad
+d_{jk}=\sum_{i=1}^nr_{ik}\tau_{ij},
+\]
+
+and
+
+\[
+b_{jk}=\sum_{i=1}^nr_{ik}\tau_{ij}x_{ij}.
+\]
+
+Completing the square yields
+
+\[
+P_j=\lambda_jQ_K+D_j,
+\qquad
+P_j\mu_j=b_j,
+\qquad
+V_j=P_j^{-1}.
+\]
+
+For feature-level known noise, $s_{ij}=s_j$ and therefore
+
+\[
+d_{jk}=N_k/s_j^2,
+\qquad
+b_{jk}=s_j^{-2}\sum_i r_{ik}x_{ij},
+\qquad
+N_k=\sum_i r_{ik}.
+\]
+
+For observation-level known noise, two observations assigned to the same
+position contribute different precision according to their supplied
+measurement uncertainty.
+
+### 2.5  Position-responsibility update
+
+For each observation,
+
+\[
+\log r_{ik}
+\stackrel{+c}{=}
+\log\pi_k
+-\frac12\sum_{j=1}^d
+\left[
+\log(2\pi s_{ij}^2)
++\tau_{ij}\{(x_{ij}-\mu_{jk})^2+V_{j,kk}\}
+\right].
+\]
+
+The log-normalizing term is independent of $k$ and therefore cancels in the
+softmax, but including it in a full log-density matrix is algebraically
+harmless.  The uncertainty correction remains essential.
+
+### 2.6  Position prior and lambda
+
+For an adaptive position prior,
+
+\[
+\pi_k=\frac1n\sum_i r_{ik};
+\]
+
+a fixed prior is left unchanged.  The lambda update uses
+
+\[
+A_j=\mu_j^\top Q_K\mu_j+\operatorname{tr}(Q_KV_j).
+\]
+
+Without the optional scale prior,
+
+\[
+\lambda_j=r_Q/A_j.
+\]
+
+With $\tau_j=\lambda_j^{-1/2}\sim\operatorname{Exp}(\rho)$, the implementation
+maximizes
+
+\[
+\frac{r_Q-3}{2}\log\lambda_j
+-\frac{A_j}{2}\lambda_j
+-\rho\lambda_j^{-1/2}
+\]
+
+within the supplied lambda bounds.
+
+### 2.7  There is no variance update
+
+When `S` is non-`NULL`, $s_{ij}^2$ is fixed data supplied by the user.  The
+fit therefore stores `params$sigma2 = NULL`, skips every estimated-variance
+update, and preserves the original vector or matrix specification in
+`measurement_sd`.
+
+## 3  Fixed-$M$ structural partition with known noise
+
+### 3.1  Structural factorization
+
+For $M\geq2$, the variational family is
+
+\[
+q(C,Z,U)
+=\left\{\prod_{m=1}^M\prod_{i=1}^nq_{im}(C_i^{(m)})\right\}
+\left\{\prod_{j=1}^dq_j(Z_j)q_j(U_j\mid Z_j)\right\}.
+\]
+
+Write
+
+\[
+q(U_j\mid Z_j=m)=N(\mu_{jm},V_{jm}).
+\]
+
+These $M$ Gaussians are conditional alternatives for one trajectory, not $M$
+independent posterior trajectories that coexist in the generative state.
+
+### 3.2  Conditional Gaussian branches
+
+For ordering $m$, define
+
+\[
+d_{jmk}=\sum_{i=1}^nr_{imk}\tau_{ij},
+\qquad
+b_{jmk}=\sum_{i=1}^nr_{imk}\tau_{ij}x_{ij},
+\]
+
+\[
+D_{jm}=\operatorname{diag}(d_{jm1},\ldots,d_{jmK}).
+\]
+
+The structural conditional update is
+
+\[
+\boxed{
+P_{jm}=\lambda_{jm}Q_K+D_{jm},
+\qquad
+P_{jm}\mu_{jm}=b_{jm},
+\qquad
+V_{jm}=P_{jm}^{-1}.
+}
+\]
+
+The assignment probability $w_{jm}$ is absent from this Gaussian system.  For
+$w_{jm}>0$, it multiplies the complete local conditional block and cancels
+from the coordinate optimum.  If a stored weight is exactly zero, the
+objective does not uniquely determine that zero-probability conditional
+factor; the implementation uses the same continuous branch update so that
+the branch remains evaluable in the next assignment step.
+
+### 3.3  Ordering-specific position responsibilities
+
+Feature assignments do affect the ordering-position update.  For each
+$m,i,k$,
+
+\[
+\boxed{
+\log r_{imk}
+\stackrel{+c}{=}
+\log\pi_k^{(m)}
+-\frac12\sum_{j=1}^dw_{jm}
+\left[
+\log(2\pi s_{ij}^2)
++\tau_{ij}\{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}\}
+\right].
+}
+\]
+
+Thus a feature contributes strongly to the position posterior of an ordering
+only when $q(Z_j=m)$ is large.  This is the correct location for $w_{jm}$ in
+the position coordinate.
+
+For adaptive position priors,
+
+\[
+\pi_k^{(m)}=\frac1n\sum_i r_{imk};
+\]
+
+fixed position priors remain unchanged.
+
+### 3.4  Complete known-noise local block
+
+The data contribution for feature $j$ and ordering $m$ is
+
+\[
+\mathcal D_{jm}^S
+=-\frac12\sum_{i=1}^n\sum_{k=1}^Kr_{imk}
+\left[
+\log(2\pi s_{ij}^2)
++\tau_{ij}\{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}\}
+\right].
+\]
+
+Set
+
+\[
+A_{jm}
+=\mu_{jm}^\top Q_K\mu_{jm}
++\operatorname{tr}(Q_KV_{jm}).
+\]
+
+The conditional trajectory-prior contribution is
+
+\[
+\mathcal P_{jm}
+=\frac12\left\{
+r_Q(\log\lambda_{jm}-\log(2\pi))
++\log|Q_K|_+
+\right\}
+-\frac{\lambda_{jm}}2A_{jm},
+\]
+
+and the entropy is
+
+\[
+\mathcal H_{jm}
+=\frac12\{K\log(2\pi e)+\log|V_{jm}|\}.
+\]
+
+The exact local score stored by the structural backend is
+
+\[
+\boxed{
+B_{jm}^S
+=\mathcal D_{jm}^S
++\mathcal P_{jm}
++g_\rho(\lambda_{jm})
++\mathcal H_{jm}.
+}
+\]
+
+All four pieces are conditional on the same feature assignment and enter the
+total objective multiplied by $w_{jm}$.
+
+### 3.5  Assignment update
+
+Let $a_m=\log\omega_m$ for a fixed or adaptive point ordering prior, and let
+$a_m=\mathbb E[\log\omega_m]$ for the deprecated Dirichlet compatibility
+mode.  At temperature $T$,
+
+\[
+\boxed{
+w_{jm}
+=\frac{\exp\{(B_{jm}^S+a_m)/T\}}
+{\sum_{\ell=1}^M\exp\{(B_{j\ell}^S+a_\ell)/T\}}.
+}
+\]
+
+Known measurement noise changes $B_{jm}$ through $s_{ij}^{-2}$ and the
+observation-specific log constants.  It does not otherwise alter the
+assignment softmax.
+
+For an adaptive point ordering prior,
+
+\[
+\omega_m=d^{-1}\sum_jw_{jm}.
+\]
+
+For a fixed prior, $\omega$ is unchanged.  In the Dirichlet compatibility
+mode with symmetric prior concentration $\alpha_0$,
+
+\[
+q(\omega)
+=\operatorname{Dirichlet}\left(
+\alpha_0+\sum_jw_{j1},\ldots,
+\alpha_0+\sum_jw_{jM}
+\right).
+\]
+
+### 3.6  Total fixed-$M$ objective
+
+For each ordering, define the cell block
+
+\[
+\mathcal C_m
+=\sum_{i,k}r_{imk}\log\pi_k^{(m)}
+-\sum_{i,k}r_{imk}\log r_{imk}.
+\]
+
+Let
+
+\[
+H_Z=-\sum_{j,m}w_{jm}\log w_{jm}.
+\]
+
+For a point ordering prior,
+
+\[
+\mathcal A_T
+=\sum_{j,m}w_{jm}\log\omega_m+T H_Z.
+\]
+
+For the Dirichlet compatibility mode,
+
+\[
+\mathcal A_T
+=\sum_{j,m}w_{jm}\mathbb E[\log\omega_m]
++T H_Z
+-\operatorname{KL}\{q(\omega)\|p(\omega)\}.
+\]
+
+The known-noise structural objective is
+
+\[
+\boxed{
+\mathcal L_T^S
+=\sum_{m=1}^M\mathcal C_m
++\sum_{j=1}^d\sum_{m=1}^Mw_{jm}B_{jm}^S
++\mathcal A_T.
+}
+\]
+
+At $T=1$, this is the proper-prior ELBO or intrinsic-prior pseudo-ELBO.  At
+$T>1$, it is an entropy-tempered objective.
+
+### 3.7  Ordering-specific lambda update
+
+The same second moment $A_{jm}$ used in the local prior produces
+
+\[
+\lambda_{jm}=r_Q/A_{jm}
+\]
+
+when the optional scale prior is absent.  With rate $\rho>0$, the bounded
+branchwise objective is
+
+\[
+\frac{r_Q-3}{2}\log\lambda_{jm}
+-\frac{A_{jm}}2\lambda_{jm}
+-\rho\lambda_{jm}^{-1/2}.
+\]
+
+This update is independent of whether $S$ is a vector or matrix; the noise
+specification has already affected $\mu_{jm}$ and $V_{jm}$ through $D_{jm}$
+and $b_{jm}$.
+
+## 4  Estimated noise versus known noise
+
+The current structural model has one estimated variance $\sigma_j^2$ per
+feature, shared across all orderings.  It never estimates a separate residual
+variance for each conditional branch.
+
+For reference, define the structural expected residual
+
+\[
+E_{jm}
+=\sum_{i,k}r_{imk}
+\{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}\}.
+\]
+
+When `S = NULL`,
+
+\[
+\boxed{
+\sigma_j^2=\frac1n\sum_{m=1}^Mw_{jm}E_{jm}.
+}
+\]
+
+When `S` is supplied, this coordinate is removed rather than replaced by an
+ordering-specific parameter.
+
+| Component | Estimated noise (`S = NULL`) | Known noise (`S` supplied) |
+|---|---|---|
+| Variance | one fitted $\sigma_j^2$ per feature, shared across $m$ | fixed $s_j^2$ or $s_{ij}^2$ |
+| Gaussian diagonal | $N_{mk}/\sigma_j^2$ | $\sum_i r_{imk}/s_{ij}^2$ |
+| Gaussian right-hand side | $\sum_i r_{imk}x_{ij}/\sigma_j^2$ | $\sum_i r_{imk}x_{ij}/s_{ij}^2$ |
+| Position likelihood | weighted by $w_{jm}$ | weighted by $w_{jm}$ |
+| Conditional Gaussian system | no assignment weight | no assignment weight |
+| Variance update | shared update above | none |
+| Conditional prior and entropy | unchanged | unchanged |
+| Assignment softmax | complete estimated-noise $B_{jm}$ | complete known-noise $B_{jm}^S$ |
+
+Known `S` does not remove the model's ability to compare orderings.  Ordering
+evidence still differs through the fitted conditional mean, posterior
+uncertainty, expected residual under $r_{imk}$, smoothness cost, Gaussian
+entropy, and position fit.  What disappears is only adaptation of an unknown
+residual variance.
+
+## 5  Feature-level and observation-level special cases
+
+### 5.1  Feature-level known standard deviation
+
+If $s_{ij}=s_j$, then
+
+\[
+D_{jm}
+=\operatorname{diag}(N_{m1}/s_j^2,\ldots,N_{mK}/s_j^2),
+\]
+
+and
+
+\[
+b_{jm,k}=s_j^{-2}\sum_i r_{imk}x_{ij}.
+\]
+
+The likelihood normalizer for feature $j$ is simply
+$-n\log(2\pi s_j^2)/2$ in every conditional branch.  It is constant across
+orderings for that feature but remains part of the full fixed-$M$ objective.
+
+### 5.2  Observation-level known standard deviation
+
+If $s_{ij}$ varies over observations, the precision-weighted effective mass
+
+\[
+d_{jmk}=\sum_i r_{imk}s_{ij}^{-2}
+\]
+
+need not be proportional to $N_{mk}$.  An observation with a smaller supplied
+standard deviation contributes more strongly to both the posterior precision
+and posterior mean.  The exact log normalizer
+
+\[
+-\frac12\sum_i\log(2\pi s_{ij}^2)
+\]
+
+must be retained when evaluating the local block, although it is constant in
+$k$ during a position softmax.
+
+## 6  Intrinsic-prior identifiability under known noise
+
+For an intrinsic RW$(q)$ precision, $Q_K$ has a $q$-dimensional null space.
+The conditional posterior is proper if and only if
+
+\[
+\operatorname{null}(Q_K)\cap\operatorname{null}(D_{jm})=\{0\}.
+\]
+
+Because valid known-noise precisions are strictly positive after numerical
+flooring, positive position mass in every component makes $D_{jm}$ positive
+diagonal and identifies all null-space directions.  The implementation's
+softmax stabilization prevents finite position logits from underflowing to
+exactly empty components.
+
+The feature-assignment probability does not enter $D_{jm}$.  Therefore a
+small or zero $w_{jm}$ does not itself destroy conditional posterior
+identifiability.  Nevertheless, if externally supplied or genuinely
+degenerate position responsibilities fail to identify the intrinsic null
+space, the posterior precision remains singular.  The backend reports that
+identifiability failure instead of adding automatic jitter.
+
+An explicitly supplied ridge makes $Q_K$ full rank and changes the prior to a
+proper Gaussian.  It is a modeling choice, not a requirement caused by a
+feature being unlikely to use an ordering.
+
+## 7  Annealing and fixed-$M$ interpretation
+
+During deterministic annealing, only the feature-assignment entropy is
+multiplied by $T$.  Consequently objective values from different temperatures
+represent different optimization criteria and are not directly comparable.
+The exact structural objective is evaluated at $T=1$, and monotonicity is
+assessed only within the subsequent fixed-$T=1$ sweeps.  Continuation through
+`do_mpcurve()` also uses $T=1$.
+
+The known-noise objective is a diagnostic for one prespecified $M$.  It is not
+a cross-$M$ selection criterion.  In particular, an adaptive ordering prior
+can give an additional nearly unused ordering negligible feature mass without
+adding a calibrated complexity penalty, and an intrinsic prior yields a
+pseudo-ELBO rather than a normalized model evidence.  The package therefore
+does not currently perform greedy forward or backward dimension selection.
+
+## 8  Canonical fitted state
+
+For a fixed-$M$ known-noise structural fit:
+
+- `measurement_sd` contains the supplied length-$d$ vector or $n\times d$
+  matrix;
+- `params$sigma2` is `NULL`;
+- `gamma[[m]]` contains $r_{imk}$;
+- `position_pi[[m]]` contains $\pi_k^{(m)}$;
+- `partition$pi_weights` on the normalized `mpcurve` object, and
+  `pi_weights` on the raw structural fit, contain $w_{jm}$;
+- `conditional_posterior$mean[[m]]` and `$cov[[m]]` contain $\mu_{jm}$ and
+  $V_{jm}$;
+- `lambda_mat[j, m]` contains $\lambda_{jm}$; and
+- `local_blocks[j, m]` contains $B_{jm}^S$.
+
+This top-level state is the authority for both plotting and continuation.
+Per-ordering `$fits` entries are read-only compatibility views derived from
+it.
+
+## 9  Summary
+
+For single-ordering and fixed-$M$ structural CAVI alike, known measurement
+noise changes the sufficient statistics to
+
+\[
+d_{jmk}=\sum_i r_{imk}s_{ij}^{-2},
+\qquad
+b_{jmk}=\sum_i r_{imk}s_{ij}^{-2}x_{ij}.
+\]
+
+The conditional Gaussian update remains
+
+\[
+P_{jm}=\lambda_{jm}Q_K+D_{jm},
+\qquad
+P_{jm}\mu_{jm}=b_{jm}.
+\]
+
+In the partition model, assignment weights enter the ordering-position update,
+the complete-local-block average, and the assignment-prior updates.  They do
+not rescale a conditional branch's posterior precision or right-hand side.
+There is no estimated variance update when `S` is supplied; when noise is
+estimated instead, the one $\sigma_j^2$ for feature $j$ is shared across all
+orderings.
+
+These identities make the known-noise and estimated-noise implementations two
+likelihood variants of the same structural variational model rather than two
+different partition factorizations.

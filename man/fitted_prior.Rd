@@ -2,27 +2,48 @@
 % Please edit documentation in R/07_mpcurve.R
 \name{fitted_prior}
 \alias{fitted_prior}
+\alias{fitted_prior.mpcurve}
+\alias{fitted_prior.cavi}
+\alias{fitted_prior.soft_partition_cavi}
 \title{Extract fitted prior values}
 \usage{
 fitted_prior(x, type = c("position", "partition"), ordering = NULL, ...)
+
+\method{fitted_prior}{mpcurve}(x, type = c("position", "partition"), ordering = NULL, ...)
+
+\method{fitted_prior}{cavi}(x, type = c("position", "partition"), ordering = NULL, ...)
+
+\method{fitted_prior}{soft_partition_cavi}(x, type = c("position", "partition"), ordering = NULL, ...)
 }
 \arguments{
-\item{x}{A fitted \code{mpcurve} object.}
+\item{x}{A fitted \code{mpcurve}, raw \code{cavi}, or raw structural
+\code{soft_partition_cavi} object.}
 
 \item{type}{One of \code{"position"} or \code{"partition"}.}
 
-\item{ordering}{Optional ordering label or 1-based ordering index.}
+\item{ordering}{Optional ordering label or 1-based ordering index. For a
+single-ordering position prior it may identify the sole ordering; for a
+structural fit it is validated against the canonical ordering labels.}
 
 \item{...}{Unused.}
 }
 \value{
-The fitted/effective prior corresponding to \code{type}.
+If \code{type = "position"}, a numeric vector for a
+  single-ordering fit, a named list of vectors for an unfiltered partition
+  fit, or one numeric vector when \code{ordering} is supplied. If
+  \code{type = "partition"}, \code{NULL} for a single-ordering fit, the
+  full partition-prior record when \code{ordering = NULL}, or one unnamed
+  numeric mass when an ordering is supplied.
 }
 \description{
 Returns the current fitted/effective prior from an \code{mpcurve} object.
 For position priors, single-ordering fits return a numeric length-\code{K}
-vector while partition fits return a named list of vectors unless a specific
-ordering is requested. For partition priors, \code{ordering = NULL} returns
-the full prior record and a specific \code{ordering} returns the
-corresponding effective \eqn{\omega_m} mass.
+vector. Fixed-\code{M} structural partition fits return a named list of
+\code{M} length-\code{K} vectors, one for every retained ordering, unless a
+specific ordering is requested. For partition priors,
+\code{ordering = NULL} returns the full prior record, including the prior
+mode and effective \eqn{\omega} vector; a specific \code{ordering} returns
+the corresponding scalar \eqn{\omega_m} mass. Structural fits never
+renormalize these values over an active/frozen subset because the requested
+fixed \code{M} is always retained.
 }

@@ -1,0 +1,808 @@
+---
+title: "Fixed-M Structural Variational Inference for the Multi-Ordering MPCurve Model"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    mathjax: default
+vignette: >
+  %\VignetteIndexEntry{Fixed-M Structural Variational Inference for the Multi-Ordering MPCurve Model}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r load}
+library(MPCurver)
+```
+
+This note derives the model and coordinate updates implemented for a fixed
+number of orderings, $M \geq 2$.  The implementation uses the structural
+variational family
+
+\[
+q(C)\prod_{j=1}^d q(Z_j)q(U_j\mid Z_j),
+\]
+
+not a collection of independent posterior trajectories for every
+feature--ordering pair.  The $M$ Gaussian objects stored for feature $j$ are
+the mutually exclusive conditional branches
+$q(U_j\mid Z_j=m)$ of one latent trajectory.
+
+The derivation is deliberately implementation-specific.  It covers:
+
+- the single canonical structural state used by fitting and continuation;
+- estimated feature variance shared across all orderings;
+- known feature-level or observation-level measurement standard deviations;
+- intrinsic random-walk priors and their pseudo-determinants;
+- the complete conditional local block used to update $q(Z_j)$;
+- fixed and adaptive ordering-usage priors, plus the deprecated Dirichlet
+  compatibility path;
+- deterministic annealing and the exact $T=1$ objective; and
+- why the recorded fixed-$M$ objective is not used to select $M$.
+
+Throughout, $M$ is fixed before fitting.  The current implementation does not
+perform forward or backward selection of $M$.
+
+## 1  Indices, variables, and canonical quantities
+
+Let
+
+- $i=1,\ldots,n$ index observations;
+- $j=1,\ldots,d$ index features;
+- $m=1,\ldots,M$ index candidate orderings; and
+- $k=1,\ldots,K$ index discretized positions along an ordering.
+
+The observed data matrix is $X=(x_{ij})\in\mathbb R^{n\times d}$.  The latent
+variables are:
+
+\[
+C_i^{(m)}\in\{1,\ldots,K\},\qquad
+Z_j\in\{1,\ldots,M\},\qquad
+U_j\in\mathbb R^K.
+\]
+
+$C_i^{(m)}$ is observation $i$'s position under ordering $m$.  $Z_j$ chooses
+which ordering explains feature $j$.  Conditional on $Z_j=m$, the vector
+$U_j=(U_{j1},\ldots,U_{jK})^\top$ is the trajectory of feature $j$ along
+ordering $m$.
+
+The variational parameters used below are
+
+\[
+r_{imk}=q(C_i^{(m)}=k),\qquad
+w_{jm}=q(Z_j=m),
+\]
+
+and
+
+\[
+q(U_j\mid Z_j=m)
+=q_{jm}(U_j)
+=N(\mu_{jm},V_{jm}).
+\]
+
+For every $i,m$ and $j$,
+
+\[
+\sum_{k=1}^K r_{imk}=1,
+\qquad
+\sum_{m=1}^M w_{jm}=1.
+\]
+
+Define the position mass and the trajectory second moment
+
+\[
+N_{mk}=\sum_{i=1}^n r_{imk},
+\]
+
+\[
+A_{jm}
+:=
+\mathbb E_{q_{jm}}[U_j^\top Q_KU_j]
+=
+\mu_{jm}^\top Q_K\mu_{jm}
++\operatorname{tr}(Q_KV_{jm}).
+\]
+
+The raw structural fit stores these quantities once, at top level:
+
+- `gamma[[m]]` stores $(r_{imk})_{i,k}$;
+- `position_pi[[m]]` stores $\pi^{(m)}$;
+- `pi_weights[j, m]` stores $w_{jm}$;
+- `conditional_posterior$mean[[m]][j, ]` stores $\mu_{jm}$;
+- `conditional_posterior$cov[[m]][[j]]` stores $V_{jm}$;
+- `lambda_mat[j, m]` stores $\lambda_{jm}$; and
+- `params$sigma2[j]` stores the one variance $\sigma_j^2$ shared by all
+  orderings when measurement noise is estimated.
+
+The per-ordering objects in `$fits` are derived compatibility views.  They are
+not independent variational states and are not read back during continuation.
+
+## 2  Probabilistic model
+
+### 2.1  Position variables
+
+For each ordering $m$,
+
+\[
+C_i^{(m)}\mid\pi^{(m)}
+\sim\operatorname{Categorical}(\pi^{(m)}),
+\qquad
+\sum_{k=1}^K\pi_k^{(m)}=1.
+\]
+
+The implementation either holds $\pi^{(m)}$ fixed or estimates it as a point
+parameter.
+
+### 2.2  Feature assignment
+
+For every feature,
+
+\[
+Z_j\mid\omega\sim\operatorname{Categorical}(\omega),
+\qquad
+\sum_{m=1}^M\omega_m=1.
+\]
+
+The main interfaces support two point-parameter conventions:
+
+1. **fixed**: $\omega$ is supplied, or is uniform if it is not supplied;
+2. **adaptive**: $\omega$ is profiled from the current expected feature
+   usage.
+
+A deprecated compatibility path instead assigns a symmetric Dirichlet prior
+to $\omega$ and maintains $q(\omega)$.  Section 6.7 gives all three objective
+forms.
+
+### 2.3  Conditional trajectory prior
+
+Let $Q_K$ be the unit-scale random-walk precision and let
+
+\[
+r_Q=\operatorname{rank}(Q_K),
+\qquad
+\log|Q_K|_+
+=\sum_{\nu_\ell>0}\log\nu_\ell,
+\]
+
+where $|\cdot|_+$ is the pseudo-determinant.  Conditional on $Z_j=m$,
+
+\[
+p(U_j\mid Z_j=m,\lambda_{jm})
+\propto
+\lambda_{jm}^{r_Q/2}|Q_K|_+^{1/2}
+\exp\left\{-\frac{\lambda_{jm}}2U_j^\top Q_KU_j\right\}.
+\]
+
+With an intrinsic RW$(q)$ prior and no ridge, $r_Q=K-q$.  This is an
+intrinsic Gaussian density defined only up to its null-space reference
+measure.  Consequently the recorded quantity is a pseudo-ELBO under a fixed
+pseudo-determinant convention.  If $Q_K$ is made full rank explicitly, the
+same expression becomes the ordinary proper Gaussian log density with
+$r_Q=K$ and the usual determinant.
+
+Optionally, the implementation places an exponential prior on the trajectory
+standard-deviation scale
+
+\[
+\tau_{jm}=\lambda_{jm}^{-1/2},
+\qquad
+\tau_{jm}\sim\operatorname{Exp}(\rho),
+\]
+
+which induces
+
+\[
+g_\rho(\lambda_{jm})
+=\log p(\lambda_{jm})
+=\log(\rho/2)-\frac32\log\lambda_{jm}
+-\rho\lambda_{jm}^{-1/2}.
+\]
+
+When `lambda_sd_prior_rate = NULL`, $g_\rho$ is defined to be zero.
+
+### 2.4  Observation model with estimated noise
+
+When `S = NULL`, each feature has one variance shared across observations,
+positions, and orderings:
+
+\[
+x_{ij}\mid Z_j=m,C_i^{(m)}=k,U_j,\sigma_j^2
+\sim N(U_{jk},\sigma_j^2).
+\]
+
+The estimated-noise parameterization contains exactly one $\sigma_j^2$ for
+feature $j$.  That shared parameterization is essential to the current model
+and to the update in Section 6.5.
+
+### 2.5  Observation model with known noise
+
+When `S` is supplied, it contains standard deviations, not variances.  A
+length-$d$ vector means $s_{ij}=s_j$ for every observation, while an
+$n\times d$ matrix supplies $s_{ij}$ separately.  In either case,
+
+\[
+x_{ij}\mid Z_j=m,C_i^{(m)}=k,U_j,S
+\sim N(U_{jk},s_{ij}^2).
+\]
+
+The implementation replaces zero or extremely small supplied standard
+deviations by a numerical floor before constructing $s_{ij}^{-2}$.  No
+$\sigma_j^2$ parameter exists in this mode.
+
+## 3  Structural variational family
+
+Write
+
+\[
+q(C)=\prod_{m=1}^M\prod_{i=1}^n q_{im}(C_i^{(m)}).
+\]
+
+Ignoring $q(\omega)$ for the moment, the complete structural family is
+
+\[
+q(C,Z,U)
+=
+\left\{\prod_{m=1}^M\prod_{i=1}^nq_{im}(C_i^{(m)})\right\}
+\left\{\prod_{j=1}^d q_j(Z_j)q_j(U_j\mid Z_j)\right\}.
+\]
+
+The dependence between assignment and trajectory is retained:
+
+\[
+q_j(U_j\mid Z_j=m)=q_{jm}(U_j).
+\]
+
+This matters both mathematically and computationally.  The entropy of one
+feature's structural factor is
+
+\[
+H\{q_j(Z_j,U_j)\}
+=H\{q_j(Z_j)\}
++\sum_{m=1}^Mw_{jm}H(q_{jm}),
+\]
+
+so the conditional Gaussian entropy is weighted by the probability of the
+corresponding assignment branch.  Likelihood, trajectory prior, optional
+lambda prior, and Gaussian entropy therefore enter one complete local block.
+
+## 4  The fixed-$M$ structural objective
+
+### 4.1  Cell-position block
+
+For ordering $m$, define
+
+\[
+\mathcal C_m
+=
+\sum_{i=1}^n\sum_{k=1}^K
+r_{imk}\log\pi_k^{(m)}
+-
+\sum_{i=1}^n\sum_{k=1}^K
+r_{imk}\log r_{imk}.
+\]
+
+This is the expected position-prior log density plus the entropy of
+$q(C^{(m)})$.
+
+### 4.2  Complete conditional local block
+
+For feature $j$ and ordering $m$, define
+
+\[
+B_{jm}
+=\mathcal D_{jm}
++\mathcal P_{jm}
++g_\rho(\lambda_{jm})
++\mathcal H_{jm},
+\]
+
+where $\mathcal D_{jm}$ is the expected observation log likelihood,
+$\mathcal P_{jm}$ is the expected conditional trajectory log prior, and
+$\mathcal H_{jm}=H(q_{jm})$.
+
+For estimated noise,
+
+\[
+\mathcal D_{jm}^{\mathrm{est}}
+=-\frac12\sum_{i=1}^n\sum_{k=1}^K r_{imk}
+\left[
+\log(2\pi\sigma_j^2)
++\frac{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}}{\sigma_j^2}
+\right].
+\]
+
+For known noise,
+
+\[
+\mathcal D_{jm}^{S}
+=-\frac12\sum_{i=1}^n\sum_{k=1}^K r_{imk}
+\left[
+\log(2\pi s_{ij}^2)
++\frac{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}}{s_{ij}^2}
+\right].
+\]
+
+The prior term is
+
+\[
+\mathcal P_{jm}
+=\frac12\left\{
+r_Q\big(\log\lambda_{jm}-\log(2\pi)\big)
++\log|Q_K|_+
+\right\}
+-\frac{\lambda_{jm}}2A_{jm},
+\]
+
+and the Gaussian entropy is
+
+\[
+\mathcal H_{jm}
+=\frac12\left\{
+K\log(2\pi e)+\log|V_{jm}|
+\right\}.
+\]
+
+Thus $B_{jm}$ is complete: no Gaussian entropy or trajectory-prior term is
+added elsewhere without the same assignment weight.
+
+### 4.3  Assignment block
+
+Let
+
+\[
+H_Z=-\sum_{j=1}^d\sum_{m=1}^M w_{jm}\log w_{jm}.
+\]
+
+For fixed or adaptive point $\omega$, the temperature-$T$ assignment block is
+
+\[
+\mathcal A_T
+=\sum_{j,m}w_{jm}\log\omega_m+T H_Z.
+\]
+
+For the Dirichlet compatibility mode,
+
+\[
+\mathcal A_T
+=\sum_{j,m}w_{jm}\mathbb E_{q(\omega)}[\log\omega_m]
++T H_Z
+-\operatorname{KL}\{q(\omega)\|p(\omega)\}.
+\]
+
+### 4.4  Total objective
+
+The quantity evaluated by the structural backend is
+
+\[
+\boxed{
+\mathcal L_T
+=\sum_{m=1}^M\mathcal C_m
++\sum_{j=1}^d\sum_{m=1}^M w_{jm}B_{jm}
++\mathcal A_T.
+}
+\]
+
+At $T=1$, this is the structural ELBO for proper trajectory priors and the
+fixed-convention structural pseudo-ELBO for an intrinsic prior.  For $T>1$,
+it is an entropy-tempered optimization objective, not the ordinary ELBO.
+
+## 5  Sufficient statistics for the conditional Gaussian branches
+
+### 5.1  Estimated shared variance
+
+For a fixed ordering $m$, define
+
+\[
+D_{jm}
+=\operatorname{diag}\left(
+\frac{N_{m1}}{\sigma_j^2},\ldots,
+\frac{N_{mK}}{\sigma_j^2}
+\right),
+\]
+
+and
+
+\[
+b_{jm,k}
+=\frac{1}{\sigma_j^2}
+\sum_{i=1}^n r_{imk}x_{ij}.
+\]
+
+### 5.2  Known measurement standard deviations
+
+Set $\tau_{ij}=s_{ij}^{-2}$.  Then
+
+\[
+D_{jm}
+=\operatorname{diag}\left(
+\sum_i r_{im1}\tau_{ij},\ldots,
+\sum_i r_{imK}\tau_{ij}
+\right),
+\]
+
+\[
+b_{jm,k}
+=\sum_{i=1}^n r_{imk}\tau_{ij}x_{ij}.
+\]
+
+If `S` is a length-$d$ vector, $\tau_{ij}=s_j^{-2}$ and these expressions
+reduce to the estimated-noise sufficient statistics with $\sigma_j^2$
+formally replaced by the fixed value $s_j^2$.
+
+## 6  Coordinate updates
+
+### 6.1  Conditional trajectory update
+
+For $w_{jm}>0$, all terms involving $q_{jm}$ occur inside
+$w_{jm}B_{jm}$.  Dividing the coordinate objective by this positive scalar
+shows that the assignment probability does not alter the conditional
+posterior.  Completing the square gives
+
+\[
+P_{jm}=\lambda_{jm}Q_K+D_{jm},
+\qquad
+P_{jm}\mu_{jm}=b_{jm},
+\qquad
+V_{jm}=P_{jm}^{-1}.
+\]
+
+Both the likelihood precision $D_{jm}$ and right-hand side $b_{jm}$ use the
+full conditional data contribution.  Assignment probabilities do not appear
+inside either quantity.
+
+If $w_{jm}=0$ exactly, the ELBO is indifferent to the value of the
+zero-probability conditional factor.  The implementation uses the continuous
+extension of the positive-weight update above and keeps a well-defined
+conditional branch available for the next assignment update.  This convention
+is also what makes the local score $B_{jm}$ evaluable if a branch later regains
+positive probability.
+
+### 6.2  Position-responsibility update
+
+The terms involving $r_{imk}$ are the position prior, position entropy, and
+the assignment-weighted expected likelihoods.  For estimated noise,
+
+\[
+\log r_{imk}
+\stackrel{+c}{=}
+\log\pi_k^{(m)}
+-\frac12\sum_{j=1}^d w_{jm}
+\left[
+\log(2\pi\sigma_j^2)
++\frac{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}}{\sigma_j^2}
+\right].
+\]
+
+For known noise,
+
+\[
+\log r_{imk}
+\stackrel{+c}{=}
+\log\pi_k^{(m)}
+-\frac12\sum_{j=1}^d w_{jm}
+\left[
+\log(2\pi s_{ij}^2)
++\frac{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}}{s_{ij}^2}
+\right].
+\]
+
+Here $+c$ denotes an additive constant independent of $k$.  The posterior
+variance term $V_{jm,kk}$ is required; replacing it by zero would turn the
+update into a plug-in approximation.
+
+The implementation evaluates these logits with a row-wise log-sum-exp and
+then applies a very small categorical-probability floor to prevent floating
+point underflow to exact zero.  This simplex stabilization is not a precision
+ridge.
+
+### 6.3  Position-prior update
+
+For an adaptive position prior,
+
+\[
+\pi_k^{(m)}
+=\frac1n\sum_{i=1}^n r_{imk}.
+\]
+
+For a fixed position prior, $\pi^{(m)}$ is left unchanged.
+
+### 6.4  Expected residuals
+
+For subsequent parameter updates, define
+
+\[
+E_{jm}
+=\sum_{i=1}^n\sum_{k=1}^K r_{imk}
+\left\{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}\right\}.
+\]
+
+This is the full expected squared residual for feature $j$ under conditional
+branch $m$.
+
+### 6.5  Shared estimated-variance update
+
+Because $\sum_mw_{jm}=1$, the $\sigma_j^2$-dependent part of the objective is
+
+\[
+-\frac n2\log\sigma_j^2
+-\frac{1}{2\sigma_j^2}\sum_{m=1}^M w_{jm}E_{jm}.
+\]
+
+Its maximizer is
+
+\[
+\boxed{
+\sigma_j^2
+=\frac1n\sum_{m=1}^M w_{jm}E_{jm}.
+}
+\]
+
+The implementation clips this update to `[sigma_min, sigma_max]`.  With known
+`S`, this coordinate does not exist and `params$sigma2` is `NULL`.
+
+### 6.6  Ordering-specific lambda update
+
+Without the optional scale prior, the $\lambda_{jm}$-dependent part of
+$B_{jm}$ is
+
+\[
+\frac{r_Q}{2}\log\lambda_{jm}
+-\frac{A_{jm}}2\lambda_{jm},
+\]
+
+so
+
+\[
+\boxed{
+\lambda_{jm}=\frac{r_Q}{A_{jm}}.
+}
+\]
+
+With $\tau_{jm}\sim\operatorname{Exp}(\rho)$, the bounded one-dimensional
+objective is
+
+\[
+\frac{r_Q-3}{2}\log\lambda_{jm}
+-\frac{A_{jm}}2\lambda_{jm}
+-\rho\lambda_{jm}^{-1/2}.
+\]
+
+It is optimized on the log scale and clipped to
+`[lambda_min, lambda_max]`.  Because the whole conditional block is multiplied
+by $w_{jm}$, a positive assignment weight scales all its lambda-dependent
+terms equally and does not change this branchwise maximizer.  The implementation
+uses the same continuous branch update when the stored weight is zero.  If
+`fix_lambda = TRUE`, the supplied $\lambda_{jm}$ values are retained.
+
+### 6.7  Assignment and ordering-usage updates
+
+Given the complete local blocks, the assignment coordinate is
+
+\[
+\boxed{
+w_{jm}
+=\frac{\exp\{(B_{jm}+a_m)/T\}}
+{\sum_{\ell=1}^M\exp\{(B_{j\ell}+a_\ell)/T\}},
+}
+\]
+
+where
+
+\[
+a_m=
+\begin{cases}
+\log\omega_m,
+&\text{fixed or adaptive point prior},\\
+\mathbb E_{q(\omega)}[\log\omega_m],
+&\text{Dirichlet compatibility mode}.
+\end{cases}
+\]
+
+For the adaptive point prior,
+
+\[
+\omega_m
+=\frac{1}{d}\sum_{j=1}^d w_{jm}.
+\]
+
+For a symmetric Dirichlet prior
+$p(\omega)=\operatorname{Dirichlet}(\alpha_0,\ldots,\alpha_0)$,
+
+\[
+q(\omega)
+=\operatorname{Dirichlet}(\alpha_1,\ldots,\alpha_M),
+\qquad
+\alpha_m=\alpha_0+\sum_jw_{jm},
+\]
+
+\[
+\mathbb E[\log\omega_m]
+=\psi(\alpha_m)-\psi\left(\sum_\ell\alpha_\ell\right).
+\]
+
+The fixed and adaptive point-prior modes are the current interfaces.  The
+Dirichlet form is retained only to explain the exact objective of the
+backward-compatibility arguments.
+
+## 7  Intrinsic priors and posterior identifiability
+
+For an intrinsic RW$(q)$ prior, $Q_K$ is positive semidefinite with a
+$q$-dimensional null space.  The conditional posterior precision
+
+\[
+P_{jm}=\lambda_{jm}Q_K+D_{jm}
+\]
+
+is positive definite precisely when the likelihood identifies every prior
+null-space direction:
+
+\[
+\operatorname{null}(Q_K)\cap\operatorname{null}(D_{jm})=\{0\}.
+\]
+
+This condition is often easy to satisfy.  With finite position logits, every
+$r_{imk}$ is theoretically positive; the estimated-noise $D_{jm}$ then has a
+positive diagonal.  The same is true under known positive precisions.  The
+categorical stabilization used in code also prevents numerical softmax
+underflow from creating empty position columns.
+
+Crucially, $D_{jm}$ is built from the conditional likelihood and is present
+even if the feature's current assignment probability for ordering $m$ is
+zero.  A zero assignment probability therefore does not, by itself, remove
+the likelihood information needed to identify the intrinsic null space.
+
+This does not make every intrinsic posterior automatically proper.  If the
+position responsibilities and measurement precisions genuinely fail to
+identify a null-space direction, $P_{jm}$ remains singular.  The structural
+backend then reports an identifiability error.  It does not silently add
+precision jitter.  An explicitly requested ridge changes the statistical
+prior and is treated as a proper full-rank precision; it is not required merely
+to compensate for a small feature-assignment probability.
+
+## 8  Annealing, convergence, and hard assignments
+
+The fitting schedule replaces $H_Z$ by $T H_Z$ with $T$ decreasing from
+`T_start` to `T_end`.  At a fixed temperature, the softmax in Section 6.7 is
+the exact coordinate maximizer for the corresponding entropy-tempered
+objective.  However,
+
+\[
+\mathcal L_{T_1}\neq\mathcal L_{T_2}
+\qquad\text{when }T_1\neq T_2,
+\]
+
+so objective values recorded at different temperatures must not be compared
+as if they came from one monotone sequence.
+
+After annealing, the implementation ensures that the state is evaluated at
+$T=1$ and performs exact-temperature coordinate sweeps.  Monotonicity and
+convergence diagnostics belong to this fixed-$T=1$ segment.  `do_mpcurve()`
+continues a structural fit only with $T=1$ sweeps from the top-level canonical
+state.
+
+If `hard_assign_final = TRUE`, the final $w_{jm}$ values are projected to
+one-hot assignments.  That projection is a reporting or downstream-use
+choice, not the soft variational coordinate maximizer, and its final objective
+need not improve over the preceding soft state.
+
+## 9  Reduction to one ordering
+
+When $M=1$,
+
+\[
+w_{j1}=1,
+\qquad
+H_Z=0,
+\qquad
+\omega_1=1.
+\]
+
+There is one $q(C)$ factor and one Gaussian branch per feature.  The structural
+objective reduces to the ordinary single-ordering CAVI objective, the shared
+variance update becomes
+
+\[
+\sigma_j^2=E_{j1}/n,
+\]
+
+and the conditional Gaussian and lambda updates become the corresponding
+single-ordering updates.  This is a mathematical reduction; the partition
+backend itself requires $M\geq2$, while `cavi()` is used for $M=1$.
+
+## 10  Why the fixed-$M$ objective does not select $M$
+
+`objective_history` is designed to optimize and diagnose one prespecified
+$M$.  It is not exposed as a complexity-penalized model-selection score.
+
+Several facts prevent a naive cross-$M$ comparison:
+
+1. Under an intrinsic prior the recorded quantity uses a fixed
+   pseudo-determinant convention rather than a normalized marginal likelihood.
+2. With an adaptive ordering-usage prior, an additional nearly empty ordering
+   can receive almost no assignment mass without paying a calibrated
+   model-complexity cost.
+3. Different values of $M$ introduce different position variables, conditional
+   branches, and optimization landscapes; local variational optima are not a
+   substitute for a common marginal-evidence calculation.
+4. Values from different annealing temperatures are not comparable even within
+   one fit.
+
+A fixed uniform $\omega$ does contribute an explicit
+$-d\log M$ assignment term, but that alone does not turn the current raw
+objective into a validated dimension-selection criterion.  For this reason,
+forward and backward greedy selection are temporarily unavailable.  Users
+should choose $M$ externally or compare fixed-$M$ fits using a separately
+defined and validated criterion.
+
+## 11  Exact correspondence with the canonical implementation
+
+One complete structural sweep performs the following conceptual updates:
+
+1. update every conditional Gaussian branch from the current $q(C^{(m)})$;
+2. update every $q(C^{(m)})$ using feature likelihoods weighted by $w_{jm}$;
+3. update adaptive position priors;
+4. update the single shared $\sigma_j^2$ vector when `S = NULL`;
+5. update the ordering-specific $\lambda_{jm}$ values unless fixed;
+6. recompute the complete $B_{jm}$ matrix;
+7. update $q(Z_j)$ and the selected ordering-usage prior; and
+8. evaluate $\sum_m\mathcal C_m+\sum_{jm}w_{jm}B_{jm}+\mathcal A_T$.
+
+The stored `local_blocks[j, m]` is exactly $B_{jm}$.  The stored
+`objective_terms$cell_terms` is $\sum_m\mathcal C_m$, and the stored assignment
+information contains the expected log-assignment term, $H_Z$, and, where
+applicable, the Dirichlet KL term.  `objective_history` records their sum at
+the temperature in `temperature_history`.
+
+## 12  Summary
+
+The current fixed-$M$ method is characterized by six identities:
+
+\[
+q(C,Z,U)
+=q(C)\prod_jq(Z_j)q(U_j\mid Z_j),
+\]
+
+\[
+P_{jm}=\lambda_{jm}Q_K+D_{jm},
+\qquad
+P_{jm}\mu_{jm}=b_{jm},
+\]
+
+\[
+\log r_{imk}
+\stackrel{+c}{=}
+\log\pi_k^{(m)}
++\sum_jw_{jm}
+\mathbb E_{q_{jm}}[\log p(x_{ij}\mid C_i^{(m)}=k,U_j)],
+\]
+
+\[
+\sigma_j^2=\frac1n\sum_mw_{jm}E_{jm},
+\]
+
+\[
+w_{jm}\propto
+\exp\{(B_{jm}+a_m)/T\},
+\]
+
+and
+
+\[
+\mathcal L_T
+=\sum_m\mathcal C_m+\sum_{jm}w_{jm}B_{jm}+\mathcal A_T.
+\]
+
+Together these formulas explain why the implementation can use an intrinsic
+random-walk prior without assignment-dependent precision regularization, why
+the estimated variance is shared across orderings, and why convergence and
+model selection must be interpreted within the fixed-$M$, fixed-temperature
+setting for which the objective was defined.

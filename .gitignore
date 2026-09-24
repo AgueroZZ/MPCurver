@@ -38,5 +38,10 @@ scripts/*
 output/
 tmp/
 debug_PCA.R
-important_derivations/
+# Version the editable mathematical sources, but keep rendered/internal assets
+# (including local reference PDFs) out of ordinary commits.
+important_derivations/*
+!important_derivations/*.Rmd
+# Never version the temporary Chinese derivation reference PDF.
+MPCurve - 推导讲解-关于 replace potential trajectories.pdf
 .positai

@@ -12,17 +12,29 @@
 \arguments{
 \item{object}{An \code{mpcurve} object.}
 
-\item{...}{Passed to the underlying summary method.}
+\item{...}{Passed to the underlying summary method for single-ordering fits;
+ignored for structural partition summaries.}
+
+\item{x}{A \code{summary.mpcurve} object.}
 }
 \value{
-An object of class \code{summary.mpcurve} with fields:
-  \code{$algorithm}, \code{$modelName}, \code{$K}, \code{$n},
-  \code{$d}, and \code{$underlying} (the full underlying summary).
+An object of class \code{summary.mpcurve}. Every result contains
+  \code{$algorithm}, \code{$modelName}, \code{$intrinsic_dim},
+  \code{$K}, \code{$n}, \code{$d}, \code{$priors}, and
+  \code{$converged}. A single-ordering result also contains
+  \code{$underlying}. A structural partition result instead contains
+  \code{$partition}, \code{$objective_history},
+  \code{$convergence_info}, \code{$control}, the shared
+  \code{$sigma2} vector (or \code{NULL}), \code{$measurement_sd}, and
+  \code{$variational_family}. Compatibility dimension fields remain equal
+  to the retained fixed \code{M} for current structural objects.
 }
 \description{
-Delegates to the underlying \code{summary.cavi},
-\code{summary.csmooth_em}, or \code{summary.smooth_em}, wrapping the result in a
-\code{summary.mpcurve} object so users can access all fields
-(\code{$ml_last}, \code{$elbo_last}, convergence diagnostics, etc.)
-that the underlying class exposes.
+Single-ordering objects delegate algorithm-specific diagnostics to the
+underlying fit and store that result in \code{$underlying}. Fixed-\code{M}
+partition objects are summarized directly from their canonical structural
+state instead: the result contains the partition probabilities and hard
+assignments, fitted priors, structural objective history, convergence
+information, noise specification, and variational-family label. It does not
+contain an independently summarized per-ordering \code{$underlying} fit.
 }

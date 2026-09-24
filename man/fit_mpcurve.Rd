@@ -12,6 +12,7 @@ fit_mpcurve(
   rw_q = 2,
   lambda = 1,
   S = NULL,
+  sigma2_init = NULL,
   fix_lambda = FALSE,
   iter = 100,
   tol = 1e-06,
@@ -43,11 +44,11 @@ fit_mpcurve(
   inner_iter = 1L,
   max_converge_iter = NULL,
   tol_outer = 1e-05,
-  freeze_unused_ordering = TRUE,
-  freeze_unused_ordering_threshold = 0.5,
-  freeze_feature = TRUE,
-  freeze_feature_weight_threshold = 0.1,
-  drop_unused_ordering = FALSE,
+  freeze_unused_ordering = NULL,
+  freeze_unused_ordering_threshold = NULL,
+  freeze_feature = NULL,
+  freeze_feature_weight_threshold = NULL,
+  drop_unused_ordering = NULL,
   verbose = FALSE,
   ...
 )
@@ -58,26 +59,32 @@ fit_mpcurve(
 \item{algorithm}{Public backend selector. Must be \code{"cavi"}; legacy
 backend values are rejected with an error.}
 
-\item{method}{Initialisation method(s) for the trajectory ordering. If
-\code{num_cores > 1} and \code{length(method) > 1} in the single-ordering
-case, all methods are run in parallel and a named list of fits is
-returned. For partition fits, \code{length(method)} must be either 1 or
+\item{method}{Initialisation method(s) for the trajectory ordering. In the
+single-ordering case, multiple methods are all attempted only when
+\code{num_cores > 1}; otherwise only \code{method[[1]]} is fitted. For
+partition fits, \code{length(method)} must be either 1 or
 \code{intrinsic_dim}.}
 
 \item{K}{Integer number of mixture components (grid knots).}
 
 \item{rw_q}{Integer random-walk order for the GMRF prior.}
 
-\item{lambda}{Positive scalar initial value for \code{lambda_j} in the
-single-ordering CAVI fit.}
+\item{lambda}{Positive initial smoothness value(s). A single-ordering fit
+accepts a scalar or length-\code{d} vector. A structural partition fit
+accepts a scalar, a length-\code{d} vector broadcast across orderings, a
+flattened length-\code{d * M} vector, or a \code{d x M} matrix.}
 
 \item{S}{Optional known measurement standard deviations. If a length-\code{d}
 vector, each feature uses a known shared standard deviation across
 observations. If an \code{n x d} matrix, each observation-feature pair uses
 its own known standard deviation.}
 
-\item{fix_lambda}{Logical; if \code{TRUE}, keep \code{lambda_j} fixed at the
-supplied initial value in the single-ordering CAVI fit.}
+\item{sigma2_init}{Optional scalar or length-\code{d} initial variance
+vector. Partition fits use one vector shared across all orderings. It
+cannot be supplied together with \code{S}.}
+
+\item{fix_lambda}{Logical; if \code{TRUE}, keep all smoothness parameters
+fixed at the supplied initial value.}
 
 \item{iter}{Maximum number of CAVI sweeps for the single-ordering fit.}
 
@@ -88,16 +95,12 @@ single-ordering runs.}
 
 \item{intrinsic_dim}{Integer intrinsic dimensionality of the latent ordering
 system. \code{intrinsic_dim = 1} fits the standard single-ordering model.
-Values \code{>= 2} fit the partition-CAVI model.}
+Values \code{>= 2} fit the fixed-\eqn{M} structural partition model.}
 
-\item{greedy}{Dimension-selection mode. \code{"none"} keeps the requested
-\code{intrinsic_dim}. \code{"forward"} treats \code{intrinsic_dim} as an
-upper bound and compares \eqn{M} versus \eqn{M+1} sequentially starting
-from \eqn{M=1}. Greedy comparison is normalized to the active intrinsic
-dimension after compaction, so a collapsed candidate cannot justify
-moving to a larger model. \code{"backward"} fits the upper bound first,
-then compares active \eqn{M} versus a warm-started smaller model while
-greedily removing the most correlated active ordering.}
+\item{greedy}{Retained for call compatibility. Only \code{"none"} is
+currently supported: structural VI fits a fixed \code{intrinsic_dim}, and
+cross-\eqn{M} selection requires a separate predictive or
+complexity-penalized criterion.}
 
 \item{partition_init}{For partition fits only: either
 \code{"similarity"} for feature-similarity-driven block initialization or
@@ -109,7 +112,11 @@ initialization. For partition fits, MPCurver enforces a common \code{K}
 across orderings; if quantile cuts collapse, it falls back to equal-width
 bins.}
 
-\item{ridge}{Optional nugget added to the RW precision.}
+\item{ridge}{Nonnegative nugget explicitly added to the RW precision.
+The default \code{0} retains the intrinsic prior. Structural conditional
+posterior precision does not rely on an automatic ridge or jitter; if the
+likelihood does not identify the intrinsic-prior null space, fitting stops
+with an identifiability error.}
 
 \item{lambda_sd_prior_rate}{Optional positive rate for an exponential prior
 on \code{1 / sqrt(lambda_j)}. Passed to the CAVI backend and the partition
@@ -120,13 +127,12 @@ exponential prior with rate zero.}
 
 \item{lambda_min, lambda_max}{Positive bounds for \code{lambda_j}.}
 
-\item{sigma_min, sigma_max}{Positive bounds for \code{sigma_j^2}. These apply
-to the single-ordering CAVI path and to the \code{"smooth_fit"}
-similarity metric when \code{partition_init = "similarity"}.}
+\item{sigma_min, sigma_max}{Positive bounds for \code{sigma_j^2}. Structural
+partition fits update one feature-specific vector shared across orderings.}
 
 \item{position_prior}{Either \code{"adaptive"} or \code{"fixed"} for the
-single-ordering component prior \code{pi}. In the partition path, this
-mode is forwarded to each ordering-specific weighted CAVI update.}
+single-ordering component prior \code{pi}. Partition fits apply the same
+mode independently to each ordering's position responsibilities.}
 
 \item{position_prior_init}{Optional length-\code{K} initial/fixed vector for
 the component prior \code{pi}. When \code{position_prior = "fixed"} and
@@ -136,15 +142,14 @@ broadcast to all orderings.}
 
 \item{partition_prior}{For partition fits only: either \code{"adaptive"} or
 \code{"fixed"} for the ordering-usage prior \code{omega}. The adaptive
-mode uses an empirical-Bayes update proportional to \code{colSums(w)}
-over the currently active orderings. The fixed mode keeps a constant prior
-and renormalizes it over the active ordering set after any drops/freeze
-events.}
+mode uses an empirical-Bayes update proportional to \code{colSums(w)}.
+The fixed mode keeps a constant prior over the fixed set of \eqn{M}
+orderings.}
 
 \item{partition_prior_init}{For partition fits only: optional length-\code{M}
 initial/fixed vector for the ordering prior \code{omega}. Used only when
 \code{partition_prior = "fixed"}. When omitted, the fixed prior defaults
-to uniform over the active orderings.}
+to uniform over the \eqn{M} orderings.}
 
 \item{assignment_prior}{Deprecated compatibility argument for the old
 partition-prior API. \code{"uniform"} maps to
@@ -178,11 +183,16 @@ hierarchical-clustering linkage applied to \code{1 - S(X)}. Defaults to
 \item{similarity_min_feature_sd}{For \code{partition_init = "similarity"}
 only: low-variance feature threshold used when building \code{S(X)}.}
 
-\item{T_start, T_end}{Annealing temperatures for partition CAVI.}
+\item{T_start, T_end}{Positive starting and ending temperatures for the
+structural feature-assignment annealing schedule. Objective values
+recorded at different temperatures are not directly comparable.
+Regardless of \code{T_end}, the implementation records an exact
+\eqn{T=1} state after annealing when needed and performs convergence
+iterations at \eqn{T=1}.}
 
 \item{n_outer}{Number of annealing steps for partition CAVI.}
 
-\item{inner_iter}{Number of weighted CAVI sweeps per annealing step.}
+\item{inner_iter}{Number of structural coordinate sweeps per annealing step.}
 
 \item{max_converge_iter}{Maximum number of exact \code{T = 1} partition
 iterations after annealing. Defaults to \code{iter} when \code{NULL}.}
@@ -190,54 +200,62 @@ iterations after annealing. Defaults to \code{iter} when \code{NULL}.}
 \item{tol_outer}{Relative objective tolerance for partition phase-2
 convergence.}
 
-\item{freeze_unused_ordering}{For partition fits only: if \code{TRUE},
-inactive orderings are frozen and skipped in subsequent weighted updates.}
+\item{freeze_unused_ordering, freeze_unused_ordering_threshold}{Deprecated
+no-op compatibility arguments. Structural VI has no inactive/frozen
+ordering state; explicitly supplying either argument emits a warning.}
 
-\item{freeze_unused_ordering_threshold}{For partition fits only: non-negative
-feature-mass threshold used to decide when an ordering is effectively
-unused.}
+\item{freeze_feature, freeze_feature_weight_threshold}{Deprecated no-op
+compatibility arguments. Structural conditional trajectories are never
+frozen according to \eqn{w_{jm}}.}
 
-\item{freeze_feature}{For partition fits only: if \code{TRUE},
-feature-ordering pairs with sufficiently small posterior weight are frozen
-and their trajectory contribution is neutralized.}
-
-\item{freeze_feature_weight_threshold}{For partition fits only: non-negative
-threshold on \code{w_{jm}} used when \code{freeze_feature = TRUE}.}
-
-\item{drop_unused_ordering}{For partition fits only: if \code{TRUE}, the
-returned \code{mpcurve} view may compact away frozen orderings. With
-\code{FALSE}, the reported partition \code{$objective_history} is the
-fixed-requested-\code{M} comparison objective; with \code{TRUE}, it is
-the post-drop fitting objective of the active model. Greedy search always
-reports the selected active dimension after compaction.}
+\item{drop_unused_ordering}{Deprecated no-op compatibility argument. A
+structural fit always retains its fixed requested \eqn{M}.}
 
 \item{verbose}{Logical; print per-iteration progress?}
 
 \item{...}{Advanced CAVI / partition-CAVI options forwarded to the underlying
 backend. This is intended for advanced initialization controls such as
 \code{responsibilities_init}, deprecated \code{pi_init},
-\code{sigma2_init},
 \code{fits_init}, \code{init_methods}, \code{pca_components}, or
 \code{hard_assign_final}. Legacy smoothEM/csmoothEM controls are rejected.}
 }
 \value{
 An \code{\link{mpcurve}} object, or (for parallel multi-method
-  single-ordering runs) a named list of \code{mpcurve} objects with a
-  \code{summary} attribute. Every returned fit stores inferred cell
+  single-ordering runs) a named list whose successful entries are
+  \code{mpcurve} objects and whose failed entries are \code{NULL}. The list
+  has a \code{summary} attribute recording success, convergence, final ELBO,
+  and any error message for every attempted method. Every returned fit
+  stores inferred cell
   locations in \code{$locations}; for single-ordering fits this includes both
-  posterior-mean and MAP locations derived from \code{$gamma}. Greedy runs
-  additionally attach a \code{$greedy_selection} metadata block recording
-  the stepwise search history and stop reason.
+  posterior-mean and MAP locations derived from \code{$gamma}. A structural
+  partition result stores named ordering-specific \code{$params$pi},
+  \code{$params$mu}, \code{$gamma}, and \code{$locations}; one shared
+  \code{$params$sigma2}; \code{$conditional_posterior}; a
+  \code{d x M} \code{$lambda_mat}; and
+  \code{$partition$pi_weights}. Its \code{$fits} field contains derived
+  compatibility views and is not continuation state.
 }
 \description{
 High-level user-facing wrapper around MPCurve's recommended CAVI fitting
 paths. Use \code{intrinsic_dim = 1} for a standard single-ordering fit and
-\code{intrinsic_dim >= 2} for the partition-CAVI model with one ordering per
-latent dimension.
+\code{intrinsic_dim = M >= 2} for the fixed-\code{M} structural partition
+model.
 }
 \details{
 MPCurver's public fitting interface is CAVI-only. Legacy \code{smooth_em}
 and \code{csmooth_em} code paths remain in the package implementation for
 internal compatibility and regression testing, but they are not part of the
 documented public workflow.
+
+For fixed \eqn{M >= 2}, the structural variational family is
+\deqn{q(C)\prod_{j=1}^d q(Z_j)q(U_j\mid Z_j).}
+
+A structural partition fit preserves posterior dependence between a
+feature's ordering assignment \eqn{Z_j} and its trajectory \eqn{U_j}.
+Conditional trajectory precision is not multiplied by
+\eqn{q(Z_j=m)}, estimated \eqn{\sigma_j^2} is shared across all orderings,
+and the returned object has no active, frozen, or dropped ordering state.
+The requested \code{M} is fixed. The raw fixed-\code{M} structural objective
+is not a complexity-penalized criterion for choosing \code{M}, so automatic
+forward/backward greedy selection is temporarily unavailable.
 }

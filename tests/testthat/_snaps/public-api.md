@@ -13,11 +13,11 @@
 
     MPCurve partition fit
       Backend        : cavi
-      Dim (req/act/view): 2 / 2 / 2
+      Variational    : structural q(C) q(Z) q(U | Z)
+      Intrinsic dim  : 2 (fixed)
       n / d / K      : 60 / 8 / 6
       Iterations     : 4
-      Partition      : A=3, B=5
-      Active         : A, B
-      Objective (last): -449.922152
+      Partition      : A=2, B=6
+      Objective (last): -554.977747
       Converged      : FALSE
 

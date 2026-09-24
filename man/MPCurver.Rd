@@ -8,6 +8,9 @@
 \description{
 CAVI-first trajectory and pseudotime inference with legacy smoothEM
 backends retained for internal benchmarking and compatibility checks.
+Single-ordering fits use ordinary CAVI; fixed multi-ordering fits use the
+structural family \eqn{q(C)\prod_j q(Z_j)q(U_j\mid Z_j)} with one canonical
+shared state.
 }
 \seealso{
 Useful links:

@@ -1,35 +1,19 @@
 # ============================================================
 # mpcurve S3 class - unified model object for MPCurve fits
 # ============================================================
-# MPCurve is the statistical model (GMM + GMRF prior on mu);
-# cavi, csmooth_em, and smooth_em are the currently supported fitting
-# backends. The recommended/default path is now cavi.
+# MPCurve is the statistical model (GMM + GMRF prior on trajectories).
+# The public fitting path is CAVI. csmooth_em and smooth_em remain available
+# only for internal normalization, compatibility, and benchmarking.
 #
 # as_mpcurve()   - convert a raw algorithm fit to an mpcurve object
 # fit_mpcurve()  - run the full pipeline and return an mpcurve
 #
-# mpcurve object fields:
-#   $params$pi      K-vector   mixture weights
-#   $params$mu      d x K      cluster means (unified matrix format)
-#   $params$sigma2  d-vec or d x K  per-feature variances
-#   $gamma          n x K      responsibility matrix
-#   $locations      inferred cell locations from gamma
-#   $elbo_trace     numeric    penalized ELBO over iterations
-#   $loglik_trace   numeric    observed log-likelihood over iterations
-#   $lambda_trace   list       lambda_vec per iteration
-#   $iter           integer    number of EM iterations run
-#   $K, $n, $d      integers   dimensions
-#   $algorithm      character  "cavi", "smooth_em", or "csmooth_em"
-#   $modelName      character  covariance structure string
-#   $intrinsic_dim  integer    1 = single ordering, 2 = dual-ordering partition
-#   $fit            raw        underlying cavi / smooth_em / csmooth_em object
-#
-# For intrinsic_dim = 2 (soft partition), additional fields:
-#   $fits           list(fit1, fit2)  mpcurve objects for each ordering
-#   $partition      list with:
-#     $pi_weights   d x 2 matrix of feature-to-ordering weights
-#     $assign       d-length character vector ("A" / "B")
-#   $objective_history  numeric  variational objective trace
+# Single-ordering objects expose matrix-valued params and gamma. Fixed-M
+# structural partition objects instead expose named ordering lists for pi, mu,
+# gamma, and locations, one shared sigma2 vector, conditional_posterior,
+# lambda_mat, and partition$pi_weights. Their $fits list is derived for
+# compatibility and is never continuation state. See ?mpcurve for the complete
+# public schema.
 # ============================================================
 
 `%||%` <- function(a, b) if (!is.null(a)) a else b
@@ -1211,17 +1195,29 @@ as_mpcurve <- function(x, ...) {
 #' @description
 #' Returns the current fitted/effective prior from an \code{mpcurve} object.
 #' For position priors, single-ordering fits return a numeric length-\code{K}
-#' vector while partition fits return a named list of vectors unless a specific
-#' ordering is requested. For partition priors, \code{ordering = NULL} returns
-#' the full prior record and a specific \code{ordering} returns the
-#' corresponding effective \eqn{\omega_m} mass.
+#' vector. Fixed-\code{M} structural partition fits return a named list of
+#' \code{M} length-\code{K} vectors, one for every retained ordering, unless a
+#' specific ordering is requested. For partition priors,
+#' \code{ordering = NULL} returns the full prior record, including the prior
+#' mode and effective \eqn{\omega} vector; a specific \code{ordering} returns
+#' the corresponding scalar \eqn{\omega_m} mass. Structural fits never
+#' renormalize these values over an active/frozen subset because the requested
+#' fixed \code{M} is always retained.
 #'
-#' @param x A fitted \code{mpcurve} object.
+#' @param x A fitted \code{mpcurve}, raw \code{cavi}, or raw structural
+#'   \code{soft_partition_cavi} object.
 #' @param type One of \code{"position"} or \code{"partition"}.
-#' @param ordering Optional ordering label or 1-based ordering index.
+#' @param ordering Optional ordering label or 1-based ordering index. For a
+#'   single-ordering position prior it may identify the sole ordering; for a
+#'   structural fit it is validated against the canonical ordering labels.
 #' @param ... Unused.
 #'
-#' @return The fitted/effective prior corresponding to \code{type}.
+#' @return If \code{type = "position"}, a numeric vector for a
+#'   single-ordering fit, a named list of vectors for an unfiltered partition
+#'   fit, or one numeric vector when \code{ordering} is supplied. If
+#'   \code{type = "partition"}, \code{NULL} for a single-ordering fit, the
+#'   full partition-prior record when \code{ordering = NULL}, or one unnamed
+#'   numeric mass when an ordering is supplied.
 #' @export
 fitted_prior <- function(x,
                          type = c("position", "partition"),
@@ -1231,6 +1227,7 @@ fitted_prior <- function(x,
 }
 
 
+#' @rdname fitted_prior
 #' @export
 fitted_prior.mpcurve <- function(x,
                                  type = c("position", "partition"),
@@ -1244,7 +1241,8 @@ fitted_prior.mpcurve <- function(x,
 }
 
 
-#' @noRd
+#' @rdname fitted_prior
+#' @export
 fitted_prior.cavi <- function(x,
                               type = c("position", "partition"),
                               ordering = NULL,
@@ -1257,7 +1255,8 @@ fitted_prior.cavi <- function(x,
 }
 
 
-#' @noRd
+#' @rdname fitted_prior
+#' @export
 fitted_prior.soft_partition_cavi <- function(x,
                                              type = c("position", "partition"),
                                              ordering = NULL,
@@ -1425,6 +1424,63 @@ as_mpcurve.smooth_em <- function(x, ...) {
 
 #' @noRd
 as_mpcurve.soft_partition_cavi <- function(x, ...) {
+  if (identical(x$variational_family %||% (x$control %||% list())$variational_family,
+                "structured")) {
+    M <- as.integer(x$M)
+    ord_labels <- x$ordering_labels %||% colnames(x$pi_weights) %||%
+      .mpcurve_ordering_labels(M)
+    fits_mp <- stats::setNames(lapply(x$fits, as_mpcurve), ord_labels)
+    locations <- stats::setNames(lapply(fits_mp, `[[`, "locations"), ord_labels)
+    priors <- .mpcurve_priors_from_partition_fit(x)
+    return(structure(
+      list(
+        data = x$data,
+        params = list(
+          pi = stats::setNames(x$position_pi, ord_labels),
+          mu = stats::setNames(x$params$mu, ord_labels),
+          sigma2 = x$params$sigma2
+        ),
+        gamma = stats::setNames(x$gamma, ord_labels),
+        conditional_posterior = x$conditional_posterior,
+        posterior = x$conditional_posterior,
+        lambda_mat = x$lambda_mat,
+        fits = fits_mp,
+        measurement_sd = x$measurement_sd,
+        locations = locations,
+        elbo_trace = x$objective_history,
+        loglik_trace = numeric(0),
+        lambda_trace = x$lambda_trace,
+        sigma2_trace = x$sigma2_trace,
+        partition = list(
+          pi_weights = x$pi_weights,
+          assign = x$assign,
+          variational_family = "structured"
+        ),
+        objective_history = x$objective_history,
+        temperature_history = x$temperature_history,
+        iter = x$iter,
+        K = x$K,
+        n = x$n,
+        d = x$d,
+        algorithm = "cavi",
+        modelName = "partition_cavi_structured",
+        intrinsic_dim = M,
+        requested_intrinsic_dim = M,
+        active_intrinsic_dim = M,
+        displayed_intrinsic_dim = M,
+        variational_family = "structured",
+        priors = priors,
+        init_info = x$init_info,
+        ordering_similarity = x$ordering_similarity,
+        similarity_init = x$similarity_init,
+        converged = x$converged,
+        convergence_info = x$convergence_info,
+        control = x$control,
+        fit = x
+      ),
+      class = "mpcurve"
+    ))
+  }
   M <- x$M %||% 2L
   ord_labels_full <- colnames(x$pi_weights) %||% .mpcurve_ordering_labels(M)
   active_full <- x$active_orderings %||% rep(TRUE, M)
@@ -1508,6 +1564,13 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
 
 #' Print an \code{mpcurve} fit
 #'
+#' Prints a compact status view. Single-ordering fits report their backend,
+#' dimensions, convergence status, and final ELBO. Fixed-\code{M} structural
+#' partition fits additionally identify the variational family, report the
+#' retained fixed \code{M}, show hard feature-assignment counts derived from
+#' \code{$partition$pi_weights}, and report the final structural objective.
+#' Structural fits have no active, frozen, or dropped ordering state.
+#'
 #' @param x An \code{mpcurve} object.
 #' @param ... Ignored.
 #'
@@ -1520,8 +1583,13 @@ print.mpcurve <- function(x, ...) {
   is_partition <- .mpcurve_is_partition(x)
 
   if (is_partition) {
+    structured <- identical(
+      x$variational_family %||% (x$control %||% list())$variational_family,
+      "structured"
+    )
     cat("MPCurve partition fit\n")
     cat(sprintf("  Backend        : %s\n", x$algorithm))
+    if (structured) cat("  Variational    : structural q(C) q(Z) q(U | Z)\n")
     greedy_info <- x$greedy_selection %||% NULL
     if (!is.null(greedy_info)) {
       cat(sprintf(
@@ -1531,7 +1599,11 @@ print.mpcurve <- function(x, ...) {
         greedy_info$selected_intrinsic_dim
       ))
     }
-    cat(sprintf("  Dim (req/act/view): %d / %d / %d\n", idim, active_dim, displayed_dim))
+    if (structured) {
+      cat(sprintf("  Intrinsic dim  : %d (fixed)\n", idim))
+    } else {
+      cat(sprintf("  Dim (req/act/view): %d / %d / %d\n", idim, active_dim, displayed_dim))
+    }
     cat(sprintf("  n / d / K      : %d / %d / %d\n", x$n, x$d, x$K))
     cat(sprintf("  Iterations     : %d\n", x$iter))
     part <- x$partition
@@ -1539,21 +1611,22 @@ print.mpcurve <- function(x, ...) {
       tbl <- table(part$assign)
       part_str <- paste(sprintf("%s=%d", names(tbl), as.integer(tbl)), collapse = ", ")
       cat(sprintf("  Partition      : %s\n", part_str))
-      active <- part$active_orderings
-      dropped <- part$dropped_labels
-      ord_labels <- colnames(part$pi_weights) %||% .mpcurve_ordering_labels(idim)
-      if (!is.null(active)) {
-        cat(sprintf("  Active         : %s\n",
-                    paste(ord_labels[active], collapse = ", ")))
-      }
-      frozen <- part$frozen_labels
-      if (!is.null(frozen) && length(frozen) > 0L) {
-        if (isTRUE(part$compacted)) {
-          cat(sprintf("  Dropped from view: %s\n",
-                      paste(frozen, collapse = ", ")))
-        } else {
-          cat(sprintf("  Frozen         : %s\n",
-                      paste(frozen, collapse = ", ")))
+      if (!structured) {
+        active <- part$active_orderings
+        ord_labels <- colnames(part$pi_weights) %||% .mpcurve_ordering_labels(idim)
+        if (!is.null(active)) {
+          cat(sprintf("  Active         : %s\n",
+                      paste(ord_labels[active], collapse = ", ")))
+        }
+        frozen <- part$frozen_labels
+        if (!is.null(frozen) && length(frozen) > 0L) {
+          if (isTRUE(part$compacted)) {
+            cat(sprintf("  Dropped from view: %s\n",
+                        paste(frozen, collapse = ", ")))
+          } else {
+            cat(sprintf("  Frozen         : %s\n",
+                        paste(frozen, collapse = ", ")))
+          }
         }
       }
     }
@@ -1591,17 +1664,27 @@ print.mpcurve <- function(x, ...) {
 
 #' Summarise an \code{mpcurve} model fit
 #'
-#' Delegates to the underlying \code{summary.cavi},
-#' \code{summary.csmooth_em}, or \code{summary.smooth_em}, wrapping the result in a
-#' \code{summary.mpcurve} object so users can access all fields
-#' (\code{$ml_last}, \code{$elbo_last}, convergence diagnostics, etc.)
-#' that the underlying class exposes.
+#' Single-ordering objects delegate algorithm-specific diagnostics to the
+#' underlying fit and store that result in \code{$underlying}. Fixed-\code{M}
+#' partition objects are summarized directly from their canonical structural
+#' state instead: the result contains the partition probabilities and hard
+#' assignments, fitted priors, structural objective history, convergence
+#' information, noise specification, and variational-family label. It does not
+#' contain an independently summarized per-ordering \code{$underlying} fit.
 #'
 #' @param object An \code{mpcurve} object.
-#' @param ... Passed to the underlying summary method.
-#' @return An object of class \code{summary.mpcurve} with fields:
-#'   \code{$algorithm}, \code{$modelName}, \code{$K}, \code{$n},
-#'   \code{$d}, and \code{$underlying} (the full underlying summary).
+#' @param ... Passed to the underlying summary method for single-ordering fits;
+#'   ignored for structural partition summaries.
+#' @return An object of class \code{summary.mpcurve}. Every result contains
+#'   \code{$algorithm}, \code{$modelName}, \code{$intrinsic_dim},
+#'   \code{$K}, \code{$n}, \code{$d}, \code{$priors}, and
+#'   \code{$converged}. A single-ordering result also contains
+#'   \code{$underlying}. A structural partition result instead contains
+#'   \code{$partition}, \code{$objective_history},
+#'   \code{$convergence_info}, \code{$control}, the shared
+#'   \code{$sigma2} vector (or \code{NULL}), \code{$measurement_sd}, and
+#'   \code{$variational_family}. Compatibility dimension fields remain equal
+#'   to the retained fixed \code{M} for current structural objects.
 #' @export
 summary.mpcurve <- function(object, ...) {
   idim <- object$intrinsic_dim %||% 1L
@@ -1628,6 +1711,10 @@ summary.mpcurve <- function(object, ...) {
       convergence_info = object$convergence_info %||% object$fit$convergence_info,
       ordering_events = object$ordering_events %||% list(),
       control       = object$control %||% list(),
+      sigma2        = object$params$sigma2,
+      measurement_sd = object$measurement_sd,
+      variational_family = object$variational_family %||%
+        (object$control %||% list())$variational_family,
       greedy_selection = object$greedy_selection %||% NULL
     )
   } else {
@@ -1653,6 +1740,7 @@ summary.mpcurve <- function(object, ...) {
 
 
 #' @rdname summary.mpcurve
+#' @param x A \code{summary.mpcurve} object.
 #' @export
 print.summary.mpcurve <- function(x, ...) {
   idim <- x$intrinsic_dim %||% 1L
@@ -1661,6 +1749,10 @@ print.summary.mpcurve <- function(x, ...) {
   is_partition <- !is.null(x$partition)
 
   if (is_partition) {
+    structured <- identical(
+      x$variational_family %||% (x$control %||% list())$variational_family,
+      "structured"
+    )
     cat("MPCurve Partition Summary\n")
     greedy_info <- x$greedy_selection %||% NULL
     if (!is.null(greedy_info)) {
@@ -1669,23 +1761,35 @@ print.summary.mpcurve <- function(x, ...) {
                   greedy_info$requested_upper_bound,
                   greedy_info$selected_intrinsic_dim))
     }
-    cat(sprintf("Algorithm : %s  |  requested=%d  active=%d  displayed=%d  |  n=%d  d=%d  K=%d\n",
-                x$algorithm, idim, active_dim, displayed_dim, x$n, x$d, x$K))
+    if (structured) {
+      cat(sprintf("Algorithm : %s  |  structural VI  |  fixed M=%d  |  n=%d  d=%d  K=%d\n",
+                  x$algorithm, idim, x$n, x$d, x$K))
+      if (is.null(x$measurement_sd)) {
+        cat(sprintf("Shared sigma2 range : [%.4g, %.4g]\n", min(x$sigma2), max(x$sigma2)))
+      } else {
+        cat("Noise model : known measurement SD\n")
+      }
+    } else {
+      cat(sprintf("Algorithm : %s  |  requested=%d  active=%d  displayed=%d  |  n=%d  d=%d  K=%d\n",
+                  x$algorithm, idim, active_dim, displayed_dim, x$n, x$d, x$K))
+    }
     if (!is.null(x$partition)) {
       tbl <- table(x$partition$assign)
       part_str <- paste(sprintf("%s=%d", names(tbl), as.integer(tbl)), collapse = "  ")
       cat(sprintf("Partition : %s\n", part_str))
-      active <- x$partition$active_orderings
-      ord_labels <- colnames(x$partition$pi_weights) %||% .mpcurve_ordering_labels(idim)
-      if (!is.null(active)) {
-        cat(sprintf("Active    : %s\n", paste(ord_labels[active], collapse = ", ")))
-      }
-      frozen <- x$partition$frozen_labels
-      if (!is.null(frozen) && length(frozen) > 0L) {
-        if (isTRUE(x$partition$compacted)) {
-          cat(sprintf("Dropped from view : %s\n", paste(frozen, collapse = ", ")))
-        } else {
-          cat(sprintf("Frozen    : %s\n", paste(frozen, collapse = ", ")))
+      if (!structured) {
+        active <- x$partition$active_orderings
+        ord_labels <- colnames(x$partition$pi_weights) %||% .mpcurve_ordering_labels(idim)
+        if (!is.null(active)) {
+          cat(sprintf("Active    : %s\n", paste(ord_labels[active], collapse = ", ")))
+        }
+        frozen <- x$partition$frozen_labels
+        if (!is.null(frozen) && length(frozen) > 0L) {
+          if (isTRUE(x$partition$compacted)) {
+            cat(sprintf("Dropped from view : %s\n", paste(frozen, collapse = ", ")))
+          } else {
+            cat(sprintf("Frozen    : %s\n", paste(frozen, collapse = ", ")))
+          }
         }
       }
     }
@@ -1702,20 +1806,24 @@ print.summary.mpcurve <- function(x, ...) {
       }
     }
     events <- x$ordering_events %||% list()
-    if (length(events) > 0L) {
+    if (!structured && length(events) > 0L) {
       event_types <- vapply(events, `[[`, character(1), "event")
       cat(sprintf("Events    : %d freeze\n",
                   sum(event_types == "freeze")))
     }
     if (length(x$objective_history) > 0L)
       cat(sprintf("Objective (last) : %.6f\n", tail(x$objective_history, 1L)))
-    drop_view <- isTRUE((x$control %||% list())$drop_unused_ordering)
-    cat(sprintf("Objective type : %s\n",
-                if (drop_view) {
-                  "post-drop fit (not comparable across requested dimensions)"
-                } else {
-                  "fixed-requested-M comparison"
-                }))
+    if (structured) {
+      cat("Objective type : fixed-M structural ELBO\n")
+    } else {
+      drop_view <- isTRUE((x$control %||% list())$drop_unused_ordering)
+      cat(sprintf("Objective type : %s\n",
+                  if (drop_view) {
+                    "post-drop fit (not comparable across requested dimensions)"
+                  } else {
+                    "fixed-requested-M comparison"
+                  }))
+    }
     if (!is.null(x$converged))
       cat(sprintf("Converged : %s\n", x$converged))
     conv_info <- x$convergence_info
@@ -1803,47 +1911,218 @@ print.summary.mpcurve <- function(x, ...) {
 }
 
 
+#' @noRd
+.plot_structural_mu_mpcurve <- function(x, dims, ...) {
+  structured <- identical(
+    x$variational_family %||% (x$control %||% list())$variational_family,
+    "structured"
+  )
+  if (!structured) {
+    stop(
+      "plot_type = 'mu' for a partition fit requires a canonical structural state.",
+      call. = FALSE
+    )
+  }
+
+  means <- x$conditional_posterior$mean
+  if (!is.list(means) || length(means) < 1L) {
+    stop(
+      "x$conditional_posterior$mean must be a non-empty list of trajectory mean matrices.",
+      call. = FALSE
+    )
+  }
+
+  M <- as.integer(x$intrinsic_dim %||% length(means))
+  if (length(M) != 1L || is.na(M) || M < 2L || length(means) != M) {
+    stop(
+      "x$conditional_posterior$mean must contain one matrix per fixed ordering.",
+      call. = FALSE
+    )
+  }
+
+  valid_matrix <- vapply(
+    means,
+    function(mu) is.matrix(mu) && is.numeric(mu) && all(is.finite(mu)),
+    logical(1)
+  )
+  if (!all(valid_matrix)) {
+    stop(
+      "Every entry of x$conditional_posterior$mean must be a finite numeric matrix.",
+      call. = FALSE
+    )
+  }
+
+  d <- as.integer(x$d %||% nrow(means[[1L]]))
+  K <- as.integer(x$K %||% ncol(means[[1L]]))
+  if (length(d) != 1L || is.na(d) || d < 1L ||
+      length(K) != 1L || is.na(K) || K < 2L) {
+    stop("The structural state must contain positive d and K >= 2.", call. = FALSE)
+  }
+  expected_dims <- vapply(
+    means,
+    function(mu) identical(dim(mu), c(d, K)),
+    logical(1)
+  )
+  if (!all(expected_dims) || K < 2L) {
+    stop(
+      sprintf(
+        "Each conditional posterior mean must be a d x K matrix (%d x %d) with K >= 2.",
+        d,
+        K
+      ),
+      call. = FALSE
+    )
+  }
+
+  dims <- as.integer(dims)
+  if (length(dims) < 1L || length(dims) > 2L) {
+    stop("dims must have length 1 or 2.", call. = FALSE)
+  }
+  if (anyNA(dims) || any(dims < 1L) || any(dims > d)) {
+    stop("dims out of range for the structural trajectory means.", call. = FALSE)
+  }
+
+  pi_weights <- x$partition$pi_weights
+  if (!is.matrix(pi_weights) || !is.numeric(pi_weights) ||
+      !identical(dim(pi_weights), c(d, M)) ||
+      any(!is.finite(pi_weights)) ||
+      any(pi_weights < -1e-10) || any(pi_weights > 1 + 1e-10) ||
+      any(abs(rowSums(pi_weights) - 1) > 1e-8)) {
+    stop(
+      sprintf(
+        "x$partition$pi_weights must be a finite row-stochastic %d x %d matrix.",
+        d,
+        M
+      ),
+      call. = FALSE
+    )
+  }
+
+  ordering_labels <- names(means)
+  if (is.null(ordering_labels) || length(ordering_labels) != M ||
+      anyNA(ordering_labels) || any(!nzchar(ordering_labels))) {
+    ordering_labels <- colnames(pi_weights)
+  }
+  if (is.null(ordering_labels) || length(ordering_labels) != M ||
+      anyNA(ordering_labels) || any(!nzchar(ordering_labels))) {
+    ordering_labels <- .mpcurve_ordering_labels(M)
+  }
+
+  old_par <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(old_par), add = TRUE)
+  panel_cols <- if (M <= 3L) M else ceiling(sqrt(M))
+  panel_rows <- ceiling(M / panel_cols)
+  graphics::par(
+    mfrow = c(panel_rows, panel_cols),
+    mar = c(4, 4, 6, 1),
+    cex.main = 0.85
+  )
+
+  positions <- (seq_len(K) - 1L) / (K - 1L)
+  for (m in seq_len(M)) {
+    mu_m <- means[[m]]
+    weight_text <- paste(
+      sprintf(
+        "q(Z%d=%s)=%.2f",
+        dims,
+        ordering_labels[m],
+        pi_weights[dims, m]
+      ),
+      collapse = "\n"
+    )
+    panel_title <- sprintf("Ordering %s\n%s", ordering_labels[m], weight_text)
+
+    if (length(dims) == 2L) {
+      graphics::plot(
+        mu_m[dims[1L], ], mu_m[dims[2L], ],
+        type = "o", pch = 16, col = "orange", lwd = 2,
+        xlab = sprintf("dim %d", dims[1L]),
+        ylab = sprintf("dim %d", dims[2L]),
+        main = panel_title,
+        ...
+      )
+    } else {
+      graphics::plot(
+        positions, mu_m[dims[1L], ],
+        type = "o", pch = 16, col = "orange", lwd = 2,
+        xlab = "pseudotime",
+        ylab = sprintf("dim %d", dims[1L]),
+        main = panel_title,
+        ...
+      )
+    }
+  }
+
+  invisible(x)
+}
+
+
 #' Plot an \code{mpcurve} model fit
 #'
 #' @description
-#' Visualise an \code{mpcurve} fit. The default (\code{plot_type="scatterplot"})
-#' colors each observation by its estimated pseudotime position along the
-#' inferred trajectory, mapped to a \eqn{[0, 1]} scale where component \eqn{k}
-#' occupies position \eqn{(k-1)/(K-1)}.  The pseudotime for observation \eqn{i}
-#' is the responsibility-weighted average
+#' Visualise an \code{mpcurve} fit. Pseudotime is mapped to \eqn{[0,1]}, with
+#' grid component \eqn{k} at \eqn{(k-1)/(K-1)}. For a responsibility row
+#' \eqn{\gamma_i}, the posterior-mean pseudotime is
 #' \deqn{t_i = \sum_{k=1}^{K} \gamma_{ik} \cdot \frac{k-1}{K-1}.}
-#' Component means are overlaid as orange stars connected by arrows.
-#' A vertical gradient color bar is drawn in the top-right corner of the plot.
+#'
+#' For a fixed-\code{M} structural partition fit, scatterplots contain one
+#' panel per ordering. Panel \eqn{m} uses that ordering's
+#' \eqn{q(C^{(m)})} responsibilities for pseudotime and overlays the
+#' conditional trajectory mean from \eqn{q(U_j\mid Z_j=m)}. The fitted
+#' feature-assignment probabilities for the selected dimensions are shown in
+#' each panel title.
 #'
 #' \describe{
 #'   \item{\code{"scatterplot"}}{Scatter of two chosen dimensions, colored by
-#'     pseudotime (default).}
-#'   \item{\code{"elbo"}}{ELBO / log-likelihood / collapsed-ML traces.
-#'     Delegates to the underlying \code{plot.cavi}, \code{plot.csmooth_em},
-#'     or \code{plot.smooth_em}.}
-#'   \item{\code{"mu"}}{Component-means-only plot.
-#'     Delegates to the underlying fit's plot method.}
+#'     pseudotime, with posterior means overlaid as an orange path. For a
+#'     structural partition fit, draws one panel per fixed ordering.}
+#'   \item{\code{"elbo"}}{For a single-ordering fit, delegates to the
+#'     underlying CAVI trace plot. For a structural partition fit, plots the
+#'     single fixed-\code{M} structural objective history. Values recorded at
+#'     different annealing temperatures are not directly comparable; the
+#'     exact \eqn{T=1} segment is the monotonicity diagnostic.}
+#'   \item{\code{"mu"}}{Posterior-mean trajectory only. With one selected
+#'     dimension, plots the feature mean against normalized latent position;
+#'     with two dimensions, plots the posterior-mean path in that feature
+#'     plane. Structural partition fits draw one panel per ordering directly
+#'     from the canonical \code{$conditional_posterior$mean}, representing
+#'     \eqn{E[U_j\mid Z_j=m]}; derived \code{$fits} are not the data source.}
 #' }
 #'
 #' @param x An \code{mpcurve} object.
 #' @param plot_type One of \code{"scatterplot"} (default), \code{"elbo"},
 #'   \code{"mu"}.
-#' @param dims Integer vector of length 2 (or 1). Columns of the data matrix to
-#'   use for the scatter plot.  Defaults to \code{c(1, 2)}.
-#' @param data Optional numeric matrix (n x d).  If \code{NULL} (default), uses
-#'   \code{x$fit$data}.  Must be supplied if the data were not stored at fit
-#'   time.
+#' @param dims Integer vector of length one or two identifying feature columns.
+#'   It determines the scatterplot axes and the trajectory coordinates used by
+#'   \code{plot_type = "mu"}. Defaults to \code{c(1, 2)}.
+#' @param data Optional numeric \code{n x d} matrix used by scatterplots. If
+#'   \code{NULL}, data stored on \code{x} are used. It is not required for
+#'   \code{plot_type = "elbo"} or \code{plot_type = "mu"}.
 #' @param pal Colour palette (length-256 character vector) used to map
-#'   pseudotime to point colors.  Defaults to the classic pseudotime rainbow
+#'   pseudotime to point colours. Defaults to the classic pseudotime rainbow
 #'   (navy \eqn{\to} cyan \eqn{\to} green \eqn{\to} gold \eqn{\to} red),
 #'   which avoids white and is easy to read against a white background.
 #' @param add_legend Logical; draw a gradient color-bar legend?  Default
 #'   \code{TRUE}.
-#' @param ... Further arguments forwarded to \code{plot_EM_embedding2D} (for
-#'   \code{"scatterplot"}) or the underlying algorithm's \code{plot} method
-#'   (for \code{"elbo"} / \code{"mu"}).
+#' @param ... Additional base-graphics arguments. For single-ordering
+#'   non-scatter plots these are forwarded to the underlying CAVI plot method.
 #'
 #' @return Invisibly returns \code{x}.
+#' @examples
+#' \dontrun{
+#' sim <- simulate_dual_trajectory(n = 100, d1 = 3, d2 = 3, seed = 1)
+#' fit <- fit_mpcurve(
+#'   sim$X,
+#'   intrinsic_dim = 2,
+#'   K = 8,
+#'   n_outer = 3,
+#'   max_converge_iter = 3
+#' )
+#' plot(fit, plot_type = "scatterplot", dims = c(1, 4))
+#' plot(fit, plot_type = "mu", dims = 1)
+#' plot(fit, plot_type = "mu", dims = c(1, 4))
+#' plot(fit, plot_type = "elbo")
+#' }
 #' @export
 plot.mpcurve <- function(
     x,
@@ -1944,18 +2223,58 @@ plot.mpcurve <- function(
     return(invisible(x))
   }
 
-  # ---- delegate non-scatterplot types to the underlying fit ----
+  if (is_partition && plot_type == "mu") {
+    structured <- identical(
+      x$variational_family %||% (x$control %||% list())$variational_family,
+      "structured"
+    )
+    if (structured) {
+      return(.plot_structural_mu_mpcurve(x, dims = dims, ...))
+    }
+
+    # Legacy partition objects remain readable through their derived fit views.
+    legacy_fits <- x$fits
+    if (!is.list(legacy_fits) || length(legacy_fits) < 1L) {
+      stop(
+        "Legacy partition trajectory plotting requires a non-empty x$fits list.",
+        call. = FALSE
+      )
+    }
+    old_par <- graphics::par(no.readonly = TRUE)
+    on.exit(graphics::par(old_par), add = TRUE)
+    graphics::par(mfrow = c(1L, length(legacy_fits)), mar = c(4, 4, 4, 1))
+    for (m in seq_along(legacy_fits)) {
+      plot(legacy_fits[[m]], plot_type = "mu", dims = dims, ...)
+      graphics::mtext(
+        sprintf("Ordering %s", names(legacy_fits)[m] %||% m),
+        side = 3,
+        line = 0.25,
+        cex = 0.8
+      )
+    }
+    return(invisible(x))
+  }
+
+  # ---- plot objective traces or delegate single-ordering diagnostics ----
   if (plot_type != "scatterplot") {
     if (is_partition) {
-      # For partition objects, plot objective history
+      # The partition ELBO is stored only in the canonical structural state.
       obj <- x$objective_history
       if (length(obj) > 0L) {
         plot(obj, type = "b", pch = 19, cex = 0.7,
-             xlab = "Iteration", ylab = "Variational objective",
-             main = "Partition objective trace")
+             xlab = "Iteration", ylab = "Fixed-M structural objective",
+             main = "Fixed-M structural objective trace")
       }
     } else {
-      plot(x$fit, plot_type = plot_type, ...)
+      plot(
+        x$fit,
+        plot_type = plot_type,
+        dims = dims,
+        data = data,
+        pal = pal,
+        add_legend = add_legend,
+        ...
+      )
     }
     return(invisible(x))
   }
@@ -2039,18 +2358,37 @@ plot.mpcurve <- function(
 #'
 #' Public continuation wrapper for MPCurve's recommended CAVI paths. For
 #' single-ordering fits, this continues the underlying CAVI backend. For
-#' partition fits, it continues the exact \eqn{T = 1} phase of the stored
-#' partition-CAVI fit using the existing frozen-ordering and assignment-prior
-#' controls.
+#' structural partition fits, it continues exact \eqn{T = 1} coordinate
+#' sweeps from the canonical state. Legacy augmented partition fits remain
+#' readable but must be refitted before continuation.
 #'
 #' Legacy smoothEM/csmoothEM continuation is not part of this high-level
 #' interface.
 #'
+#' @details
+#' Structural continuation uses only the canonical fields stored on the raw
+#' fit: \code{$gamma}, \code{$params$pi}, the shared
+#' \code{$params$sigma2} (when noise is estimated),
+#' \code{$conditional_posterior}, \code{$lambda_mat}, and
+#' \code{$partition$pi_weights}. The derived compatibility view
+#' \code{$fits} is never used as continuation state.
+#'
+#' The additional structural sweeps run at exactly \eqn{T=1}. Their objective
+#' values are appended to \code{$objective_history}, and the corresponding
+#' entries of \code{$temperature_history} are \code{1}. Consequently,
+#' monotonicity should be checked within this exact-temperature segment rather
+#' than across the earlier annealing schedule. The fitted value of \eqn{M} is
+#' fixed throughout continuation, and a shared estimated \eqn{\sigma_j^2}
+#' remains shared across all conditional ordering branches.
+#'
 #' @param object An \code{mpcurve} object wrapping a CAVI fit.
 #' @param iter Integer >= 1. Maximum number of additional CAVI sweeps (single
 #'   ordering) or exact \code{T = 1} partition steps.
-#' @param lambda Optional scalar or d-vector. For single-ordering CAVI only:
-#'   fix \code{lambda_j} at this value for the continuation run.
+#' @param lambda Optional positive smoothness value(s). A single-ordering fit
+#'   accepts a scalar or length-\code{d} vector. A structural partition fit
+#'   accepts a scalar, a length-\code{d} vector broadcast across orderings, a
+#'   flattened length-\code{d * M} vector, or a \code{d x M} matrix; this
+#'   resets \code{lambda_mat} before continuation.
 #' @param S Optional known measurement standard deviations. If \code{NULL},
 #'   reuse the value stored on \code{object}. Supplying a new \code{S} is only
 #'   allowed when it matches the stored specification.
@@ -2067,31 +2405,18 @@ plot.mpcurve <- function(
 #'   \code{NULL}, reuse the stored values.
 #' @param tol_outer For partition fits only: relative objective tolerance used
 #'   by the phase-2 convergence rule. If \code{NULL}, reuse the stored value.
-#' @param freeze_unused_ordering For partition fits only: if \code{TRUE},
-#'   inactive orderings remain frozen and skipped in subsequent weighted
-#'   updates. If \code{NULL}, reuse the stored value.
-#' @param freeze_unused_ordering_threshold For partition fits only: non-negative
-#'   feature-mass threshold used to decide when an ordering is effectively
-#'   unused. If \code{NULL}, reuse the stored value.
-#' @param freeze_feature For partition fits only: if \code{TRUE},
-#'   feature-ordering pairs with sufficiently small posterior weight are frozen
-#'   and their trajectory contribution is neutralized. If \code{NULL}, reuse
-#'   the stored value.
-#' @param freeze_feature_weight_threshold For partition fits only: non-negative
-#'   threshold on \code{w_{jm}} used when \code{freeze_feature = TRUE}. If
-#'   \code{NULL}, reuse the stored value.
-#' @param drop_unused_ordering For partition fits only: if \code{TRUE}, the
-#'   returned \code{mpcurve} view may compact away frozen orderings. If
-#'   \code{NULL}, reuse the stored value. When \code{FALSE}, the reported
-#'   partition \code{$objective_history} retains fixed-requested-\code{M}
-#'   comparison semantics; when \code{TRUE}, it becomes the post-drop fitting
-#'   objective of the active model.
-#' @param assignment_prior Deprecated compatibility argument for continuing old
-#'   partition fits that still store the legacy assignment-prior interface. If
-#'   \code{NULL}, \code{do_mpcurve()} reuses the stored prior mode.
-#' @param ordering_alpha Deprecated compatibility argument used only for the
-#'   legacy \code{assignment_prior = "dirichlet"} path. If \code{NULL},
-#'   \code{do_mpcurve()} reuses the stored value.
+#' @param freeze_unused_ordering,freeze_unused_ordering_threshold Deprecated
+#'   no-op compatibility arguments. Explicit values emit a warning for either
+#'   a single-ordering or structural continuation.
+#' @param freeze_feature,freeze_feature_weight_threshold Deprecated no-op
+#'   compatibility arguments. Structural conditional trajectories are not
+#'   frozen by assignment weight.
+#' @param drop_unused_ordering Deprecated no-op compatibility argument. The
+#'   fitted fixed \eqn{M} is retained.
+#' @param assignment_prior,ordering_alpha Deprecated no-op compatibility
+#'   arguments. Structural continuation always reuses the partition-prior
+#'   state stored in the canonical fit; explicitly supplying either argument
+#'   emits a warning and does not change that state.
 #' @param verbose Logical. Print per-iteration progress?
 #'
 #' @return An updated \code{mpcurve} object.
@@ -2130,7 +2455,50 @@ do_mpcurve <- function(object,
     )
   }
 
+  .structural_partition_warn_legacy_controls(
+    freeze_unused_ordering = freeze_unused_ordering,
+    freeze_unused_ordering_threshold = freeze_unused_ordering_threshold,
+    freeze_feature = freeze_feature,
+    freeze_feature_weight_threshold = freeze_feature_weight_threshold,
+    drop_unused_ordering = drop_unused_ordering,
+    caller = "do_mpcurve()"
+  )
+  if (!is.null(assignment_prior) || !is.null(ordering_alpha)) {
+    warning(
+      "do_mpcurve(): assignment_prior and ordering_alpha are deprecated ",
+      "no-op compatibility arguments. Structural continuation reuses the ",
+      "partition-prior state stored on the fit.",
+      call. = FALSE
+    )
+  }
+
   if (inherits(object$fit, "soft_partition_cavi")) {
+    if (identical(
+      object$fit$variational_family %||%
+        (object$fit$control %||% list())$variational_family,
+      "structured"
+    )) {
+      raw <- .continue_structural_partition_cavi(
+        fit = object$fit,
+        iter = iter,
+        lambda = lambda,
+        S = S,
+        tol_outer = tol_outer,
+        lambda_sd_prior_rate = lambda_sd_prior_rate,
+        lambda_min = lambda_min,
+        lambda_max = lambda_max,
+        sigma_min = sigma_min,
+        sigma_max = sigma_max,
+        verbose = verbose
+      )
+      return(as_mpcurve(raw))
+    }
+    stop(
+      "Legacy augmented partition fits are read-only. Refit with fit_mpcurve() ",
+      "to continue under the structural variational family.",
+      call. = FALSE
+    )
+
     sp <- object$fit
     M <- sp$M %||% 2L
     fits <- sp$fits
@@ -2415,47 +2783,61 @@ do_mpcurve <- function(object,
 #'
 #' High-level user-facing wrapper around MPCurve's recommended CAVI fitting
 #' paths. Use \code{intrinsic_dim = 1} for a standard single-ordering fit and
-#' \code{intrinsic_dim >= 2} for the partition-CAVI model with one ordering per
-#' latent dimension.
+#' \code{intrinsic_dim = M >= 2} for the fixed-\code{M} structural partition
+#' model.
 #'
+#' @details
 #' MPCurver's public fitting interface is CAVI-only. Legacy \code{smooth_em}
 #' and \code{csmooth_em} code paths remain in the package implementation for
 #' internal compatibility and regression testing, but they are not part of the
 #' documented public workflow.
 #'
+#' For fixed \eqn{M >= 2}, the structural variational family is
+#' \deqn{q(C)\prod_{j=1}^d q(Z_j)q(U_j\mid Z_j).}
+#'
+#' A structural partition fit preserves posterior dependence between a
+#' feature's ordering assignment \eqn{Z_j} and its trajectory \eqn{U_j}.
+#' Conditional trajectory precision is not multiplied by
+#' \eqn{q(Z_j=m)}, estimated \eqn{\sigma_j^2} is shared across all orderings,
+#' and the returned object has no active, frozen, or dropped ordering state.
+#' The requested \code{M} is fixed. The raw fixed-\code{M} structural objective
+#' is not a complexity-penalized criterion for choosing \code{M}, so automatic
+#' forward/backward greedy selection is temporarily unavailable.
+#'
 #' @param X Numeric matrix (n x d) of observations.
 #' @param algorithm Public backend selector. Must be \code{"cavi"}; legacy
 #'   backend values are rejected with an error.
-#' @param method Initialisation method(s) for the trajectory ordering. If
-#'   \code{num_cores > 1} and \code{length(method) > 1} in the single-ordering
-#'   case, all methods are run in parallel and a named list of fits is
-#'   returned. For partition fits, \code{length(method)} must be either 1 or
+#' @param method Initialisation method(s) for the trajectory ordering. In the
+#'   single-ordering case, multiple methods are all attempted only when
+#'   \code{num_cores > 1}; otherwise only \code{method[[1]]} is fitted. For
+#'   partition fits, \code{length(method)} must be either 1 or
 #'   \code{intrinsic_dim}.
 #' @param K Integer number of mixture components (grid knots).
 #' @param rw_q Integer random-walk order for the GMRF prior.
-#' @param lambda Positive scalar initial value for \code{lambda_j} in the
-#'   single-ordering CAVI fit.
+#' @param lambda Positive initial smoothness value(s). A single-ordering fit
+#'   accepts a scalar or length-\code{d} vector. A structural partition fit
+#'   accepts a scalar, a length-\code{d} vector broadcast across orderings, a
+#'   flattened length-\code{d * M} vector, or a \code{d x M} matrix.
 #' @param S Optional known measurement standard deviations. If a length-\code{d}
 #'   vector, each feature uses a known shared standard deviation across
 #'   observations. If an \code{n x d} matrix, each observation-feature pair uses
 #'   its own known standard deviation.
-#' @param fix_lambda Logical; if \code{TRUE}, keep \code{lambda_j} fixed at the
-#'   supplied initial value in the single-ordering CAVI fit.
+#' @param sigma2_init Optional scalar or length-\code{d} initial variance
+#'   vector. Partition fits use one vector shared across all orderings. It
+#'   cannot be supplied together with \code{S}.
+#' @param fix_lambda Logical; if \code{TRUE}, keep all smoothness parameters
+#'   fixed at the supplied initial value.
 #' @param iter Maximum number of CAVI sweeps for the single-ordering fit.
 #' @param tol Relative ELBO tolerance for the single-ordering CAVI fit.
 #' @param num_cores Integer >= 1. Workers for parallel multi-method
 #'   single-ordering runs.
 #' @param intrinsic_dim Integer intrinsic dimensionality of the latent ordering
 #'   system. \code{intrinsic_dim = 1} fits the standard single-ordering model.
-#'   Values \code{>= 2} fit the partition-CAVI model.
-#' @param greedy Dimension-selection mode. \code{"none"} keeps the requested
-#'   \code{intrinsic_dim}. \code{"forward"} treats \code{intrinsic_dim} as an
-#'   upper bound and compares \eqn{M} versus \eqn{M+1} sequentially starting
-#'   from \eqn{M=1}. Greedy comparison is normalized to the active intrinsic
-#'   dimension after compaction, so a collapsed candidate cannot justify
-#'   moving to a larger model. \code{"backward"} fits the upper bound first,
-#'   then compares active \eqn{M} versus a warm-started smaller model while
-#'   greedily removing the most correlated active ordering.
+#'   Values \code{>= 2} fit the fixed-\eqn{M} structural partition model.
+#' @param greedy Retained for call compatibility. Only \code{"none"} is
+#'   currently supported: structural VI fits a fixed \code{intrinsic_dim}, and
+#'   cross-\eqn{M} selection requires a separate predictive or
+#'   complexity-penalized criterion.
 #' @param partition_init For partition fits only: either
 #'   \code{"similarity"} for feature-similarity-driven block initialization or
 #'   \code{"ordering_methods"} for the existing per-ordering warm starts. The
@@ -2464,7 +2846,11 @@ do_mpcurve <- function(object,
 #'   initialization. For partition fits, MPCurver enforces a common \code{K}
 #'   across orderings; if quantile cuts collapse, it falls back to equal-width
 #'   bins.
-#' @param ridge Optional nugget added to the RW precision.
+#' @param ridge Nonnegative nugget explicitly added to the RW precision.
+#'   The default \code{0} retains the intrinsic prior. Structural conditional
+#'   posterior precision does not rely on an automatic ridge or jitter; if the
+#'   likelihood does not identify the intrinsic-prior null space, fitting stops
+#'   with an identifiability error.
 #' @param lambda_sd_prior_rate Optional positive rate for an exponential prior
 #'   on \code{1 / sqrt(lambda_j)}. Passed to the CAVI backend and the partition
 #'   CAVI path. The default \code{NULL} means no lambda prior penalty. For
@@ -2472,12 +2858,11 @@ do_mpcurve <- function(object,
 #'   is only an alias for "no penalty" and does not correspond to a literal
 #'   exponential prior with rate zero.
 #' @param lambda_min,lambda_max Positive bounds for \code{lambda_j}.
-#' @param sigma_min,sigma_max Positive bounds for \code{sigma_j^2}. These apply
-#'   to the single-ordering CAVI path and to the \code{"smooth_fit"}
-#'   similarity metric when \code{partition_init = "similarity"}.
+#' @param sigma_min,sigma_max Positive bounds for \code{sigma_j^2}. Structural
+#'   partition fits update one feature-specific vector shared across orderings.
 #' @param position_prior Either \code{"adaptive"} or \code{"fixed"} for the
-#'   single-ordering component prior \code{pi}. In the partition path, this
-#'   mode is forwarded to each ordering-specific weighted CAVI update.
+#'   single-ordering component prior \code{pi}. Partition fits apply the same
+#'   mode independently to each ordering's position responsibilities.
 #' @param position_prior_init Optional length-\code{K} initial/fixed vector for
 #'   the component prior \code{pi}. When \code{position_prior = "fixed"} and
 #'   this is \code{NULL}, a uniform prior over the \code{K} positions is used.
@@ -2485,14 +2870,13 @@ do_mpcurve <- function(object,
 #'   broadcast to all orderings.
 #' @param partition_prior For partition fits only: either \code{"adaptive"} or
 #'   \code{"fixed"} for the ordering-usage prior \code{omega}. The adaptive
-#'   mode uses an empirical-Bayes update proportional to \code{colSums(w)}
-#'   over the currently active orderings. The fixed mode keeps a constant prior
-#'   and renormalizes it over the active ordering set after any drops/freeze
-#'   events.
+#'   mode uses an empirical-Bayes update proportional to \code{colSums(w)}.
+#'   The fixed mode keeps a constant prior over the fixed set of \eqn{M}
+#'   orderings.
 #' @param partition_prior_init For partition fits only: optional length-\code{M}
 #'   initial/fixed vector for the ordering prior \code{omega}. Used only when
 #'   \code{partition_prior = "fixed"}. When omitted, the fixed prior defaults
-#'   to uniform over the active orderings.
+#'   to uniform over the \eqn{M} orderings.
 #' @param assignment_prior Deprecated compatibility argument for the old
 #'   partition-prior API. \code{"uniform"} maps to
 #'   \code{partition_prior = "fixed"} with a uniform prior. \code{"dirichlet"}
@@ -2518,44 +2902,47 @@ do_mpcurve <- function(object,
 #'   \code{"single"}.
 #' @param similarity_min_feature_sd For \code{partition_init = "similarity"}
 #'   only: low-variance feature threshold used when building \code{S(X)}.
-#' @param T_start,T_end Annealing temperatures for partition CAVI.
+#' @param T_start,T_end Positive starting and ending temperatures for the
+#'   structural feature-assignment annealing schedule. Objective values
+#'   recorded at different temperatures are not directly comparable.
+#'   Regardless of \code{T_end}, the implementation records an exact
+#'   \eqn{T=1} state after annealing when needed and performs convergence
+#'   iterations at \eqn{T=1}.
 #' @param n_outer Number of annealing steps for partition CAVI.
-#' @param inner_iter Number of weighted CAVI sweeps per annealing step.
+#' @param inner_iter Number of structural coordinate sweeps per annealing step.
 #' @param max_converge_iter Maximum number of exact \code{T = 1} partition
 #'   iterations after annealing. Defaults to \code{iter} when \code{NULL}.
 #' @param tol_outer Relative objective tolerance for partition phase-2
 #'   convergence.
-#' @param freeze_unused_ordering For partition fits only: if \code{TRUE},
-#'   inactive orderings are frozen and skipped in subsequent weighted updates.
-#' @param freeze_unused_ordering_threshold For partition fits only: non-negative
-#'   feature-mass threshold used to decide when an ordering is effectively
-#'   unused.
-#' @param freeze_feature For partition fits only: if \code{TRUE},
-#'   feature-ordering pairs with sufficiently small posterior weight are frozen
-#'   and their trajectory contribution is neutralized.
-#' @param freeze_feature_weight_threshold For partition fits only: non-negative
-#'   threshold on \code{w_{jm}} used when \code{freeze_feature = TRUE}.
-#' @param drop_unused_ordering For partition fits only: if \code{TRUE}, the
-#'   returned \code{mpcurve} view may compact away frozen orderings. With
-#'   \code{FALSE}, the reported partition \code{$objective_history} is the
-#'   fixed-requested-\code{M} comparison objective; with \code{TRUE}, it is
-#'   the post-drop fitting objective of the active model. Greedy search always
-#'   reports the selected active dimension after compaction.
+#' @param freeze_unused_ordering,freeze_unused_ordering_threshold Deprecated
+#'   no-op compatibility arguments. Structural VI has no inactive/frozen
+#'   ordering state; explicitly supplying either argument emits a warning.
+#' @param freeze_feature,freeze_feature_weight_threshold Deprecated no-op
+#'   compatibility arguments. Structural conditional trajectories are never
+#'   frozen according to \eqn{w_{jm}}.
+#' @param drop_unused_ordering Deprecated no-op compatibility argument. A
+#'   structural fit always retains its fixed requested \eqn{M}.
 #' @param verbose Logical; print per-iteration progress?
 #' @param ... Advanced CAVI / partition-CAVI options forwarded to the underlying
 #'   backend. This is intended for advanced initialization controls such as
 #'   \code{responsibilities_init}, deprecated \code{pi_init},
-#'   \code{sigma2_init},
 #'   \code{fits_init}, \code{init_methods}, \code{pca_components}, or
 #'   \code{hard_assign_final}. Legacy smoothEM/csmoothEM controls are rejected.
 #'
 #' @return An \code{\link{mpcurve}} object, or (for parallel multi-method
-#'   single-ordering runs) a named list of \code{mpcurve} objects with a
-#'   \code{summary} attribute. Every returned fit stores inferred cell
+#'   single-ordering runs) a named list whose successful entries are
+#'   \code{mpcurve} objects and whose failed entries are \code{NULL}. The list
+#'   has a \code{summary} attribute recording success, convergence, final ELBO,
+#'   and any error message for every attempted method. Every returned fit
+#'   stores inferred cell
 #'   locations in \code{$locations}; for single-ordering fits this includes both
-#'   posterior-mean and MAP locations derived from \code{$gamma}. Greedy runs
-#'   additionally attach a \code{$greedy_selection} metadata block recording
-#'   the stepwise search history and stop reason.
+#'   posterior-mean and MAP locations derived from \code{$gamma}. A structural
+#'   partition result stores named ordering-specific \code{$params$pi},
+#'   \code{$params$mu}, \code{$gamma}, and \code{$locations}; one shared
+#'   \code{$params$sigma2}; \code{$conditional_posterior}; a
+#'   \code{d x M} \code{$lambda_mat}; and
+#'   \code{$partition$pi_weights}. Its \code{$fits} field contains derived
+#'   compatibility views and is not continuation state.
 #'
 #' @export
 fit_mpcurve <- function(
@@ -2566,6 +2953,7 @@ fit_mpcurve <- function(
     rw_q = 2,
     lambda = 1,
     S = NULL,
+    sigma2_init = NULL,
     fix_lambda = FALSE,
     iter = 100,
     tol = 1e-6,
@@ -2597,11 +2985,11 @@ fit_mpcurve <- function(
     inner_iter = 1L,
     max_converge_iter = NULL,
     tol_outer = 1e-5,
-    freeze_unused_ordering = TRUE,
-    freeze_unused_ordering_threshold = 0.5,
-    freeze_feature = TRUE,
-    freeze_feature_weight_threshold = 0.1,
-    drop_unused_ordering = FALSE,
+    freeze_unused_ordering = NULL,
+    freeze_unused_ordering_threshold = NULL,
+    freeze_feature = NULL,
+    freeze_feature_weight_threshold = NULL,
+    drop_unused_ordering = NULL,
     verbose = FALSE,
     ...
 ) {
@@ -2642,6 +3030,7 @@ fit_mpcurve <- function(
     rw_q = rw_q,
     lambda = lambda,
     S = S,
+    sigma2_init = sigma2_init,
     fix_lambda = fix_lambda,
     iter = iter,
     tol = tol,
@@ -2681,20 +3070,11 @@ fit_mpcurve <- function(
   )
 
   if (!identical(greedy, "none")) {
-    return(
-      switch(
-        greedy,
-        forward = .mpcurve_greedy_forward(
-          fit_args = fit_args,
-          dots = dots,
-          method_missing = method_missing
-        ),
-        backward = .mpcurve_greedy_backward(
-          fit_args = fit_args,
-          dots = dots,
-          method_missing = method_missing
-        )
-      )
+    stop(
+      "greedy dimension selection is temporarily unavailable for structural VI. ",
+      "Fit a fixed intrinsic_dim; cross-M selection requires a separate predictive ",
+      "or complexity-penalized criterion.",
+      call. = FALSE
     )
   }
 
@@ -2756,6 +3136,8 @@ fit_mpcurve <- function(
         similarity_min_feature_sd = similarity_min_feature_sd,
         K = K,
         rw_q = rw_q,
+        lambda_init = lambda,
+        fix_lambda = fix_lambda,
         discretization = discretization %||% c("quantile", "equal", "kmeans")[1L],
         T_start = T_start,
         T_end = T_end,
@@ -2769,6 +3151,7 @@ fit_mpcurve <- function(
         lambda_max = lambda_max,
         sigma_min = sigma_min,
         sigma_max = sigma_max,
+        sigma2_init = sigma2_init,
         position_prior = position_prior,
         position_prior_init = position_prior_init,
         partition_prior = partition_prior,
@@ -2799,6 +3182,7 @@ fit_mpcurve <- function(
         ridge = ridge,
         discretization = discretization,
         S = S,
+        sigma2_init = sigma2_init,
         fix_lambda = fix_lambda,
         lambda_sd_prior_rate = lambda_sd_prior_rate,
         lambda_min = lambda_min,

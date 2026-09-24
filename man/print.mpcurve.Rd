@@ -15,5 +15,10 @@
 Invisibly returns \code{x}.
 }
 \description{
-Print an \code{mpcurve} fit
+Prints a compact status view. Single-ordering fits report their backend,
+dimensions, convergence status, and final ELBO. Fixed-\code{M} structural
+partition fits additionally identify the variational family, report the
+retained fixed \code{M}, show hard feature-assignment counts derived from
+\code{$partition$pi_weights}, and report the final structural objective.
+Structural fits have no active, frozen, or dropped ordering state.
 }

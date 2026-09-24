@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -83,8 +83,9 @@ questions:</p>
 environments?</li>
 <li>If we encourage smoother trajectories, do we keep the same ordering
 while improving interpretability?</li>
-<li>Do the data support multiple ordering systems, or does a single
-ordering remain sufficient once we account for measurement error?</li>
+<li>What feature partition and conditional trajectories appear under a
+scientifically chosen fixed two-ordering model, with and without known
+measurement error?</li>
 </ol>
 <p>The recommended workflow throughout is the default <code>cavi</code>
 backend exposed by <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code>.</p>
@@ -390,23 +391,38 @@ stronger regularization mostly improves interpretability rather than
 changing the basic ordering story.</p>
 </div>
 <div class="section level2">
-<h2 id="step-3-ask-whether-one-ordering-is-enough">Step 3: Ask whether one ordering is enough<a class="anchor" aria-label="anchor" href="#step-3-ask-whether-one-ordering-is-enough"></a>
+<h2 id="step-3-explore-a-fixed-two-ordering-representation">Step 3: Explore a fixed two-ordering representation<a class="anchor" aria-label="anchor" href="#step-3-explore-a-fixed-two-ordering-representation"></a>
 </h2>
 <p>The single-ordering fit assumes that every environment varies
-smoothly along the same latent mutant axis. That may be too restrictive.
-Some environments may reflect a different adaptation program and
-therefore prefer a different latent ordering.</p>
-<p>To test that idea, we let <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> search over up
-to four latent ordering systems using greedy backward selection. The
-model starts with four orderings and prunes back to the optimal number
-based on the ELBO.</p>
+smoothly along the same latent mutant axis. As a scientifically
+motivated sensitivity analysis, we can instead ask how the environments
+partition under two fixed latent orderings. This is an exploratory
+representation, not an automatic test that
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">M=2</annotation></semantics></math>
+is preferable to
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">M=1</annotation></semantics></math>.</p>
+<p>To examine that idea, we fit a structural partition model with a
+scientifically chosen fixed value
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">M=2</annotation></semantics></math>.
+The structural ELBO is a fitting objective for a given
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>;
+it is not used here as an automatic complexity penalty for choosing
+among different values of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>.</p>
+<p>For every <code>intrinsic_dim &gt;= 2</code>, the fitted object has
+one canonical
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>C</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>Z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>U</mi><mo>∣</mo><mi>Z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(C)q(Z)q(U\mid Z)</annotation></semantics></math>
+state. Estimated feature variances form one shared
+length-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>d</mi><annotation encoding="application/x-tex">d</annotation></semantics></math><code>params$sigma2</code> vector across orderings. There are no
+active/inactive, freeze, or drop states, and greedy
+cross-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
+selection is currently unavailable.</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_partition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
 <span>  <span class="va">X</span>,</span>
 <span>  method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
-<span>  intrinsic_dim <span class="op">=</span> <span class="fl">4</span>,</span>
-<span>  greedy <span class="op">=</span> <span class="st">"backward"</span>,</span>
-<span>  ridge <span class="op">=</span> <span class="fl">1e-6</span>,</span>
+<span>  intrinsic_dim <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  ridge <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  K <span class="op">=</span> <span class="fl">50</span>,</span>
 <span>  iter <span class="op">=</span> <span class="fl">500</span>,</span>
 <span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
@@ -417,31 +433,31 @@ based on the ELBO.</p>
 <code class="sourceCode R"><span><span class="va">fit_partition</span></span>
 <span><span class="co">#&gt; MPCurve partition fit</span></span>
 <span><span class="co">#&gt;   Backend        : cavi</span></span>
-<span><span class="co">#&gt;   Greedy search  : backward (upper bound 4 -&gt; selected 3)</span></span>
-<span><span class="co">#&gt;   Dim (req/act/view): 3 / 3 / 3</span></span>
+<span><span class="co">#&gt;   Variational    : structural q(C) q(Z) q(U | Z)</span></span>
+<span><span class="co">#&gt;   Intrinsic dim  : 2 (fixed)</span></span>
 <span><span class="co">#&gt;   n / d / K      : 421 / 45 / 50</span></span>
-<span><span class="co">#&gt;   Iterations     : 83</span></span>
-<span><span class="co">#&gt;   Partition      : A=35, B=1, C=9</span></span>
-<span><span class="co">#&gt;   Active         : A, B, C</span></span>
-<span><span class="co">#&gt;   Objective (last): 12526.762490</span></span>
+<span><span class="co">#&gt;   Iterations     : 210</span></span>
+<span><span class="co">#&gt;   Partition      : A=27, B=18</span></span>
+<span><span class="co">#&gt;   Objective (last): 12946.251465</span></span>
 <span><span class="co">#&gt;   Converged      : TRUE</span></span></code></pre></div>
 <div class="section level3">
-<h3 id="look-at-some-fitted-orderings">Look at some fitted orderings<a class="anchor" aria-label="anchor" href="#look-at-some-fitted-orderings"></a>
+<h3 id="inspect-conditional-structural-trajectories">Inspect conditional structural trajectories<a class="anchor" aria-label="anchor" href="#inspect-conditional-structural-trajectories"></a>
 </h3>
+<p>For <code>plot_type = "mu"</code>, each ordering panel shows the
+canonical conditional posterior mean
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi><mrow><mo stretchy="true" form="prefix">[</mo><msub><mi>U</mi><mi>j</mi></msub><mo>∣</mo><msub><mi>Z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo stretchy="true" form="postfix">]</mo></mrow></mrow><annotation encoding="application/x-tex">E[U_j\mid Z_j=m]</annotation></semantics></math>.
+The title also reports the feature-assignment probability
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(Z_j=m)</annotation></semantics></math>.
+These are conditional alternatives, so the plotted trajectory is not
+multiplied by its assignment probability.</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">1</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/partition-plot-1.png" class="r-plt" alt="Two panels showing fitted partition-CAVI trajectories for environment dimensions 1 and 27." width="100%"></p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, dims <span class="op">=</span> <span class="fl">27</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/partition-plot-2.png" class="r-plt" alt="Two panels showing fitted partition-CAVI trajectories for environment dimensions 1 and 27." width="100%"></p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+<p><img src="fitness_files/figure-html/partition-plot-1.png" class="r-plt" alt="Conditional posterior mean trajectory for environment dimension 1 under each of two fixed orderings." width="100%"></p>
 </div>
 <div class="section level3">
 <h3 id="which-environments-were-assigned-to-which-ordering">Which environments were assigned to which ordering?<a class="anchor" aria-label="anchor" href="#which-environments-were-assigned-to-which-ordering"></a>
 </h3>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">assignment_tbl</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  environment <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">X</span><span class="op">)</span>,</span>
 <span>  category <span class="op">=</span> <span class="va">env_category</span>,</span>
@@ -469,37 +485,47 @@ based on the ELBO.</p>
 <td align="left">A</td>
 </tr>
 <tr class="odd">
+<td align="left">1% EtOH</td>
+<td align="left">carbon source</td>
+<td align="left">A</td>
+</tr>
+<tr class="even">
 <td align="left">1% Gly</td>
 <td align="left">carbon source</td>
 <td align="left">A</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">1% Raf</td>
 <td align="left">carbon source</td>
 <td align="left">A</td>
 </tr>
-<tr class="odd">
-<td align="left">0.5% DMSO</td>
+<tr class="even">
+<td align="left">0.5 μg/ml Flu</td>
 <td align="left">drug / chemical</td>
 <td align="left">A</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">17 μM GdA</td>
 <td align="left">drug / chemical</td>
 <td align="left">A</td>
 </tr>
-<tr class="odd">
-<td align="left">2 μg/ml Flu</td>
-<td align="left">drug / chemical</td>
-<td align="left">A</td>
-</tr>
 <tr class="even">
-<td align="left">8.5 μM GdA (B1)</td>
+<td align="left">2 μg/ml Flu</td>
 <td align="left">drug / chemical</td>
 <td align="left">A</td>
 </tr>
 <tr class="odd">
 <td align="left">8.5 μM GdA (B9)</td>
+<td align="left">drug / chemical</td>
+<td align="left">A</td>
+</tr>
+<tr class="even">
+<td align="left">Baffle, 0.4 μg/ml Ben</td>
+<td align="left">drug / chemical</td>
+<td align="left">A</td>
+</tr>
+<tr class="odd">
+<td align="left">Baffle, 2 μg/ml Ben</td>
 <td align="left">drug / chemical</td>
 <td align="left">A</td>
 </tr>
@@ -514,57 +540,7 @@ based on the ELBO.</p>
 <td align="left">A</td>
 </tr>
 <tr class="even">
-<td align="left">Baffle (B8)</td>
-<td align="left">glucose / batch</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
-<td align="left">Baffle (B9)</td>
-<td align="left">glucose / batch</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
-<td align="left">Baffle, 1.4% Gluc</td>
-<td align="left">glucose / batch</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
-<td align="left">Baffle, 1.6% Gluc</td>
-<td align="left">glucose / batch</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
-<td align="left">Baffle, 1.7% Gluc</td>
-<td align="left">glucose / batch</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
-<td align="left">Baffle, 1.8% Gluc</td>
-<td align="left">glucose / batch</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
-<td align="left">Baffle, 2.5% Gluc</td>
-<td align="left">glucose / batch</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
 <td align="left">EC 1BigBatch</td>
-<td align="left">other</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
-<td align="left">EC Batch 13</td>
-<td align="left">other</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
-<td align="left">EC Batch 18</td>
-<td align="left">other</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
-<td align="left">EC Batch 19</td>
 <td align="left">other</td>
 <td align="left">A</td>
 </tr>
@@ -584,32 +560,32 @@ based on the ELBO.</p>
 <td align="left">A</td>
 </tr>
 <tr class="even">
-<td align="left">EC Batch 3</td>
-<td align="left">other</td>
+<td align="left">0.2 M KCl</td>
+<td align="left">salt stress</td>
 <td align="left">A</td>
 </tr>
 <tr class="odd">
-<td align="left">EC Batch 6</td>
-<td align="left">other</td>
+<td align="left">0.2 M NaCl</td>
+<td align="left">salt stress</td>
 <td align="left">A</td>
 </tr>
 <tr class="even">
-<td align="left">12 hr Ferm</td>
+<td align="left">0.5 M KCl</td>
+<td align="left">salt stress</td>
+<td align="left">A</td>
+</tr>
+<tr class="odd">
+<td align="left">0.5 M NaCl</td>
+<td align="left">salt stress</td>
+<td align="left">A</td>
+</tr>
+<tr class="even">
+<td align="left">1 Day</td>
 <td align="left">time course</td>
 <td align="left">A</td>
 </tr>
 <tr class="odd">
-<td align="left">18 hr Ferm</td>
-<td align="left">time course</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
 <td align="left">22 hr Ferm</td>
-<td align="left">time course</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
-<td align="left">3 Day</td>
 <td align="left">time course</td>
 <td align="left">A</td>
 </tr>
@@ -629,59 +605,99 @@ based on the ELBO.</p>
 <td align="left">A</td>
 </tr>
 <tr class="odd">
-<td align="left">8 hr Ferm</td>
+<td align="left">7 Day</td>
 <td align="left">time course</td>
 <td align="left">A</td>
 </tr>
 <tr class="even">
-<td align="left">7 Day</td>
+<td align="left">0.5% DMSO</td>
+<td align="left">drug / chemical</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">8.5 μM GdA (B1)</td>
+<td align="left">drug / chemical</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">Baffle (B8)</td>
+<td align="left">glucose / batch</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">Baffle (B9)</td>
+<td align="left">glucose / batch</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">Baffle, 1.4% Gluc</td>
+<td align="left">glucose / batch</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">Baffle, 1.6% Gluc</td>
+<td align="left">glucose / batch</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">Baffle, 1.7% Gluc</td>
+<td align="left">glucose / batch</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">Baffle, 1.8% Gluc</td>
+<td align="left">glucose / batch</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">Baffle, 2.5% Gluc</td>
+<td align="left">glucose / batch</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">EC Batch 13</td>
+<td align="left">other</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">EC Batch 18</td>
+<td align="left">other</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">EC Batch 19</td>
+<td align="left">other</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">EC Batch 3</td>
+<td align="left">other</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">EC Batch 6</td>
+<td align="left">other</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">12 hr Ferm</td>
 <td align="left">time course</td>
 <td align="left">B</td>
 </tr>
 <tr class="odd">
-<td align="left">1% EtOH</td>
-<td align="left">carbon source</td>
-<td align="left">C</td>
-</tr>
-<tr class="even">
-<td align="left">0.5 μg/ml Flu</td>
-<td align="left">drug / chemical</td>
-<td align="left">C</td>
-</tr>
-<tr class="odd">
-<td align="left">Baffle, 0.4 μg/ml Ben</td>
-<td align="left">drug / chemical</td>
-<td align="left">C</td>
-</tr>
-<tr class="even">
-<td align="left">Baffle, 2 μg/ml Ben</td>
-<td align="left">drug / chemical</td>
-<td align="left">C</td>
-</tr>
-<tr class="odd">
-<td align="left">0.2 M KCl</td>
-<td align="left">salt stress</td>
-<td align="left">C</td>
-</tr>
-<tr class="even">
-<td align="left">0.2 M NaCl</td>
-<td align="left">salt stress</td>
-<td align="left">C</td>
-</tr>
-<tr class="odd">
-<td align="left">0.5 M KCl</td>
-<td align="left">salt stress</td>
-<td align="left">C</td>
-</tr>
-<tr class="even">
-<td align="left">0.5 M NaCl</td>
-<td align="left">salt stress</td>
-<td align="left">C</td>
-</tr>
-<tr class="odd">
-<td align="left">1 Day</td>
+<td align="left">18 hr Ferm</td>
 <td align="left">time course</td>
-<td align="left">C</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">3 Day</td>
+<td align="left">time course</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">8 hr Ferm</td>
+<td align="left">time course</td>
+<td align="left">B</td>
 </tr>
 </tbody>
 </table>
@@ -689,7 +705,7 @@ based on the ELBO.</p>
 <div class="section level3">
 <h3 id="how-similar-are-the-inferred-orderings">How similar are the inferred orderings?<a class="anchor" aria-label="anchor" href="#how-similar-are-the-inferred-orderings"></a>
 </h3>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ordering_names</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">locations</span><span class="op">)</span></span>
 <span><span class="va">ordering_names</span> <span class="op">&lt;-</span> <span class="va">ordering_names</span><span class="op">[</span><span class="va">ordering_names</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">assign</span><span class="op">)</span><span class="op">]</span></span>
 <span></span>
@@ -707,25 +723,16 @@ based on the ELBO.</p>
 <th align="left"></th>
 <th align="right">A</th>
 <th align="right">B</th>
-<th align="right">C</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
 <td align="left">A</td>
 <td align="right">1.000</td>
-<td align="right">-0.617</td>
-<td align="right">0.202</td>
+<td align="right">0.866</td>
 </tr>
 <tr class="even">
 <td align="left">B</td>
-<td align="right">-0.617</td>
-<td align="right">1.000</td>
-<td align="right">-0.617</td>
-</tr>
-<tr class="odd">
-<td align="left">C</td>
-<td align="right">0.202</td>
-<td align="right">-0.617</td>
+<td align="right">0.866</td>
 <td align="right">1.000</td>
 </tr>
 </tbody>
@@ -740,12 +747,12 @@ based on the ELBO.</p>
 <code>S</code> argument. In the public API, <code>S</code> is
 interpreted as a matrix of known measurement standard deviations.</p>
 <p>This matters here because ignoring heterogeneous measurement error
-can make the model over-explain noisy columns by introducing extra
-orderings.</p>
+can make a fixed multi-ordering fit attribute noisy columns to
+apparently distinct trajectory structure.</p>
 <div class="section level3">
 <h3 id="single-ordering-fit-with-known-measurement-sd">Single-ordering fit with known measurement SD<a class="anchor" aria-label="anchor" href="#single-ordering-fit-with-known-measurement-sd"></a>
 </h3>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_unidir_known_sd</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
 <span>  <span class="va">X</span>,</span>
 <span>  S <span class="op">=</span> <span class="va">S</span>,</span>
@@ -756,34 +763,34 @@ orderings.</p>
 <span>  lambda_sd_prior_rate <span class="op">=</span> <span class="fl">1e4</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="fitness_files/figure-html/uni-known-sd-convergence-1.png" class="r-plt" alt="ELBO trace for the single-ordering CAVI fit with known measurement standard deviations." width="100%"></p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">31</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">45</span><span class="op">)</span></span></code></pre></div>
 <p><img src="fitness_files/figure-html/uni-known-sd-trajectories-1.png" class="r-plt" alt="Four panels showing fitted trajectories for the single-ordering CAVI fit with known measurement SDs." width="100%"></p>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="greedy-search-with-known-measurement-sd">Greedy search with known measurement SD<a class="anchor" aria-label="anchor" href="#greedy-search-with-known-measurement-sd"></a>
+<h3 id="fixed-two-ordering-fit-with-known-measurement-sd">Fixed two-ordering fit with known measurement SD<a class="anchor" aria-label="anchor" href="#fixed-two-ordering-fit-with-known-measurement-sd"></a>
 </h3>
-<p>We first try forward selection to see whether the data support
-multiple orderings once we account for measurement error. This approach
-starts with a single ordering and adds orderings until the ELBO stops
-improving.</p>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<p>We now refit the same fixed
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">M=2</annotation></semantics></math>
+structural model while accounting for measurement error. This isolates
+the effect of known noise without mixing it with a separate
+dimension-selection procedure.</p>
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_partition_known_sd</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
 <span>  <span class="va">X</span>,</span>
 <span>  S <span class="op">=</span> <span class="va">S</span>,</span>
 <span>  method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
-<span>  intrinsic_dim <span class="op">=</span> <span class="fl">4</span>,</span>
-<span>  greedy <span class="op">=</span> <span class="st">"forward"</span>,</span>
-<span>  ridge <span class="op">=</span> <span class="fl">1e-6</span>,</span>
+<span>  intrinsic_dim <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  ridge <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  K <span class="op">=</span> <span class="fl">50</span>,</span>
 <span>  iter <span class="op">=</span> <span class="fl">500</span>,</span>
 <span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
@@ -792,75 +799,18 @@ improving.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">fit_partition_known_sd</span></span>
-<span><span class="co">#&gt; MPCurve fit</span></span>
+<span><span class="co">#&gt; MPCurve partition fit</span></span>
 <span><span class="co">#&gt;   Backend        : cavi</span></span>
-<span><span class="co">#&gt;   Greedy search  : forward (upper bound 4 -&gt; selected 1)</span></span>
-<span><span class="co">#&gt;   Model          : homoskedastic</span></span>
-<span><span class="co">#&gt;   Intrinsic dim  : 1</span></span>
+<span><span class="co">#&gt;   Variational    : structural q(C) q(Z) q(U | Z)</span></span>
+<span><span class="co">#&gt;   Intrinsic dim  : 2 (fixed)</span></span>
 <span><span class="co">#&gt;   n / d / K      : 421 / 45 / 50</span></span>
-<span><span class="co">#&gt;   Iterations     : 235</span></span>
-<span><span class="co">#&gt;   Converged      : yes</span></span>
-<span><span class="co">#&gt;   ELBO (last)    : 13531.873663</span></span></code></pre></div>
-<p>It is also useful to check the same question from the other direction
-by starting from the upper bound and pruning redundant orderings.</p>
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">fit_partition_known_sd_backward</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  <span class="va">X</span>,</span>
-<span>  S <span class="op">=</span> <span class="va">S</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
-<span>  intrinsic_dim <span class="op">=</span> <span class="fl">4</span>,</span>
-<span>  greedy <span class="op">=</span> <span class="st">"backward"</span>,</span>
-<span>  ridge <span class="op">=</span> <span class="fl">1e-6</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">50</span>,</span>
-<span>  iter <span class="op">=</span> <span class="fl">500</span>,</span>
-<span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  lambda_sd_prior_rate <span class="op">=</span> <span class="fl">1e4</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">fit_partition_known_sd_backward</span></span>
-<span><span class="co">#&gt; MPCurve fit</span></span>
-<span><span class="co">#&gt;   Backend        : cavi</span></span>
-<span><span class="co">#&gt;   Greedy search  : backward (upper bound 4 -&gt; selected 1)</span></span>
-<span><span class="co">#&gt;   Model          : homoskedastic</span></span>
-<span><span class="co">#&gt;   Intrinsic dim  : 1</span></span>
-<span><span class="co">#&gt;   n / d / K      : 421 / 45 / 50</span></span>
-<span><span class="co">#&gt;   Iterations     : 197</span></span>
-<span><span class="co">#&gt;   Converged      : yes</span></span>
-<span><span class="co">#&gt;   ELBO (last)    : 13591.042390</span></span></code></pre></div>
-<p>When both forward and backward selection collapse back to a single
-ordering, that is strong evidence that the earlier higher-dimensional
-fit was mainly absorbing noise heterogeneity rather than revealing
-genuinely distinct latent systems.</p>
-</div>
-<div class="section level3">
-<h3 id="compare-the-forward-and-backward-single-ordering-solutions">Compare the forward and backward single-ordering solutions<a class="anchor" aria-label="anchor" href="#compare-the-forward-and-backward-single-ordering-solutions"></a>
-</h3>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span></span>
-<span>  <span class="va">fit_partition_known_sd</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span>,</span>
-<span>  <span class="va">fit_partition_known_sd_backward</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span></span>
-<span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 0.999151</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span></span>
-<span>  <span class="va">fit_partition_known_sd</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span>,</span>
-<span>  <span class="va">fit_partition_known_sd_backward</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span>,</span>
-<span>  xlab <span class="op">=</span> <span class="st">"Latent position (forward search)"</span>,</span>
-<span>  ylab <span class="op">=</span> <span class="st">"Latent position (backward search)"</span></span>
-<span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span>, lty <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/compare-known-sd-orderings-1.png" class="r-plt" alt="Scatter plot comparing inferred pseudotime between forward and backward greedy search with known measurement SDs." width="100%"></p>
-<p>Though both methods find a single ordering.</p>
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition_known_sd</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition_known_sd</span>, dims <span class="op">=</span> <span class="fl">30</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition_known_sd_backward</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition_known_sd_backward</span>, dims <span class="op">=</span> <span class="fl">30</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/compare-known-sd-trajectories-1.png" class="r-plt" alt="Four panels comparing fitted trajectories from forward and backward greedy search with known measurement SDs." width="100%"></p>
-<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span><span class="co">#&gt;   Iterations     : 304</span></span>
+<span><span class="co">#&gt;   Partition      : A=13, B=32</span></span>
+<span><span class="co">#&gt;   Objective (last): 13909.645485</span></span>
+<span><span class="co">#&gt;   Converged      : TRUE</span></span></code></pre></div>
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition_known_sd</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">31</span><span class="op">)</span></span></code></pre></div>
+<p><img src="fitness_files/figure-html/known-sd-partition-trajectories-1.png" class="r-plt" alt="Conditional posterior mean trajectory for environment dimension 31 under each of two fixed orderings with known measurement SDs." width="100%"></p>
 </div>
 </div>
 <div class="section level2">
@@ -874,11 +824,13 @@ ordering.</li>
 <li>Use <code>lambda_sd_prior_rate</code> when the ordering looks
 sensible but the fitted trajectories are too rough to interpret
 comfortably.</li>
-<li>Use <code>intrinsic_dim</code> together with greedy search to test
-whether the data support multiple ordering systems.</li>
+<li>Use a fixed <code>intrinsic_dim</code> to study a scientifically
+plausible number of ordering systems; assess different values through
+stability or external validation rather than the raw structural ELBO
+alone.</li>
 <li>If measurement error is available, pass it through <code>S</code>;
-otherwise the model may over-split noisy environments into extra
-orderings.</li>
+otherwise a fixed multi-ordering fit may interpret noisy environments as
+distinct trajectory structure.</li>
 </ol>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
