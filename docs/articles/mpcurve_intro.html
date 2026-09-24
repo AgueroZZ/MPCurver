@@ -6,7 +6,8 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>Getting Started with MPCurver CAVI • MPCurver</title>
-<script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<!-- katex math --><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script><script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous" onload="renderMathInElement(document.body);"></script><script src="../katex-auto.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
@@ -80,42 +81,30 @@ and then walks through a larger but still easy spiral example.</p>
 <div class="section level2">
 <h2 id="statistical-model">1 Statistical model<a class="anchor" aria-label="anchor" href="#statistical-model"></a>
 </h2>
-<p>We observe a data matrix
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>X</mi><mo>=</mo><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo>∈</mo><msup><mi>ℝ</mi><mrow><mi>n</mi><mo>×</mo><mi>d</mi></mrow></msup><mo>,</mo></mrow><annotation encoding="application/x-tex">
+<p>We observe a data matrix <span class="math display">
 X = (x_{ij}) \in \mathbb{R}^{n \times d},
-</annotation></semantics></math> where row
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>
-is one cell and column
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math>
-is one feature.</p>
+</span> where row <span class="math inline">i</span> is one cell and
+column <span class="math inline">j</span> is one feature.</p>
 <p>The single-ordering MPCurve model assumes:</p>
 <ol style="list-style-type: decimal">
-<li>each cell has a latent position
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>c</mi><mi>i</mi></msub><mo>∈</mo><mo stretchy="false" form="prefix">{</mo><mn>1</mn><mo>,</mo><mi>…</mi><mo>,</mo><mi>K</mi><mo stretchy="false" form="postfix">}</mo><mo>,</mo></mrow><annotation encoding="application/x-tex">
+<li>each cell has a latent position <span class="math display">
 c_i \in \{1,\dots,K\},
-</annotation></semantics></math>
+</span>
 </li>
-<li>each feature has a smooth trajectory over the
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math>
-ordered components, written as
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>𝐮</mi><mi>j</mi></msub><mo>=</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>u</mi><mrow><mi>j</mi><mn>1</mn></mrow></msub><mo>,</mo><mi>…</mi><mo>,</mo><msub><mi>u</mi><mrow><mi>j</mi><mi>K</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mi>⊤</mi></msup><mo>∈</mo><msup><mi>ℝ</mi><mi>K</mi></msup><mo>,</mo></mrow><annotation encoding="application/x-tex">
+<li>each feature has a smooth trajectory over the <span class="math inline">K</span> ordered components, written as <span class="math display">
 \boldsymbol{u}_j = (u_{j1},\dots,u_{jK})^\top \in \mathbb{R}^K,
-</annotation></semantics></math>
+</span>
 </li>
-<li>observations follow a Gaussian likelihood
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>∣</mo><msub><mi>c</mi><mi>i</mi></msub><mo>=</mo><mi>k</mi><mo>,</mo><msub><mi>𝐮</mi><mi>j</mi></msub><mo>,</mo><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><mo>∼</mo><mi>N</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>u</mi><mrow><mi>j</mi><mi>k</mi></mrow></msub><mo>,</mo><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mrow><annotation encoding="application/x-tex">
-x_{ij} \mid c_i = k, \boldsymbol{u}_j, \sigma_j^2 \sim N(u_{jk}, \sigma_j^2),
-</annotation></semantics></math>
+<li>observations follow a Gaussian likelihood <span class="math display">
+x_{ij} \mid c_i = k, \boldsymbol{u}_j, \sigma_j^2 \sim N(u_{jk},
+\sigma_j^2),
+</span>
 </li>
 <li>and each trajectory is regularized by a Gaussian Markov random field
-prior along the component axis:
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>𝐮</mi><mi>j</mi></msub><mo>∼</mo><mi>N</mi><mspace width="-0.167em"></mspace><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>λ</mi><mi>j</mi></msub><msub><mi>Q</mi><mi>K</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mrow><mi>−</mi><mn>1</mn></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mrow><annotation encoding="application/x-tex">
+prior along the component axis: <span class="math display">
 \boldsymbol{u}_j \sim N\!\left(0, (\lambda_j Q_K)^{-1}\right),
-</annotation></semantics></math> where
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>Q</mi><mi>K</mi></msub><annotation encoding="application/x-tex">Q_K</annotation></semantics></math>
-is the random-walk precision matrix on the
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math>
-bins.</li>
+</span> where <span class="math inline">Q_K</span> is the random-walk
+precision matrix on the <span class="math inline">K</span> bins.</li>
 </ol>
 <p>In the current <code>cavi</code> implementation:</p>
 <ul>
@@ -124,10 +113,9 @@ bins.</li>
 <li>
 <code>lambda_j</code> is feature-specific,</li>
 <li>the covariance model is homoskedastic across components,</li>
-<li>and the posterior is approximated with a mean-field family
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>C</mi><mo>,</mo><mi>U</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><munderover><mo>∏</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msub><mi>q</mi><mi>i</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>c</mi><mi>i</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><munderover><mo>∏</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>d</mi></munderover><msub><mi>q</mi><mi>j</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>𝐮</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+<li>and the posterior is approximated with a mean-field family <span class="math display">
 q(C,U) = \prod_{i=1}^n q_i(c_i)\prod_{j=1}^d q_j(\boldsymbol{u}_j).
-</annotation></semantics></math>
+</span>
 </li>
 </ul>
 </div>
@@ -135,27 +123,21 @@ q(C,U) = \prod_{i=1}^n q_i(c_i)\prod_{j=1}^d q_j(\boldsymbol{u}_j).
 <h2 id="variational-algorithm">2 Variational algorithm<a class="anchor" aria-label="anchor" href="#variational-algorithm"></a>
 </h2>
 <p>The backend used by <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> performs
-coordinate-ascent variational inference on an explicit ELBO. Write
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>r</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><mo>:=</mo><msub><mi>q</mi><mi>i</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>c</mi><mi>i</mi></msub><mo>=</mo><mi>k</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><mspace width="2.0em"></mspace><msub><mi>N</mi><mi>k</mi></msub><mo>:=</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msub><mi>r</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><mo>,</mo></mrow><annotation encoding="application/x-tex">
+coordinate-ascent variational inference on an explicit ELBO. Write <span class="math display">
 r_{ik} := q_i(c_i = k),
 \qquad
 N_k := \sum_{i=1}^n r_{ik},
-</annotation></semantics></math> and for each feature
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math>,
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>q</mi><mi>j</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>𝐮</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mi>N</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>𝐦</mi><mi>j</mi></msub><mo>,</mo><msub><mi>S</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+</span> and for each feature <span class="math inline">j</span>, <span class="math display">
 q_j(\boldsymbol{u}_j) = N(\boldsymbol{m}_j, S_j).
-</annotation></semantics></math></p>
-<p>Under the mean-field family
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>C</mi><mo>,</mo><mi>U</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><munderover><mo>∏</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msub><mi>q</mi><mi>i</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>c</mi><mi>i</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><munderover><mo>∏</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>d</mi></munderover><msub><mi>q</mi><mi>j</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>𝐮</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mrow><annotation encoding="application/x-tex">
+</span></p>
+<p>Under the mean-field family <span class="math display">
 q(C,U)=\prod_{i=1}^n q_i(c_i)\prod_{j=1}^d q_j(\boldsymbol{u}_j),
-</annotation></semantics></math> the ELBO can be written, up to additive
-constants, as
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>ℒ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>q</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><msub><mi>r</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><mo>log</mo><msub><mi>π</mi><mi>k</mi></msub><mo>−</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><msub><mi>r</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><mo>log</mo><msub><mi>r</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub></mrow><annotation encoding="application/x-tex">
+</span> the ELBO can be written, up to additive constants, as <span class="math display">
 \mathcal L(q)
- =
+=
 \sum_{i=1}^n\sum_{k=1}^K r_{ik}\log \pi_k
 - \sum_{i=1}^n\sum_{k=1}^K r_{ik}\log r_{ik}
-</annotation></semantics></math><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>−</mi><mfrac><mn>1</mn><mn>2</mn></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>d</mi></munderover><msub><mi>r</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><mrow><mo stretchy="true" form="prefix">[</mo><mo>log</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mi>π</mi><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><mo>+</mo><mfrac><mrow><msup><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>−</mo><msub><mi>m</mi><mrow><mi>j</mi><mi>k</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mn>2</mn></msup><mo>+</mo><msub><mi>S</mi><mrow><mi>j</mi><mo>,</mo><mi>k</mi><mi>k</mi></mrow></msub></mrow><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup></mfrac><mo stretchy="true" form="postfix">]</mo></mrow></mrow><annotation encoding="application/x-tex">
+</span> <span class="math display">
 - \frac12 \sum_{i=1}^n\sum_{k=1}^K\sum_{j=1}^d
 r_{ik}
 \left[
@@ -163,67 +145,50 @@ r_{ik}
 +
 \frac{(x_{ij}-m_{jk})^2 + S_{j,kk}}{\sigma_j^2}
 \right]
-</annotation></semantics></math><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>+</mi><mfrac><mn>1</mn><mn>2</mn></mfrac><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>d</mi></munderover><mrow><mo stretchy="true" form="prefix">[</mo><mo>rank</mo><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Q</mi><mi>K</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo>log</mo><msub><mi>λ</mi><mi>j</mi></msub><mo>−</mo><msub><mi>λ</mi><mi>j</mi></msub><mo minsize="1.8" maxsize="1.8" stretchy="false" form="prefix">(</mo><msubsup><mi>𝐦</mi><mi>j</mi><mi>⊤</mi></msubsup><msub><mi>Q</mi><mi>K</mi></msub><msub><mi>𝐦</mi><mi>j</mi></msub><mo>+</mo><mo>tr</mo><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Q</mi><mi>K</mi></msub><msub><mi>S</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo minsize="1.8" maxsize="1.8" stretchy="false" form="postfix">)</mo><mo>+</mo><mo>log</mo><mrow><mo stretchy="true" form="prefix">|</mo><msub><mi>S</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">|</mo></mrow><mo stretchy="true" form="postfix">]</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+</span> <span class="math display">
 + \frac12 \sum_{j=1}^d
 \left[
 \operatorname{rank}(Q_K)\log \lambda_j
-- \lambda_j\Big(\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j + \operatorname{tr}(Q_K S_j)\Big)
+- \lambda_j\Big(\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j +
+\operatorname{tr}(Q_K S_j)\Big)
 + \log |S_j|
 \right].
-</annotation></semantics></math></p>
+</span></p>
 <p>This is the quantity recorded in <code>elbo_trace</code>. The updates
 used by the public backend are obtained by maximizing this ELBO one
 block at a time.</p>
 <div class="section level3">
-<h3 id="update-for-qboldsymbolu_j">2.1 Update for
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>𝐮</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(\boldsymbol{u}_j)</annotation></semantics></math><a class="anchor" aria-label="anchor" href="#update-for-qboldsymbolu_j"></a>
+<h3 id="update-for-qboldsymbolu_j">2.1 Update for <span class="math inline">q(\boldsymbol{u}_j)</span><a class="anchor" aria-label="anchor" href="#update-for-qboldsymbolu_j"></a>
 </h3>
-<p>Fix
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>r</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><annotation encoding="application/x-tex">r_{ik}</annotation></semantics></math>,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><annotation encoding="application/x-tex">\sigma_j^2</annotation></semantics></math>,
-and
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>λ</mi><mi>j</mi></msub><annotation encoding="application/x-tex">\lambda_j</annotation></semantics></math>.
-The ELBO terms involving
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>𝐮</mi><mi>j</mi></msub><annotation encoding="application/x-tex">\boldsymbol{u}_j</annotation></semantics></math>
-are quadratic, so the optimal variational factor is Gaussian:
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>log</mo><msubsup><mi>q</mi><mi>j</mi><mo>⋆</mo></msubsup><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>𝐮</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mi>−</mi><mfrac><mn>1</mn><mn>2</mn></mfrac><msubsup><mi>𝐮</mi><mi>j</mi><mi>⊤</mi></msubsup><msub><mi>A</mi><mi>j</mi></msub><msub><mi>𝐮</mi><mi>j</mi></msub><mo>+</mo><msubsup><mi>𝐮</mi><mi>j</mi><mi>⊤</mi></msubsup><msub><mi>𝐛</mi><mi>j</mi></msub><mo>+</mo><mtext mathvariant="normal">const</mtext><mo>,</mo></mrow><annotation encoding="application/x-tex">
+<p>Fix <span class="math inline">r_{ik}</span>, <span class="math inline">\sigma_j^2</span>, and <span class="math inline">\lambda_j</span>. The ELBO terms involving <span class="math inline">\boldsymbol{u}_j</span> are quadratic, so the
+optimal variational factor is Gaussian: <span class="math display">
 \log q_j^\star(\boldsymbol{u}_j)
 =
 -\frac12 \boldsymbol{u}_j^\top A_j \boldsymbol{u}_j
 + \boldsymbol{u}_j^\top \boldsymbol{b}_j + \text{const},
-</annotation></semantics></math> where
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>A</mi><mi>j</mi></msub><mo>=</mo><msub><mi>λ</mi><mi>j</mi></msub><msub><mi>Q</mi><mi>K</mi></msub><mo>+</mo><mo>diag</mo><mspace width="-0.167em"></mspace><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>N</mi><mn>1</mn></msub><mi>/</mi><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><mo>,</mo><mi>…</mi><mo>,</mo><msub><mi>N</mi><mi>K</mi></msub><mi>/</mi><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mrow><annotation encoding="application/x-tex">
+</span> where <span class="math display">
 A_j
 =
 \lambda_j Q_K +
 \operatorname{diag}\!\left(N_1/\sigma_j^2,\dots,N_K/\sigma_j^2\right),
-</annotation></semantics></math> and
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>b</mi><mrow><mi>j</mi><mi>k</mi></mrow></msub><mo>=</mo><mfrac><mn>1</mn><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msub><mi>r</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
+</span> and <span class="math display">
 b_{jk}
 =
 \frac{1}{\sigma_j^2}\sum_{i=1}^n r_{ik} x_{ij}.
-</annotation></semantics></math> Therefore,
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>S</mi><mi>j</mi></msub><mo>=</mo><msubsup><mi>A</mi><mi>j</mi><mrow><mi>−</mi><mn>1</mn></mrow></msubsup><mo>,</mo><mspace width="2.0em"></mspace><msub><mi>𝐦</mi><mi>j</mi></msub><mo>=</mo><msub><mi>S</mi><mi>j</mi></msub><msub><mi>𝐛</mi><mi>j</mi></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
+</span> Therefore, <span class="math display">
 S_j = A_j^{-1},
 \qquad
 \boldsymbol{m}_j = S_j \boldsymbol{b}_j.
-</annotation></semantics></math></p>
+</span></p>
 <p>This is exactly the linear-algebra step implemented by the backend
 behind <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code>.</p>
 </div>
 <div class="section level3">
-<h3 id="update-for-qc_i">2.2 Update for
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>c</mi><mi>i</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(c_i)</annotation></semantics></math><a class="anchor" aria-label="anchor" href="#update-for-qc_i"></a>
+<h3 id="update-for-qc_i">2.2 Update for <span class="math inline">q(c_i)</span><a class="anchor" aria-label="anchor" href="#update-for-qc_i"></a>
 </h3>
-<p>Fix
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>U</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(U)</annotation></semantics></math>,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>π</mi><annotation encoding="application/x-tex">\pi</annotation></semantics></math>,
-and
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><annotation encoding="application/x-tex">\sigma_j^2</annotation></semantics></math>.
-Collecting the ELBO terms involving the row
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>r</mi><mrow><mi>i</mi><mo>⋅</mo></mrow></msub><annotation encoding="application/x-tex">r_{i\cdot}</annotation></semantics></math>
-gives
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>log</mo><msub><mi>r</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><mo>∝</mo><mo>log</mo><msub><mi>π</mi><mi>k</mi></msub><mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>d</mi></munderover><mrow><mo stretchy="true" form="prefix">[</mo><mo>log</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mi>π</mi><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><mo stretchy="true" form="postfix">)</mo></mrow><mo>+</mo><mfrac><mrow><msup><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>−</mo><msub><mi>m</mi><mrow><mi>j</mi><mi>k</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mn>2</mn></msup><mo>+</mo><msub><mi>S</mi><mrow><mi>j</mi><mo>,</mo><mi>k</mi><mi>k</mi></mrow></msub></mrow><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup></mfrac><mo stretchy="true" form="postfix">]</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+<p>Fix <span class="math inline">q(U)</span>, <span class="math inline">\pi</span>, and <span class="math inline">\sigma_j^2</span>. Collecting the ELBO terms
+involving the row <span class="math inline">r_{i\cdot}</span> gives
+<span class="math display">
 \log r_{ik}
 \propto
 \log \pi_k
@@ -233,72 +198,57 @@ gives
 +
 \frac{(x_{ij}-m_{jk})^2 + S_{j,kk}}{\sigma_j^2}
 \right].
-</annotation></semantics></math> So the cell-position posterior is
-updated by a row-wise softmax:
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>r</mi><mrow><mi>i</mi><mo>⋅</mo></mrow></msub><mo>←</mo><mo>softmax</mo><mspace width="-0.167em"></mspace><mo minsize="1.2" maxsize="1.2" stretchy="false" form="prefix">(</mo><msub><mo>ℓ</mo><mrow><mi>i</mi><mn>1</mn></mrow></msub><mo>,</mo><mi>…</mi><mo>,</mo><msub><mo>ℓ</mo><mrow><mi>i</mi><mi>K</mi></mrow></msub><mo minsize="1.2" maxsize="1.2" stretchy="false" form="postfix">)</mo><mo>,</mo></mrow><annotation encoding="application/x-tex">
-r_{i\cdot} \leftarrow \operatorname{softmax}\!\big(\ell_{i1},\dots,\ell_{iK}\big),
-</annotation></semantics></math> with
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mo>ℓ</mo><mrow><mi>i</mi><mi>k</mi></mrow></msub><annotation encoding="application/x-tex">\ell_{ik}</annotation></semantics></math>
-equal to the right-hand side above.</p>
-<p>The extra
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>S</mi><mrow><mi>j</mi><mo>,</mo><mi>k</mi><mi>k</mi></mrow></msub><annotation encoding="application/x-tex">S_{j,kk}</annotation></semantics></math>
-term is the uncertainty correction that distinguishes this update from a
-pure plug-in EM step.</p>
+</span> So the cell-position posterior is updated by a row-wise softmax:
+<span class="math display">
+r_{i\cdot} \leftarrow
+\operatorname{softmax}\!\big(\ell_{i1},\dots,\ell_{iK}\big),
+</span> with <span class="math inline">\ell_{ik}</span> equal to the
+right-hand side above.</p>
+<p>The extra <span class="math inline">S_{j,kk}</span> term is the
+uncertainty correction that distinguishes this update from a pure
+plug-in EM step.</p>
 </div>
 <div class="section level3">
-<h3 id="update-for-pi_k">2.3 Update for
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>π</mi><mi>k</mi></msub><annotation encoding="application/x-tex">\pi_k</annotation></semantics></math><a class="anchor" aria-label="anchor" href="#update-for-pi_k"></a>
+<h3 id="update-for-pi_k">2.3 Update for <span class="math inline">\pi_k</span><a class="anchor" aria-label="anchor" href="#update-for-pi_k"></a>
 </h3>
-<p>Fixing everything else, we maximize
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><msub><mi>N</mi><mi>k</mi></msub><mo>log</mo><msub><mi>π</mi><mi>k</mi></msub></mrow><annotation encoding="application/x-tex">
+<p>Fixing everything else, we maximize <span class="math display">
 \sum_{k=1}^K N_k \log \pi_k
-</annotation></semantics></math> subject to
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mo>∑</mo><mi>k</mi></msub><msub><mi>π</mi><mi>k</mi></msub><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\sum_k \pi_k = 1</annotation></semantics></math>.
-A Lagrange multiplier gives
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>π</mi><mi>k</mi></msub><mo>=</mo><mfrac><msub><mi>N</mi><mi>k</mi></msub><mi>n</mi></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+</span> subject to <span class="math inline">\sum_k \pi_k = 1</span>. A
+Lagrange multiplier gives <span class="math display">
 \pi_k = \frac{N_k}{n}.
-</annotation></semantics></math></p>
+</span></p>
 </div>
 <div class="section level3">
-<h3 id="update-for-sigma_j2">2.4 Update for
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><annotation encoding="application/x-tex">\sigma_j^2</annotation></semantics></math><a class="anchor" aria-label="anchor" href="#update-for-sigma_j2"></a>
+<h3 id="update-for-sigma_j2">2.4 Update for <span class="math inline">\sigma_j^2</span><a class="anchor" aria-label="anchor" href="#update-for-sigma_j2"></a>
 </h3>
-<p>Fixing
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>U</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(U)</annotation></semantics></math>
-and
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>C</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(C)</annotation></semantics></math>,
-differentiate the ELBO with respect to
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><annotation encoding="application/x-tex">\sigma_j^2</annotation></semantics></math>.
-The stationary point is
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msubsup><mi>σ</mi><mi>j</mi><mn>2</mn></msubsup><mo>=</mo><mfrac><mn>1</mn><mi>n</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><msub><mi>r</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><mo minsize="1.8" maxsize="1.8" stretchy="false" form="prefix">[</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>−</mo><msub><mi>m</mi><mrow><mi>j</mi><mi>k</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mn>2</mn></msup><mo>+</mo><msub><mi>S</mi><mrow><mi>j</mi><mo>,</mo><mi>k</mi><mi>k</mi></mrow></msub><mo minsize="1.8" maxsize="1.8" stretchy="false" form="postfix">]</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">
+<p>Fixing <span class="math inline">q(U)</span> and <span class="math inline">q(C)</span>, differentiate the ELBO with respect to
+<span class="math inline">\sigma_j^2</span>. The stationary point is
+<span class="math display">
 \sigma_j^2
 =
 \frac{1}{n}
 \sum_{i=1}^n \sum_{k=1}^K
 r_{ik}\Big[(x_{ij}-m_{jk})^2 + S_{j,kk}\Big].
-</annotation></semantics></math></p>
+</span></p>
 <p>So each feature variance is updated from the posterior expected
 residual sum of squares.</p>
 </div>
 <div class="section level3">
-<h3 id="update-for-lambda_j">2.5 Update for
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>λ</mi><mi>j</mi></msub><annotation encoding="application/x-tex">\lambda_j</annotation></semantics></math><a class="anchor" aria-label="anchor" href="#update-for-lambda_j"></a>
+<h3 id="update-for-lambda_j">2.5 Update for <span class="math inline">\lambda_j</span><a class="anchor" aria-label="anchor" href="#update-for-lambda_j"></a>
 </h3>
-<p>Fixing
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>U</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(U)</annotation></semantics></math>,
-only the prior part of the ELBO depends on
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>λ</mi><mi>j</mi></msub><annotation encoding="application/x-tex">\lambda_j</annotation></semantics></math>:
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mfrac><mn>1</mn><mn>2</mn></mfrac><mo>rank</mo><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Q</mi><mi>K</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo>log</mo><msub><mi>λ</mi><mi>j</mi></msub><mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><msub><mi>λ</mi><mi>j</mi></msub><mo minsize="1.8" maxsize="1.8" stretchy="false" form="prefix">(</mo><msubsup><mi>𝐦</mi><mi>j</mi><mi>⊤</mi></msubsup><msub><mi>Q</mi><mi>K</mi></msub><msub><mi>𝐦</mi><mi>j</mi></msub><mo>+</mo><mo>tr</mo><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Q</mi><mi>K</mi></msub><msub><mi>S</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo minsize="1.8" maxsize="1.8" stretchy="false" form="postfix">)</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">
+<p>Fixing <span class="math inline">q(U)</span>, only the prior part of
+the ELBO depends on <span class="math inline">\lambda_j</span>: <span class="math display">
 \frac12 \operatorname{rank}(Q_K)\log \lambda_j
 - \frac12 \lambda_j
-\Big(\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j + \operatorname{tr}(Q_K S_j)\Big).
-</annotation></semantics></math> Setting the derivative to zero yields
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>λ</mi><mi>j</mi></msub><mo>=</mo><mfrac><mrow><mo>rank</mo><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Q</mi><mi>K</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow><mrow><msubsup><mi>𝐦</mi><mi>j</mi><mi>⊤</mi></msubsup><msub><mi>Q</mi><mi>K</mi></msub><msub><mi>𝐦</mi><mi>j</mi></msub><mo>+</mo><mo>tr</mo><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Q</mi><mi>K</mi></msub><msub><mi>S</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\Big(\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j + \operatorname{tr}(Q_K
+S_j)\Big).
+</span> Setting the derivative to zero yields <span class="math display">
 \lambda_j
 =
 \frac{\operatorname{rank}(Q_K)}
-{\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j + \operatorname{tr}(Q_K S_j)}.
-</annotation></semantics></math></p>
+{\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j + \operatorname{tr}(Q_K
+S_j)}.
+</span></p>
 </div>
 <div class="section level3">
 <h3 id="why-the-elbo-is-monotone-here">2.6 Why the ELBO is monotone here<a class="anchor" aria-label="anchor" href="#why-the-elbo-is-monotone-here"></a>
@@ -412,10 +362,9 @@ trace.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"ELBO range:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">elbo_trace</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; ELBO range: -7595.206 -4787.638</span></span></code></pre></div>
 <p>We can also compare the inferred ordering to the true latent
-parameter using the posterior-mean component index
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mover><mi>c</mi><mo accent="true">̂</mo></mover><mi>i</mi></msub><mo>=</mo><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><mi>k</mi><mspace width="0.167em"></mspace><msub><mi>r</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
+parameter using the posterior-mean component index <span class="math display">
 \hat c_i = \sum_{k=1}^K k \, r_{ik}.
-</annotation></semantics></math></p>
+</span></p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pseudotime_hat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">gamma</span> <span class="op"><a href="https://rdrr.io/r/base/matmult.html" class="external-link">%*%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">gamma</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">rho_t</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span><span class="va">pseudotime_hat</span>, <span class="va">t_true</span>, method <span class="op">=</span> <span class="st">"spearman"</span><span class="op">)</span><span class="op">)</span></span>

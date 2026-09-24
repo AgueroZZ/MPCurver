@@ -42,6 +42,9 @@ of the public repository update.
 - [x] Verify the home page and public reference/article pages report version `0.3.0` and describe fixed-`M` structural VI, shared `sigma2`, intrinsic `ridge = 0`, canonical state, and retired freeze/drop controls.
 - [x] Verify committed `docs/` does not contain or reference `AGENTS`, `CLAUDE`, `PACKAGE_OVERVIEW_FOR_AGENTS`, `Intro`, `internal/`, `important_derivations`, `log/`, or `plan/`.
 - [x] Check every local link and asset reference in the curated HTML site.
+- [x] Inspect the deployed reference page in a real browser and enable KaTeX
+  after confirming that the default custom-build output exposed raw Rd math
+  delimiters.
 
 ### Task 4: Stage the release allowlist
 

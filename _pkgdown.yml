@@ -2,6 +2,7 @@ url: https://aguerozz.github.io/MPCurver/
 
 template:
   bootstrap: 5
+  math-rendering: katex
 
 home:
   sidebar: false

@@ -25,8 +25,15 @@
 - `R CMD check --no-manual`: `Status: OK`.
 - Curated-site audit: 26 HTML files checked; all local links and assets resolve,
   and no internal project materials are exposed.
+- Real-browser deployment QA found raw Rd math delimiters on reference pages.
+  Setting `template.math-rendering: katex` in `_pkgdown.yml` and rebuilding the
+  curated site supplies the required renderer for inline and display equations.
 
 ## Publication
 
-- Commit: pending.
-- GitHub Pages deployment: pending.
+- Main release commit: `d6a104659d972dd221bd2d328d4f6998c9558603`
+  (`Release MPCurver v0.3.0 structural VI`).
+- The release commit was pushed to `origin/main`; its first GitHub Pages build
+  completed successfully. A follow-up display-only commit adds KaTeX rendering
+  after the browser QA finding above.
+- Final GitHub Pages verification: pending follow-up deployment.

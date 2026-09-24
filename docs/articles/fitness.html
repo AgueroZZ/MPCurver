@@ -6,7 +6,8 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>Analyzing the eLife Fitness Dataset with MPCurver • MPCurver</title>
-<script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<!-- katex math --><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script><script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous" onload="renderMathInElement(document.body);"></script><script src="../katex-auto.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
@@ -397,26 +398,17 @@ changing the basic ordering story.</p>
 smoothly along the same latent mutant axis. As a scientifically
 motivated sensitivity analysis, we can instead ask how the environments
 partition under two fixed latent orderings. This is an exploratory
-representation, not an automatic test that
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">M=2</annotation></semantics></math>
-is preferable to
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">M=1</annotation></semantics></math>.</p>
+representation, not an automatic test that <span class="math inline">M=2</span> is preferable to <span class="math inline">M=1</span>.</p>
 <p>To examine that idea, we fit a structural partition model with a
-scientifically chosen fixed value
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">M=2</annotation></semantics></math>.
-The structural ELBO is a fitting objective for a given
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>;
-it is not used here as an automatic complexity penalty for choosing
-among different values of
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>.</p>
+scientifically chosen fixed value <span class="math inline">M=2</span>.
+The structural ELBO is a fitting objective for a given <span class="math inline">M</span>; it is not used here as an automatic
+complexity penalty for choosing among different values of <span class="math inline">M</span>.</p>
 <p>For every <code>intrinsic_dim &gt;= 2</code>, the fitted object has
-one canonical
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>C</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>Z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>U</mi><mo>∣</mo><mi>Z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(C)q(Z)q(U\mid Z)</annotation></semantics></math>
-state. Estimated feature variances form one shared
-length-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>d</mi><annotation encoding="application/x-tex">d</annotation></semantics></math><code>params$sigma2</code> vector across orderings. There are no
-active/inactive, freeze, or drop states, and greedy
-cross-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math>
-selection is currently unavailable.</p>
+one canonical <span class="math inline">q(C)q(Z)q(U\mid Z)</span> state.
+Estimated feature variances form one shared length-<span class="math inline">d</span> <code>params$sigma2</code> vector across
+orderings. There are no active/inactive, freeze, or drop states, and
+greedy cross-<span class="math inline">M</span> selection is currently
+unavailable.</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_partition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
 <span>  <span class="va">X</span>,</span>
@@ -444,12 +436,11 @@ selection is currently unavailable.</p>
 <h3 id="inspect-conditional-structural-trajectories">Inspect conditional structural trajectories<a class="anchor" aria-label="anchor" href="#inspect-conditional-structural-trajectories"></a>
 </h3>
 <p>For <code>plot_type = "mu"</code>, each ordering panel shows the
-canonical conditional posterior mean
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi><mrow><mo stretchy="true" form="prefix">[</mo><msub><mi>U</mi><mi>j</mi></msub><mo>∣</mo><msub><mi>Z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo stretchy="true" form="postfix">]</mo></mrow></mrow><annotation encoding="application/x-tex">E[U_j\mid Z_j=m]</annotation></semantics></math>.
-The title also reports the feature-assignment probability
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>Z</mi><mi>j</mi></msub><mo>=</mo><mi>m</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(Z_j=m)</annotation></semantics></math>.
-These are conditional alternatives, so the plotted trajectory is not
-multiplied by its assignment probability.</p>
+canonical conditional posterior mean <span class="math inline">E[U_j\mid
+Z_j=m]</span>. The title also reports the feature-assignment probability
+<span class="math inline">q(Z_j=m)</span>. These are conditional
+alternatives, so the plotted trajectory is not multiplied by its
+assignment probability.</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
 <p><img src="fitness_files/figure-html/partition-plot-1.png" class="r-plt" alt="Conditional posterior mean trajectory for environment dimension 1 under each of two fixed orderings." width="100%"></p>
@@ -779,8 +770,7 @@ apparently distinct trajectory structure.</p>
 <div class="section level3">
 <h3 id="fixed-two-ordering-fit-with-known-measurement-sd">Fixed two-ordering fit with known measurement SD<a class="anchor" aria-label="anchor" href="#fixed-two-ordering-fit-with-known-measurement-sd"></a>
 </h3>
-<p>We now refit the same fixed
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">M=2</annotation></semantics></math>
+<p>We now refit the same fixed <span class="math inline">M=2</span>
 structural model while accounting for measurement error. This isolates
 the effect of known noise without mixing it with a separate
 dimension-selection procedure.</p>
