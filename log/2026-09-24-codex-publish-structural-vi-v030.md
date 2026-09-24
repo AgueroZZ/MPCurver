@@ -36,4 +36,8 @@
 - The release commit was pushed to `origin/main`; its first GitHub Pages build
   completed successfully. A follow-up display-only commit adds KaTeX rendering
   after the browser QA finding above.
-- Final GitHub Pages verification: pending follow-up deployment.
+- KaTeX follow-up commit: `7f5f635445b94eb2b157233b5fc9d06c3fbd539a`
+  (`Fix pkgdown math rendering`).
+- GitHub Pages workflow run `36057414794` completed successfully. Final browser
+  QA confirmed version `0.3.0`, rendered structural-VI display and inline math,
+  the fixed-`M` partition article, and the structural `plot_type = "mu"` help.

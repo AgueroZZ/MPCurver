@@ -68,7 +68,7 @@ of the public repository update.
 - Create: `log/2026-09-24-codex-publish-structural-vi-v030.md`
 
 - [x] Record package checks, site checks, and staged scope in the update log; add the commit and deployment verification after publication.
-- [ ] Commit the staged release as `Release MPCurver v0.3.0 structural VI`.
-- [ ] Push `main` to `origin`.
-- [ ] Verify GitHub `main` reports version `0.3.0` and contains `R/10_partition_structural_cavi.R`.
-- [ ] Poll the GitHub Pages URL until it reports version `0.3.0`, then verify the online structural partition article and primary help pages.
+- [x] Commit the staged release as `Release MPCurver v0.3.0 structural VI`.
+- [x] Push `main` to `origin`.
+- [x] Verify GitHub `main` reports version `0.3.0` and contains `R/10_partition_structural_cavi.R`.
+- [x] Poll the GitHub Pages URL until it reports version `0.3.0`, then verify the online structural partition article and primary help pages.
