@@ -21,7 +21,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -251,6 +251,14 @@ Conditional mean paths for features 4 and 14 under each ordering.
 <td align="left">Feature-by-ordering smoothness parameters</td>
 <td align="left"><code>lambda_mat</code></td>
 </tr>
+<tr class="even">
+<td align="left">Fitted number of orderings</td>
+<td align="left"><code>intrinsic_dim</code></td>
+</tr>
+<tr class="odd">
+<td align="left">Effective number of orderings</td>
+<td align="left"><code>effective_intrinsic_dim</code></td>
+</tr>
 </tbody>
 </table>
 <p>Sample positions are normalized to <span class="math inline">[0,1]</span>. Ordering labels and directions are
@@ -291,13 +299,53 @@ objective history.</p>
 <div class="section level3">
 <h3 id="number-of-orderings">Number of orderings<a class="anchor" aria-label="anchor" href="#number-of-orderings"></a>
 </h3>
-<p><code>intrinsic_dim</code> determines the number of orderings and
-stays fixed during fitting. Choose values that address the scientific
-question, then examine the stability of feature groups and their
-interpretation across fits. The structural objective assesses
-convergence for a given <span class="math inline">M</span>; it does not
-include a complexity penalty for comparing different values of <span class="math inline">M</span>. Use a separate predictive or
-model-selection assessment for that comparison.</p>
+<p><code>intrinsic_dim</code> determines the number of orderings fitted
+and stays fixed during fitting. The returned
+<code>effective_intrinsic_dim</code> records the number of orderings
+supported by the selected feature-assignment prior. With a fixed prior
+it equals the fitted <code>intrinsic_dim</code>. With the default
+adaptive empirical-Bayes prior, it counts fitted assignment-prior
+weights exceeding <code>effective_weight_tol</code> (default
+<code>1e-12</code>). The raw weights remain available through
+<code>fitted_prior(fit_partition, type = "partition")$omega</code>.</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fit_partition</span><span class="op">$</span><span class="va">effective_intrinsic_dim</span></span>
+<span><span class="co">#&gt; [1] 2</span></span>
+<span><span class="fu"><a href="../reference/fitted_prior.html">fitted_prior</a></span><span class="op">(</span><span class="va">fit_partition</span>, type <span class="op">=</span> <span class="st">"partition"</span><span class="op">)</span><span class="op">$</span><span class="va">omega</span></span>
+<span><span class="co">#&gt;   A   B </span></span>
+<span><span class="co">#&gt; 0.5 0.5</span></span></code></pre></div>
+<p>This count is a numerical occupancy estimate, not a posterior
+distribution over <span class="math inline">M</span>. The fitted model
+still contains all <code>intrinsic_dim</code> orderings. A smaller
+effective count does not remove or refit any trajectory.</p>
+<p>For a fixed <strong>uniform</strong> feature-assignment prior, use a
+separate greedy selector to compare final soft <span class="math inline">T=1</span> objectives across adjacent values of
+<span class="math inline">M</span>. If an extra ordering receives no
+feature mass, its uniform assignment prior contributes a penalty of
+<span class="math inline">D\log\{M/(M-1)\}</span> relative to the
+smaller model, where <span class="math inline">D</span> is the number of
+features. The selector fits both similarity and ordering-method
+initializations at each candidate <span class="math inline">M</span> and
+records the scores and convergence diagnostics used in its decision.</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">selected</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/select_mpcurve_dimension.html">select_mpcurve_dimension</a></span><span class="op">(</span></span>
+<span>  <span class="va">X</span>,</span>
+<span>  max_intrinsic_dim <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>  direction <span class="op">=</span> <span class="st">"forward"</span>,</span>
+<span>  K <span class="op">=</span> <span class="fl">20</span>,</span>
+<span>  T_start <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  T_end <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  n_outer <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  max_converge_iter <span class="op">=</span> <span class="fl">500</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">selected</span><span class="op">$</span><span class="va">effective_intrinsic_dim</span></span>
+<span><span class="va">selected</span><span class="op">$</span><span class="va">dimension_selection</span><span class="op">$</span><span class="va">history</span></span></code></pre></div>
+<p><code>direction = "backward"</code> starts at the upper bound and
+tests smaller dimensions. Greedy selection depends on fit quality and
+can stop at a local choice; inspect the saved candidate scores and
+convergence flags. The adaptive-prior effective count and the
+uniform-prior greedy search are different estimators and should be
+interpreted separately.</p>
 </div>
 <div class="section level3">
 <h3 id="initialization">Initialization<a class="anchor" aria-label="anchor" href="#initialization"></a>
@@ -306,7 +354,7 @@ model-selection assessment for that comparison.</p>
 features by similarity and initializes one ordering per feature group.
 Alternatively, <code>partition_init = "ordering_methods"</code> uses the
 specified ordering methods:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit3</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
 <span>  <span class="va">X</span>,</span>
 <span>  intrinsic_dim <span class="op">=</span> <span class="fl">3</span>,</span>

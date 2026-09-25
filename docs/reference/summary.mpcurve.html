@@ -13,7 +13,7 @@ The returned list can be used to construct comparison tables across fits."></hea
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -85,6 +85,9 @@ ignored for structural partition summaries.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>An object of class <code>summary.mpcurve</code>. Every result contains
   <code>$algorithm</code>, <code>$modelName</code>, <code>$intrinsic_dim</code>,
+  <code>$effective_intrinsic_dim</code>,
+  <code>$dimension_selection</code> when returned by
+  <code><a href="select_mpcurve_dimension.html">select_mpcurve_dimension()</a></code>,
   <code>$K</code>, <code>$n</code>, <code>$d</code>, <code>$priors</code>, and
   <code>$converged</code>. A single-ordering result also contains
   <code>$underlying</code>. A structural partition result instead contains

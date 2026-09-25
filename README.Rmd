@@ -139,16 +139,22 @@ For a two-ordering analysis of your sample-by-feature data matrix `X`:
 fit_multi <- fit_mpcurve(X, intrinsic_dim = 2, K = 40)
 summary(fit_multi)
 fit_multi$partition$pi_weights
+fit_multi$effective_intrinsic_dim
 plot(fit_multi, plot_type = "mu", dims = 1)
 ```
 
 The assignment probabilities describe how strongly each feature supports
 each ordering. The trajectory plot shows the feature's fitted mean under
 each ordering, with the corresponding assignment probability in the panel
-title. Choose the number of orderings for the scientific question and examine
-the stability and interpretability of the resulting feature groups. The
+title. With the default adaptive feature-assignment prior,
+`effective_intrinsic_dim` counts prior weights above the configurable
+`effective_weight_tol` (default `1e-12`); `intrinsic_dim` remains the fitted
+number of orderings. For a fixed uniform assignment prior, use
+`select_mpcurve_dimension(X, max_intrinsic_dim = 4, direction = "forward")`
+to compare final objectives across adjacent dimensions. Inspect its saved
+scores and convergence diagnostics alongside the feature groups. The
 [feature-partitioning tutorial](https://aguerozz.github.io/MPCurver/articles/partition.html)
-develops this workflow and the statistical model in detail.
+provides background on the statistical model.
 
 ## Measurement uncertainty
 

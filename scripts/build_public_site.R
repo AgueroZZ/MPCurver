@@ -6,6 +6,7 @@ public_reference_topics <- c(
   "MPCurver",
   "mpcurve",
   "fit_mpcurve",
+  "select_mpcurve_dimension",
   "do_mpcurve",
   "fitted_prior",
   "print.mpcurve",

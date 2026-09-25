@@ -6,6 +6,7 @@ test_that("public namespace exports the curated mpcurve-first API", {
       "do_mpcurve",
       "fiedler_ordering",
       "fit_mpcurve",
+      "select_mpcurve_dimension",
       "fitted_prior",
       "isomap_ordering",
       "pcurve_ordering",

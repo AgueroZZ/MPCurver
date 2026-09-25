@@ -79,7 +79,12 @@ these probabilities.
 the complete model with \code{do_mpcurve(object)}. The dimension fields
 \code{$intrinsic_dim}, \code{$active_intrinsic_dim}, and
 \code{$displayed_intrinsic_dim} all equal the specified \code{M} for
-structural partition fits.
+structural partition fits. \code{$effective_intrinsic_dim} is the number
+of orderings with nontrivial fitted assignment-prior weight under an
+adaptive prior, using \code{effective_weight_tol}; it equals the fitted
+\code{M} for a fixed prior. This count does not remove fitted orderings.
+Fits returned by \code{\link{select_mpcurve_dimension}} also include
+\code{$dimension_selection} with candidate scores and greedy decisions.
 }
 
 \keyword{models}

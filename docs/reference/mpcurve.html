@@ -15,7 +15,7 @@ plot.mpcurve to visualize trajectories and sample orderings."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -130,7 +130,12 @@ these probabilities.</p>
 the complete model with <code>do_mpcurve(object)</code>. The dimension fields
 <code>$intrinsic_dim</code>, <code>$active_intrinsic_dim</code>, and
 <code>$displayed_intrinsic_dim</code> all equal the specified <code>M</code> for
-structural partition fits.</p>
+structural partition fits. <code>$effective_intrinsic_dim</code> is the number
+of orderings with nontrivial fitted assignment-prior weight under an
+adaptive prior, using <code>effective_weight_tol</code>; it equals the fitted
+<code>M</code> for a fixed prior. This count does not remove fitted orderings.
+Fits returned by <code><a href="select_mpcurve_dimension.html">select_mpcurve_dimension</a></code> also include
+<code>$dimension_selection</code> with candidate scores and greedy decisions.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

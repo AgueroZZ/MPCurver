@@ -17,7 +17,7 @@ uncertainty in both sample positions and feature trajectories."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -90,6 +90,7 @@ uncertainty in both sample positions and feature trajectories.</p>
 <span>  position_prior_init <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  partition_prior <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"adaptive"</span>, <span class="st">"fixed"</span><span class="op">)</span>,</span>
 <span>  partition_prior_init <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  effective_weight_tol <span class="op">=</span> <span class="fl">1e-12</span>,</span>
 <span>  assignment_prior <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  ordering_alpha <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  similarity_metric <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"spearman"</span>, <span class="st">"pearson"</span>, <span class="st">"smooth_fit"</span><span class="op">)</span>,</span>
@@ -259,6 +260,15 @@ initial/fixed vector for the ordering prior <code>omega</code>. Used only when
 to uniform over the \(M\) orderings.</p></dd>
 
 
+<dt id="arg-effective-weight-tol">effective_weight_tol<a class="anchor" aria-label="anchor" href="#arg-effective-weight-tol"></a></dt>
+<dd><p>Nonnegative threshold for reporting the effective
+number of orderings under <code>partition_prior = "adaptive"</code>. An ordering
+counts when its fitted prior mass \(\omega_m\) exceeds this threshold.
+The default is <code>1e-12</code>; the value must be less than
+<code>1 / intrinsic_dim</code>. It does not change the fitted model. The result
+stores the threshold in <code>$effective_weight_tol</code> for partition fits.</p></dd>
+
+
 <dt id="arg-assignment-prior">assignment_prior<a class="anchor" aria-label="anchor" href="#arg-assignment-prior"></a></dt>
 <dd><p>Deprecated; use <code>partition_prior</code> and
 <code>partition_prior_init</code>. The value <code>"uniform"</code> specifies a fixed
@@ -359,7 +369,10 @@ controls such as <code>responsibilities_init</code>, <code>fits_init</code>,
   <code>$params$mu</code>, <code>$gamma</code>, and <code>$locations</code>; one shared
   <code>$params$sigma2</code>; <code>$conditional_posterior</code>; a
   <code>d x M</code> <code>$lambda_mat</code>; and
-  <code>$partition$pi_weights</code>. See <code><a href="mpcurve.html">mpcurve</a></code> for the complete
+  <code>$partition$pi_weights</code>. Every fit has
+  <code>$effective_intrinsic_dim</code>; adaptive partition fits calculate it
+  from the fitted ordering prior using <code>effective_weight_tol</code>, while
+  other fits set it to the fitted <code>M</code>. See <code><a href="mpcurve.html">mpcurve</a></code> for the complete
   object description.</p>
     </div>
     <div class="section level2">

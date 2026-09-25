@@ -170,6 +170,35 @@
   )
 }
 
+.mpcurve_validate_effective_weight_tol <- function(tol, M) {
+  if (!is.numeric(M) || length(M) != 1L || !is.finite(M) ||
+      M < 1 || M != floor(M)) {
+    stop("intrinsic_dim must be a single positive integer.", call. = FALSE)
+  }
+  if (!is.numeric(tol) || length(tol) != 1L || !is.finite(tol) ||
+      tol < 0 || tol >= 1 / M) {
+    stop(
+      "effective_weight_tol must be a single finite number in [0, 1 / intrinsic_dim).",
+      call. = FALSE
+    )
+  }
+  as.numeric(tol)
+}
+
+.mpcurve_effective_intrinsic_dim <- function(priors, M, tol) {
+  if (is.null(priors$partition) ||
+      !identical(priors$partition$mode, "adaptive")) {
+    return(as.integer(M))
+  }
+
+  omega <- as.numeric(priors$partition$omega)
+  if (length(omega) != M || any(!is.finite(omega)) || any(omega < 0)) {
+    stop("The fitted adaptive partition prior has invalid ordering weights.",
+         call. = FALSE)
+  }
+  as.integer(sum(omega > tol))
+}
+
 .mpcurve_partition_assignment_info_from_fit <- function(fit) {
   ctl <- fit$control %||% list()
   partition_prior <- ctl$partition_prior %||%
@@ -1163,7 +1192,10 @@
 #' }
 #'
 #' For partition fits (\code{intrinsic_dim >= 2}), \code{$locations} is a named
-#' list with one such location object per ordering.
+#' list with one such location object per ordering. All fits also store
+#' \code{$effective_intrinsic_dim}. For adaptive partition priors, it counts
+#' ordering weights above \code{$effective_weight_tol}; otherwise it equals
+#' the fitted number of orderings.
 #' @noRd
 as_mpcurve <- function(x, ...) {
   ns <- asNamespace("MPCurver")
@@ -1310,6 +1342,7 @@ as_mpcurve.csmooth_em <- function(x, ...) {
       requested_intrinsic_dim = 1L,
       active_intrinsic_dim = 1L,
       displayed_intrinsic_dim = 1L,
+      effective_intrinsic_dim = 1L,
       priors         = .mpcurve_priors_from_legacy_fit(x),
       converged      = x$converged %||% NULL,
       convergence_info = x$convergence_info %||% NULL,
@@ -1355,6 +1388,7 @@ as_mpcurve.cavi <- function(x, ...) {
       requested_intrinsic_dim = 1L,
       active_intrinsic_dim = 1L,
       displayed_intrinsic_dim = 1L,
+      effective_intrinsic_dim = 1L,
       priors        = .mpcurve_priors_from_cavi_fit(x),
       init_info     = x$init_info %||% NULL,
       ordering_similarity = x$ordering_similarity %||% NULL,
@@ -1414,6 +1448,7 @@ as_mpcurve.smooth_em <- function(x, ...) {
       requested_intrinsic_dim = 1L,
       active_intrinsic_dim = 1L,
       displayed_intrinsic_dim = 1L,
+      effective_intrinsic_dim = 1L,
       priors         = .mpcurve_priors_from_legacy_fit(x),
       converged      = x$converged %||% NULL,
       convergence_info = x$convergence_info %||% NULL,
@@ -1435,6 +1470,9 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
     fits_mp <- stats::setNames(lapply(x$fits, as_mpcurve), ord_labels)
     locations <- stats::setNames(lapply(fits_mp, `[[`, "locations"), ord_labels)
     priors <- .mpcurve_priors_from_partition_fit(x)
+    effective_weight_tol <- .mpcurve_validate_effective_weight_tol(
+      (x$control %||% list())$effective_weight_tol %||% 1e-12, M
+    )
     return(structure(
       list(
         data = x$data,
@@ -1471,6 +1509,10 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
         requested_intrinsic_dim = M,
         active_intrinsic_dim = M,
         displayed_intrinsic_dim = M,
+        effective_intrinsic_dim = .mpcurve_effective_intrinsic_dim(
+          priors, M, effective_weight_tol
+        ),
+        effective_weight_tol = effective_weight_tol,
         variational_family = "structured",
         priors = priors,
         init_info = x$init_info,
@@ -1510,6 +1552,9 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
   visible_active <- if (drop_view) rep(TRUE, length(keep_idx)) else active_full[keep_idx]
   visible_frozen <- if (drop_view) rep(FALSE, length(keep_idx)) else frozen_full[keep_idx]
   priors <- .mpcurve_priors_from_partition_fit(x)
+  effective_weight_tol <- .mpcurve_validate_effective_weight_tol(
+    (x$control %||% list())$effective_weight_tol %||% 1e-12, M
+  )
 
   structure(
     list(
@@ -1548,6 +1593,10 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
       requested_intrinsic_dim = as.integer(M),
       active_intrinsic_dim = as.integer(sum(active_full)),
       displayed_intrinsic_dim = as.integer(length(keep_idx)),
+      effective_intrinsic_dim = .mpcurve_effective_intrinsic_dim(
+        priors, M, effective_weight_tol
+      ),
+      effective_weight_tol = effective_weight_tol,
       priors        = priors,
       init_info     = x$init_info,
       ordering_similarity = x$ordering_similarity,
@@ -1568,8 +1617,8 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
 #' Print an \code{mpcurve} fit
 #'
 #' Displays the model dimensions, iteration count, convergence status, and
-#' final variational objective. Multi-ordering fits also show the number of
-#' orderings and the number of features assigned to each ordering. These
+#' final variational objective. Multi-ordering fits also show the fitted and
+#' effective numbers of orderings and the feature-assignment counts. These
 #' counts use the most probable assignment for each feature; inspect
 #' \code{x$partition$pi_weights} to assess assignment uncertainty.
 #'
@@ -1592,6 +1641,15 @@ print.mpcurve <- function(x, ...) {
     cat("MPCurve partition fit\n")
     cat(sprintf("  Backend        : %s\n", x$algorithm))
     if (structured) cat("  Variational    : structural q(C) q(Z) q(U | Z)\n")
+    selection_info <- x$dimension_selection %||% NULL
+    if (!is.null(selection_info)) {
+      cat(sprintf(
+        "  M selection   : %s (upper bound %d -> selected %d)\n",
+        selection_info$direction,
+        selection_info$max_intrinsic_dim,
+        selection_info$selected_M
+      ))
+    }
     greedy_info <- x$greedy_selection %||% NULL
     if (!is.null(greedy_info)) {
       cat(sprintf(
@@ -1606,6 +1664,8 @@ print.mpcurve <- function(x, ...) {
     } else {
       cat(sprintf("  Dim (req/act/view): %d / %d / %d\n", idim, active_dim, displayed_dim))
     }
+    cat(sprintf("  Effective dim  : %d\n",
+                x$effective_intrinsic_dim %||% idim))
     cat(sprintf("  n / d / K      : %d / %d / %d\n", x$n, x$d, x$K))
     cat(sprintf("  Iterations     : %d\n", x$iter))
     part <- x$partition
@@ -1641,6 +1701,15 @@ print.mpcurve <- function(x, ...) {
   } else {
     cat("MPCurve fit\n")
     cat(sprintf("  Backend        : %s\n",  x$algorithm))
+    selection_info <- x$dimension_selection %||% NULL
+    if (!is.null(selection_info)) {
+      cat(sprintf(
+        "  M selection   : %s (upper bound %d -> selected %d)\n",
+        selection_info$direction,
+        selection_info$max_intrinsic_dim,
+        selection_info$selected_M
+      ))
+    }
     greedy_info <- x$greedy_selection %||% NULL
     if (!is.null(greedy_info)) {
       cat(sprintf(
@@ -1676,6 +1745,9 @@ print.mpcurve <- function(x, ...) {
 #'   ignored for structural partition summaries.
 #' @return An object of class \code{summary.mpcurve}. Every result contains
 #'   \code{$algorithm}, \code{$modelName}, \code{$intrinsic_dim},
+#'   \code{$effective_intrinsic_dim},
+#'   \code{$dimension_selection} when returned by
+#'   \code{select_mpcurve_dimension()},
 #'   \code{$K}, \code{$n}, \code{$d}, \code{$priors}, and
 #'   \code{$converged}. A single-ordering result also contains
 #'   \code{$underlying}. A structural partition result instead contains
@@ -1698,6 +1770,8 @@ summary.mpcurve <- function(object, ...) {
       requested_intrinsic_dim = object$requested_intrinsic_dim %||% idim,
       active_intrinsic_dim = active_dim,
       displayed_intrinsic_dim = displayed_dim,
+      effective_intrinsic_dim = object$effective_intrinsic_dim %||% idim,
+      effective_weight_tol = object$effective_weight_tol %||% 1e-12,
       modelName     = object$modelName %||% "partition_cavi",
       K             = object$K,
       n             = object$n,
@@ -1713,7 +1787,8 @@ summary.mpcurve <- function(object, ...) {
       measurement_sd = object$measurement_sd,
       variational_family = object$variational_family %||%
         (object$control %||% list())$variational_family,
-      greedy_selection = object$greedy_selection %||% NULL
+      greedy_selection = object$greedy_selection %||% NULL,
+      dimension_selection = object$dimension_selection %||% NULL
     )
   } else {
     underlying <- summary(object$fit, ...)
@@ -1723,13 +1798,15 @@ summary.mpcurve <- function(object, ...) {
       intrinsic_dim = idim,
       active_intrinsic_dim = active_dim,
       displayed_intrinsic_dim = displayed_dim,
+      effective_intrinsic_dim = object$effective_intrinsic_dim %||% idim,
       K             = object$K,
       n             = object$n,
       d             = object$d,
       priors        = priors,
       converged     = object$converged %||% underlying$converged %||% NULL,
       underlying    = underlying,
-      greedy_selection = object$greedy_selection %||% NULL
+      greedy_selection = object$greedy_selection %||% NULL,
+      dimension_selection = object$dimension_selection %||% NULL
     )
   }
   class(result) <- "summary.mpcurve"
@@ -1752,6 +1829,13 @@ print.summary.mpcurve <- function(x, ...) {
       "structured"
     )
     cat("MPCurve Partition Summary\n")
+    selection_info <- x$dimension_selection %||% NULL
+    if (!is.null(selection_info)) {
+      cat(sprintf("M selection : %s  |  upper bound = %d  |  selected = %d\n",
+                  selection_info$direction,
+                  selection_info$max_intrinsic_dim,
+                  selection_info$selected_M))
+    }
     greedy_info <- x$greedy_selection %||% NULL
     if (!is.null(greedy_info)) {
       cat(sprintf("Greedy search : %s  |  upper bound = %d  |  selected = %d\n",
@@ -1762,6 +1846,7 @@ print.summary.mpcurve <- function(x, ...) {
     if (structured) {
       cat(sprintf("Algorithm : %s  |  structural VI  |  fixed M=%d  |  n=%d  d=%d  K=%d\n",
                   x$algorithm, idim, x$n, x$d, x$K))
+      cat(sprintf("Effective M : %d\n", x$effective_intrinsic_dim %||% idim))
       if (is.null(x$measurement_sd)) {
         cat(sprintf("Shared sigma2 range : [%.4g, %.4g]\n", min(x$sigma2), max(x$sigma2)))
       } else {
@@ -1770,6 +1855,7 @@ print.summary.mpcurve <- function(x, ...) {
     } else {
       cat(sprintf("Algorithm : %s  |  requested=%d  active=%d  displayed=%d  |  n=%d  d=%d  K=%d\n",
                   x$algorithm, idim, active_dim, displayed_dim, x$n, x$d, x$K))
+      cat(sprintf("Effective M : %d\n", x$effective_intrinsic_dim %||% idim))
     }
     if (!is.null(x$partition)) {
       tbl <- table(x$partition$assign)
@@ -1838,6 +1924,13 @@ print.summary.mpcurve <- function(x, ...) {
     }
   } else {
     cat("MPCurve Model Summary\n")
+    selection_info <- x$dimension_selection %||% NULL
+    if (!is.null(selection_info)) {
+      cat(sprintf("M selection : %s  |  upper bound = %d  |  selected = %d\n",
+                  selection_info$direction,
+                  selection_info$max_intrinsic_dim,
+                  selection_info$selected_M))
+    }
     greedy_info <- x$greedy_selection %||% NULL
     if (!is.null(greedy_info)) {
       cat(sprintf("Greedy search : %s  |  upper bound = %d  |  selected = %d\n",
@@ -2473,7 +2566,12 @@ do_mpcurve <- function(object,
         sigma_max = sigma_max,
         verbose = verbose
       )
-      return(as_mpcurve(raw))
+      out <- as_mpcurve(raw)
+      out$dimension_selection <- object$dimension_selection %||% NULL
+      if (!is.null(out$dimension_selection)) {
+        out$dimension_selection$continued_after_selection <- TRUE
+      }
+      return(out)
     }
     stop(
       "Legacy augmented partition fits are read-only. Refit with fit_mpcurve() ",
@@ -2754,6 +2852,10 @@ do_mpcurve <- function(object,
   )
   out <- as_mpcurve(new_fit)
   out$greedy_selection <- object$greedy_selection %||% NULL
+  out$dimension_selection <- object$dimension_selection %||% NULL
+  if (!is.null(out$dimension_selection)) {
+    out$dimension_selection$continued_after_selection <- TRUE
+  }
   out$requested_intrinsic_dim <- object$requested_intrinsic_dim %||% out$intrinsic_dim
   out
 }
@@ -2864,6 +2966,12 @@ do_mpcurve <- function(object,
 #'   initial/fixed vector for the ordering prior \code{omega}. Used only when
 #'   \code{partition_prior = "fixed"}. When omitted, the fixed prior defaults
 #'   to uniform over the \eqn{M} orderings.
+#' @param effective_weight_tol Nonnegative threshold for reporting the effective
+#'   number of orderings under \code{partition_prior = "adaptive"}. An ordering
+#'   counts when its fitted prior mass \eqn{\omega_m} exceeds this threshold.
+#'   The default is \code{1e-12}; the value must be less than
+#'   \code{1 / intrinsic_dim}. It does not change the fitted model. The result
+#'   stores the threshold in \code{$effective_weight_tol} for partition fits.
 #' @param assignment_prior Deprecated; use \code{partition_prior} and
 #'   \code{partition_prior_init}. The value \code{"uniform"} specifies a fixed
 #'   uniform prior; \code{"dirichlet"} specifies a Dirichlet prior using
@@ -2919,7 +3027,10 @@ do_mpcurve <- function(object,
 #'   \code{$params$mu}, \code{$gamma}, and \code{$locations}; one shared
 #'   \code{$params$sigma2}; \code{$conditional_posterior}; a
 #'   \code{d x M} \code{$lambda_mat}; and
-#'   \code{$partition$pi_weights}. See \code{\link{mpcurve}} for the complete
+#'   \code{$partition$pi_weights}. Every fit has
+#'   \code{$effective_intrinsic_dim}; adaptive partition fits calculate it
+#'   from the fitted ordering prior using \code{effective_weight_tol}, while
+#'   other fits set it to the fitted \code{M}. See \code{\link{mpcurve}} for the complete
 #'   object description.
 #'
 #' @export
@@ -2950,6 +3061,7 @@ fit_mpcurve <- function(
     position_prior_init = NULL,
     partition_prior = c("adaptive", "fixed"),
     partition_prior_init = NULL,
+    effective_weight_tol = 1e-12,
     assignment_prior = NULL,
     ordering_alpha = NULL,
     similarity_metric = c("spearman", "pearson", "smooth_fit"),
@@ -2974,6 +3086,9 @@ fit_mpcurve <- function(
   method_missing <- missing(method)
   num_cores <- as.integer(num_cores)
   intrinsic_dim <- as.integer(intrinsic_dim)
+  effective_weight_tol <- .mpcurve_validate_effective_weight_tol(
+    effective_weight_tol, intrinsic_dim
+  )
   greedy <- match.arg(greedy)
   algorithm <- match.arg(algorithm)
   partition_init <- match.arg(partition_init)
@@ -3026,6 +3141,7 @@ fit_mpcurve <- function(
     position_prior_init = position_prior_init,
     partition_prior = partition_prior,
     partition_prior_init = partition_prior_init,
+    effective_weight_tol = effective_weight_tol,
     assignment_prior = assignment_prior,
     ordering_alpha = ordering_alpha,
     similarity_metric = similarity_metric,
@@ -3050,8 +3166,7 @@ fit_mpcurve <- function(
   if (!identical(greedy, "none")) {
     stop(
       "greedy dimension selection is temporarily unavailable for structural VI. ",
-      "Fit a fixed intrinsic_dim; cross-M selection requires a separate predictive ",
-      "or complexity-penalized criterion.",
+      "Use select_mpcurve_dimension() for fixed-uniform-prior ELBO selection.",
       call. = FALSE
     )
   }
@@ -3146,6 +3261,7 @@ fit_mpcurve <- function(
       dots
     )
     raw <- do.call(soft_partition_cavi, sp_args)
+    raw$control$effective_weight_tol <- effective_weight_tol
     return(as_mpcurve(raw))
   }
 

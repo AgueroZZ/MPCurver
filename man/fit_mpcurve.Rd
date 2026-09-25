@@ -31,6 +31,7 @@ fit_mpcurve(
   position_prior_init = NULL,
   partition_prior = c("adaptive", "fixed"),
   partition_prior_init = NULL,
+  effective_weight_tol = 1e-12,
   assignment_prior = NULL,
   ordering_alpha = NULL,
   similarity_metric = c("spearman", "pearson", "smooth_fit"),
@@ -148,6 +149,13 @@ initial/fixed vector for the ordering prior \code{omega}. Used only when
 \code{partition_prior = "fixed"}. When omitted, the fixed prior defaults
 to uniform over the \eqn{M} orderings.}
 
+\item{effective_weight_tol}{Nonnegative threshold for reporting the effective
+number of orderings under \code{partition_prior = "adaptive"}. An ordering
+counts when its fitted prior mass \eqn{\omega_m} exceeds this threshold.
+The default is \code{1e-12}; the value must be less than
+\code{1 / intrinsic_dim}. It does not change the fitted model. The result
+stores the threshold in \code{$effective_weight_tol} for partition fits.}
+
 \item{assignment_prior}{Deprecated; use \code{partition_prior} and
 \code{partition_prior_init}. The value \code{"uniform"} specifies a fixed
 uniform prior; \code{"dirichlet"} specifies a Dirichlet prior using
@@ -217,7 +225,10 @@ An \code{\link{mpcurve}} object, or (for parallel multi-method
   \code{$params$mu}, \code{$gamma}, and \code{$locations}; one shared
   \code{$params$sigma2}; \code{$conditional_posterior}; a
   \code{d x M} \code{$lambda_mat}; and
-  \code{$partition$pi_weights}. See \code{\link{mpcurve}} for the complete
+  \code{$partition$pi_weights}. Every fit has
+  \code{$effective_intrinsic_dim}; adaptive partition fits calculate it
+  from the fitted ordering prior using \code{effective_weight_tol}, while
+  other fits set it to the fitted \code{M}. See \code{\link{mpcurve}} for the complete
   object description.
 }
 \description{

@@ -16,8 +16,8 @@ Invisibly returns \code{x}.
 }
 \description{
 Displays the model dimensions, iteration count, convergence status, and
-final variational objective. Multi-ordering fits also show the number of
-orderings and the number of features assigned to each ordering. These
+final variational objective. Multi-ordering fits also show the fitted and
+effective numbers of orderings and the feature-assignment counts. These
 counts use the most probable assignment for each feature; inspect
 \code{x$partition$pi_weights} to assess assignment uncertainty.
 }

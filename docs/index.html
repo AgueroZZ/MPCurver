@@ -23,7 +23,7 @@
 
     <a class="navbar-brand me-2" href="index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -153,8 +153,9 @@
 <code class="sourceCode R"><span><span class="va">fit_multi</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span><span class="va">X</span>, intrinsic_dim <span class="op">=</span> <span class="fl">2</span>, K <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_multi</span><span class="op">)</span></span>
 <span><span class="va">fit_multi</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">pi_weights</span></span>
+<span><span class="va">fit_multi</span><span class="op">$</span><span class="va">effective_intrinsic_dim</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_multi</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<p>The assignment probabilities describe how strongly each feature supports each ordering. The trajectory plot shows the feature’s fitted mean under each ordering, with the corresponding assignment probability in the panel title. Choose the number of orderings for the scientific question and examine the stability and interpretability of the resulting feature groups. The <a href="https://aguerozz.github.io/MPCurver/articles/partition.html">feature-partitioning tutorial</a> develops this workflow and the statistical model in detail.</p>
+<p>The assignment probabilities describe how strongly each feature supports each ordering. The trajectory plot shows the feature’s fitted mean under each ordering, with the corresponding assignment probability in the panel title. With the default adaptive feature-assignment prior, <code>effective_intrinsic_dim</code> counts prior weights above the configurable <code>effective_weight_tol</code> (default <code>1e-12</code>); <code>intrinsic_dim</code> remains the fitted number of orderings. For a fixed uniform assignment prior, use <code>select_mpcurve_dimension(X, max_intrinsic_dim = 4, direction = "forward")</code> to compare final objectives across adjacent dimensions. Inspect its saved scores and convergence diagnostics alongside the feature groups. The <a href="https://aguerozz.github.io/MPCurver/articles/partition.html">feature-partitioning tutorial</a> provides background on the statistical model.</p>
 </div>
 <div class="section level2">
 <h2 id="measurement-uncertainty">Measurement uncertainty<a class="anchor" aria-label="anchor" href="#measurement-uncertainty"></a>

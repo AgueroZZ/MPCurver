@@ -11,6 +11,7 @@ reference:
   - title: Model fitting
     contents:
       - fit_mpcurve
+      - select_mpcurve_dimension
       - do_mpcurve
       - fitted_prior
       - mpcurve

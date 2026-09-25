@@ -147,6 +147,8 @@ The following fields support further analysis:
 | Trajectory covariance for feature $j$, ordering $m$ | `conditional_posterior$cov[[m]][[j]]` |
 | Feature noise variances, shared across orderings | `params$sigma2` |
 | Feature-by-ordering smoothness parameters | `lambda_mat` |
+| Fitted number of orderings | `intrinsic_dim` |
+| Effective number of orderings | `effective_intrinsic_dim` |
 
 Sample positions are normalized to $[0,1]$. Ordering labels and directions
 are arbitrary; use sample annotations to interpret the axes and align
@@ -184,12 +186,51 @@ parameters at $T=1$, extending the objective history.
 
 ### Number of orderings
 
-`intrinsic_dim` determines the number of orderings and stays fixed during
-fitting. Choose values that address the scientific question, then examine
-the stability of feature groups and their interpretation across fits.
-The structural objective assesses convergence for a given $M$; it does not
-include a complexity penalty for comparing different values of $M$.
-Use a separate predictive or model-selection assessment for that comparison.
+`intrinsic_dim` determines the number of orderings fitted and stays fixed
+during fitting. The returned `effective_intrinsic_dim` records the number of
+orderings supported by the selected feature-assignment prior. With a fixed
+prior it equals the fitted `intrinsic_dim`. With the default adaptive
+empirical-Bayes prior, it counts fitted assignment-prior weights exceeding
+`effective_weight_tol` (default `1e-12`). The raw weights remain available
+through `fitted_prior(fit_partition, type = "partition")$omega`.
+
+```{r effective-dimension}
+fit_partition$effective_intrinsic_dim
+fitted_prior(fit_partition, type = "partition")$omega
+```
+
+This count is a numerical occupancy estimate, not a posterior distribution
+over $M$. The fitted model still contains all `intrinsic_dim` orderings. A
+smaller effective count does not remove or refit any trajectory.
+
+For a fixed **uniform** feature-assignment prior, use a separate greedy
+selector to compare final soft $T=1$ objectives across adjacent values of
+$M$. If an extra ordering receives no feature mass, its uniform assignment
+prior contributes a penalty of $D\log\{M/(M-1)\}$ relative to the smaller
+model, where $D$ is the number of features. The selector fits both similarity
+and ordering-method initializations at each candidate $M$ and records the
+scores and convergence diagnostics used in its decision.
+
+```{r greedy-dimension, eval=FALSE}
+selected <- select_mpcurve_dimension(
+  X,
+  max_intrinsic_dim = 4,
+  direction = "forward",
+  K = 20,
+  T_start = 1,
+  T_end = 1,
+  n_outer = 1,
+  max_converge_iter = 500
+)
+selected$effective_intrinsic_dim
+selected$dimension_selection$history
+```
+
+`direction = "backward"` starts at the upper bound and tests smaller
+dimensions. Greedy selection depends on fit quality and can stop at a local
+choice; inspect the saved candidate scores and convergence flags. The
+adaptive-prior effective count and the uniform-prior greedy search are
+different estimators and should be interpreted separately.
 
 ### Initialization
 
