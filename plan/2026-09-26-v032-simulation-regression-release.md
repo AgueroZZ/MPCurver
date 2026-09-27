@@ -38,3 +38,9 @@ implementation changes are needed. Do not publish unrelated InferOrder work.
 All 47 fresh fits passed; all 18 pilot stopping indices match the frozen
 reference predictions. The curated site audit passed (27 pages, 900 local
 targets, 139 search entries). See the release log and experiment report.
+
+## Completed
+
+Release `fcc29de29ae8431ced4a3ce38808dd2e47fb8552` was pushed to origin/main.
+Pages deployment `36288638786` succeeded, and the live homepage and fitting
+reference were verified in Chrome. All requested release steps are complete.

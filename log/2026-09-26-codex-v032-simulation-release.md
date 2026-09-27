@@ -62,3 +62,16 @@ targets or internal-page links. The homepage, fitting/continuation reference
 and introductory vignette contain the new version and stopping-rule guidance.
 All simulation and documentation gates passed; the release is ready for the
 user-authorized push to origin/main.
+
+## Publication verified
+
+- Release commit `fcc29de29ae8431ced4a3ce38808dd2e47fb8552` was pushed to
+  `origin/main`; a subsequent remote-ref read confirmed the exact SHA.
+- GitHub Pages run `36288638786` completed successfully for that commit:
+  https://github.com/AgueroZZ/MPCurver/actions/runs/36288638786
+- A live Chrome reload confirmed version 0.3.2 and the new per-entry stopping
+  description on https://aguerozz.github.io/MPCurver/ .
+- The live `fit_mpcurve` reference shows `convergence = "normalized"`, the
+  rendered absolute ELBO-change / ND formula, and both tolerance defaults.
+- Unrelated pre-existing experiments and plans/logs were not included in the
+  release. No InferOrder changes were pushed.
