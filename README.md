@@ -21,23 +21,6 @@ among the same samples.
 Use `fit_mpcurve()` to fit a model, `summary()` and `plot()` to explore
 the results, and `do_mpcurve()` to run additional fitting iterations.
 
-## Convergence
-
-By default, fitting stops when the absolute ELBO change divided by
-`N * D` is below `1e-6`, where `N` is the number of samples and `D` the
-number of features. Use `tol` for a single ordering and `tol_outer` for
-multiple orderings; partition convergence is assessed at temperature
-`T = 1` after annealing. The objective must also satisfy the algorithm’s
-numerical nondecrease check. Setting the relevant tolerance to zero
-disables early stopping.
-
-`convergence = "relative"` selects the previous ELBO-relative rule. To
-restore both pre-0.3.2 default tolerances, also set `tol = 1e-6` and
-`tol_outer = 1e-5`. `do_mpcurve()` inherits the rule and tolerance
-stored in the fit; saved fits without a rule retain relative stopping.
-Stored ELBO traces are unchanged. A small increment indicates slow
-improvement, not a bound on the remaining optimization error.
-
 ## Documentation
 
 - [Getting

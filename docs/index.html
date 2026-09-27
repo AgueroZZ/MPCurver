@@ -68,12 +68,6 @@
 <p>For data with several sources of variation, MPCurver can learn multiple orderings and the probability that each feature follows each ordering. This allows different groups of features to describe different patterns among the same samples.</p>
 <p>Use <code><a href="reference/fit_mpcurve.html">fit_mpcurve()</a></code> to fit a model, <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> and <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> to explore the results, and <code><a href="reference/do_mpcurve.html">do_mpcurve()</a></code> to run additional fitting iterations.</p>
 <div class="section level2">
-<h2 id="convergence">Convergence<a class="anchor" aria-label="anchor" href="#convergence"></a>
-</h2>
-<p>By default, fitting stops when the absolute ELBO change divided by <code>N * D</code> is below <code>1e-6</code>, where <code>N</code> is the number of samples and <code>D</code> the number of features. Use <code>tol</code> for a single ordering and <code>tol_outer</code> for multiple orderings; partition convergence is assessed at temperature <code>T = 1</code> after annealing. The objective must also satisfy the algorithm’s numerical nondecrease check. Setting the relevant tolerance to zero disables early stopping.</p>
-<p><code>convergence = "relative"</code> selects the previous ELBO-relative rule. To restore both pre-0.3.2 default tolerances, also set <code>tol = 1e-6</code> and <code>tol_outer = 1e-5</code>. <code><a href="reference/do_mpcurve.html">do_mpcurve()</a></code> inherits the rule and tolerance stored in the fit; saved fits without a rule retain relative stopping. Stored ELBO traces are unchanged. A small increment indicates slow improvement, not a bound on the remaining optimization error.</p>
-</div>
-<div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
 </h2>
 <ul>

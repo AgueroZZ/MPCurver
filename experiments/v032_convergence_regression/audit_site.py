@@ -53,9 +53,15 @@ for path in pages:
     if rel.parts[0] == 'articles' and rel.name not in {'index.html','mpcurve_intro.html','partition.html','fitness.html'}:
         errors.append(f'Unexpected article: {rel}')
 
-for file in ['index.html','reference/fit_mpcurve.html','reference/do_mpcurve.html','articles/mpcurve_intro.html']:
+home = (root / 'index.html').read_text()
+if 'convergence' in pages[root / 'index.html'].ids:
+    errors.append('Detailed convergence section remains on homepage')
+if '0.3.2' not in home or 'https://github.com/AgueroZZ/MPCurver/blob/main/NEWS.md' not in home:
+    errors.append('Homepage version or Changelog link missing')
+
+for file in ['reference/fit_mpcurve.html','reference/do_mpcurve.html','articles/mpcurve_intro.html']:
     text = (root / file).read_text()
-    required = 'N * D' if file in ('index.html', 'articles/mpcurve_intro.html') else 'normalized'
+    required = 'N * D' if file == 'articles/mpcurve_intro.html' else 'normalized'
     if '0.3.2' not in text or required not in text:
         errors.append(f'New version or convergence documentation missing: {file}')
 
