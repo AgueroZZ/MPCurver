@@ -435,7 +435,9 @@ simulate_cavi_toy <- function(n = 150,
 #' @param sigma_min,sigma_max Bounds for \code{sigma_j^2}.
 #' @param max_iter Maximum number of CAVI sweeps. \code{0} returns the
 #'   initialization-only state.
-#' @param tol Relative ELBO tolerance.
+#' @param tol ELBO-change tolerance, interpreted using convergence.
+#' @param convergence Either normalized (per sample-feature entry, default)
+#'   or relative (using the previous ELBO magnitude plus one).
 #' @param verbose Logical.
 #'
 #' @return An object of class \code{"cavi"} with components including:
@@ -470,7 +472,9 @@ cavi <- function(X,
                  sigma_max = 1e10,
                  max_iter = 100L,
                  tol = 1e-6,
-                 verbose = FALSE) {
+                 verbose = FALSE,
+                 convergence = c("normalized", "relative")) {
+  convergence <- match.arg(convergence)
   method <- match.arg(method)
   discretization <- match.arg(discretization)
   position_prior <- match.arg(position_prior)
@@ -931,7 +935,10 @@ cavi <- function(X,
         pi_trace[[length(pi_trace) + 1L]] <- pi_vec
 
         delta <- elbo_trace[length(elbo_trace)] - elbo_trace[length(elbo_trace) - 1L]
-        rel_delta <- delta / (abs(elbo_trace[length(elbo_trace) - 1L]) + 1)
+        scaled_delta <- .mpcurve_elbo_change(
+          delta, elbo_trace[length(elbo_trace) - 1L], n, d, convergence,
+          relative_offset = 1
+        )
 
         if (verbose) {
           cat(sprintf(
@@ -947,7 +954,7 @@ cavi <- function(X,
           )
         }
 
-        if (delta >= 0 && abs(rel_delta) < tol) {
+        if (delta >= 0 && abs(scaled_delta) < tol) {
           converged <- TRUE
           break
         }
@@ -978,7 +985,10 @@ cavi <- function(X,
         pi_trace[[length(pi_trace) + 1L]] <- pi_vec
 
         delta <- elbo_trace[length(elbo_trace)] - elbo_trace[length(elbo_trace) - 1L]
-        rel_delta <- delta / (abs(elbo_trace[length(elbo_trace) - 1L]) + 1)
+        scaled_delta <- .mpcurve_elbo_change(
+          delta, elbo_trace[length(elbo_trace) - 1L], n, d, convergence,
+          relative_offset = 1
+        )
 
         if (verbose) {
           rng_sd <- .cavi_measurement_sd_range(noise_info$measurement_sd)
@@ -995,7 +1005,7 @@ cavi <- function(X,
           )
         }
 
-        if (delta >= 0 && abs(rel_delta) < tol) {
+        if (delta >= 0 && abs(scaled_delta) < tol) {
           converged <- TRUE
           break
         }
@@ -1056,6 +1066,7 @@ cavi <- function(X,
         sigma_max = sigma_max,
         max_iter = max_iter,
         tol = tol,
+        convergence = convergence,
         ridge = ridge
       ),
       data = X
@@ -1071,6 +1082,8 @@ cavi <- function(X,
 #'
 #' @param object A \code{cavi} object.
 #' @param iter Integer maximum number of additional CAVI sweeps.
+#' @param convergence Optional stopping rule; NULL reuses the stored rule,
+#'   or relative stopping for objects saved before version 0.3.2.
 #' @param tol Optional convergence tolerance. If \code{NULL}, reuse the
 #'   original fit's tolerance.
 #' @param lambda Optional scalar or d-vector. If provided, overrides
@@ -1106,7 +1119,8 @@ do_cavi <- function(object,
                     lambda_max = NULL,
                     sigma_min = NULL,
                     sigma_max = NULL,
-                    verbose = FALSE) {
+                    verbose = FALSE,
+                    convergence = NULL) {
   if (!inherits(object, "cavi")) stop("object must inherit from class 'cavi'.")
 
   iter <- as.integer(iter)
@@ -1182,6 +1196,7 @@ do_cavi <- function(object,
     sigma_max = smax_use,
     max_iter = iter,
     tol = tol_use,
+    convergence = convergence %||% object$control$convergence %||% "relative",
     verbose = verbose
   )
 

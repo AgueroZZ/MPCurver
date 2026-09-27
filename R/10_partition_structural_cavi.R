@@ -776,6 +776,8 @@
       converged = isTRUE(converged),
       convergence_info = list(
         tol_outer = state$control$tol_outer,
+        convergence = state$control$convergence,
+        n_observations = state$n * state$d,
         iterations = max(0L, length(histories$objective) - 1L),
         converged = isTRUE(converged)
       ),
@@ -823,7 +825,7 @@
     n_outer = 25L,
     inner_iter = 1L,
     max_converge_iter = 100L,
-    tol_outer = 1e-5,
+    tol_outer = 1e-6,
     rw_q = 2L,
     ridge = 0,
     lambda_init = 1,
@@ -846,7 +848,8 @@
     freeze_feature = NULL,
     freeze_feature_weight_threshold = NULL,
     drop_unused_ordering = NULL,
-    verbose = TRUE) {
+    verbose = TRUE,
+    convergence = c("normalized", "relative")) {
   .structural_partition_warn_legacy_controls(
     freeze_unused_ordering = freeze_unused_ordering,
     freeze_unused_ordering_threshold = freeze_unused_ordering_threshold,
@@ -855,6 +858,7 @@
     drop_unused_ordering = drop_unused_ordering,
     caller = "soft_partition_cavi()"
   )
+  convergence <- match.arg(convergence)
   X <- as.matrix(X)
   M <- as.integer(M)
   n_outer <- as.integer(n_outer)
@@ -913,6 +917,7 @@
     ordering_alpha = ordering_alpha,
     verbose = verbose
   )
+  state$control$convergence <- convergence
   state$control$tol_outer <- tol_outer
   state$control$T_start <- T_start
   state$control$T_end <- T_end
@@ -978,7 +983,9 @@
       histories <- .structural_partition_append_history(histories, state, 1)
       current <- state$objective
       delta <- current - previous
-      rel_delta <- delta / (abs(previous) + 1e-12)
+      scaled_delta <- .mpcurve_elbo_change(
+        delta, previous, state$n, state$d, convergence, relative_offset = 1e-12
+      )
       if (delta < -1e-7 * (abs(previous) + 1)) {
         warning(
           sprintf("Structural partition ELBO decreased by %.3e at T = 1 iteration %d.",
@@ -986,7 +993,7 @@
           call. = FALSE
         )
       }
-      if (delta >= -1e-8 * (abs(previous) + 1) && abs(rel_delta) < tol_outer) {
+      if (delta >= -1e-8 * (abs(previous) + 1) && abs(scaled_delta) < tol_outer) {
         converged <- TRUE
         break
       }
@@ -1077,7 +1084,8 @@
     lambda_max = NULL,
     sigma_min = NULL,
     sigma_max = NULL,
-    verbose = FALSE) {
+    verbose = FALSE,
+    convergence = NULL) {
   iter <- as.integer(iter)
   if (iter < 1L) stop("iter must be at least 1.", call. = FALSE)
   state <- .structural_partition_state_from_fit(fit)
@@ -1103,7 +1111,15 @@
   state$control$lambda_max <- lambda_max %||% state$control$lambda_max
   state$control$sigma_min <- sigma_min %||% state$control$sigma_min
   state$control$sigma_max <- sigma_max %||% state$control$sigma_max
+  state$control$convergence <- match.arg(
+    convergence %||% state$control$convergence %||% "relative",
+    c("normalized", "relative")
+  )
   state$control$tol_outer <- tol_outer %||% state$control$tol_outer
+  if (length(state$control$tol_outer) != 1L ||
+      !is.finite(state$control$tol_outer) || state$control$tol_outer < 0) {
+    stop("tol_outer must be a finite nonnegative value.", call. = FALSE)
+  }
 
   histories <- list(
     objective = fit$objective_history,
@@ -1119,7 +1135,10 @@
     state <- .structural_partition_sweep(state, T_now = 1)
     histories <- .structural_partition_append_history(histories, state, 1)
     delta <- state$objective - previous
-    rel_delta <- delta / (abs(previous) + 1e-12)
+    scaled_delta <- .mpcurve_elbo_change(
+      delta, previous, state$n, state$d, state$control$convergence,
+      relative_offset = 1e-12
+    )
     if (delta < -1e-7 * (abs(previous) + 1)) {
       warning(
         sprintf("Structural partition ELBO decreased by %.3e during continuation.", delta),
@@ -1127,7 +1146,7 @@
       )
     }
     if (delta >= -1e-8 * (abs(previous) + 1) &&
-        abs(rel_delta) < state$control$tol_outer) {
+        abs(scaled_delta) < state$control$tol_outer) {
       converged <- TRUE
       break
     }

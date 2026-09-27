@@ -11,7 +11,7 @@ iteration limit, or to explore a change in smoothing parameters."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -30,6 +30,7 @@ iteration limit, or to explore a change in smoothing parameters."></head><body>
     <li><h6 class="dropdown-header" data-toc-skip>Case studies</h6></li>
     <li><a class="dropdown-item" href="../articles/fitness.html">Analyzing the eLife Fitness Dataset with MPCurver</a></li>
   </ul></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/AgueroZZ/MPCurver/blob/main/NEWS.md">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/AgueroZZ/MPCurver/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -73,7 +74,8 @@ iteration limit, or to explore a change in smoothing parameters.</p>
 <span>  drop_unused_ordering <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  assignment_prior <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  ordering_alpha <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  convergence <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -107,7 +109,7 @@ allowed when it matches the stored specification.</p></dd>
 
 
 <dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>
-<dd><p>Optional relative ELBO tolerance for single-ordering CAVI. If
+<dd><p>Optional ELBO-change tolerance for single-ordering CAVI. If
 <code>NULL</code>, reuse the stored value.</p></dd>
 
 
@@ -128,7 +130,7 @@ control value is reused. Use <code>0</code> to remove this penalty.</p></dd>
 
 
 <dt id="arg-tol-outer">tol_outer<a class="anchor" aria-label="anchor" href="#arg-tol-outer"></a></dt>
-<dd><p>For partition fits only: relative objective tolerance used
+<dd><p>For partition fits only: ELBO-change tolerance used
 after annealing. If <code>NULL</code>, reuse the stored value.</p></dd>
 
 
@@ -144,6 +146,13 @@ with a warning.</p></dd>
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
 <dd><p>Logical. Print per-iteration progress?</p></dd>
+
+
+<dt id="arg-convergence">convergence<a class="anchor" aria-label="anchor" href="#arg-convergence"></a></dt>
+<dd><p>Optional stopping rule: <code>"normalized"</code> or
+<code>"relative"</code>; see <code><a href="fit_mpcurve.html">fit_mpcurve()</a></code>. If <code>NULL</code>, reuse the
+stored rule. Fits saved before version 0.3.2 use <code>"relative"</code> unless
+explicitly overridden. Changing the rule does not rescale stored traces.</p></dd>
 
 </dl></div>
     <div class="section level2">

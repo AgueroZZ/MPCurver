@@ -1,7 +1,7 @@
 Package: MPCurver
 Type: Package
 Title: Fit and Explore MPCurve Trajectory Models in R
-Version: 0.3.1
+Version: 0.3.2
 Authors@R: c(
     person(
       "Ziang", "Zhang",
@@ -17,7 +17,8 @@ Description: Implements the MPCurve statistical model for trajectory and
     structural variational inference to jointly estimate latent orderings
     and probabilistic feature assignments. Supports feature-specific noise
     estimation or known measurement standard deviations, several
-    initialization methods, and graphical summaries of fitted trajectories.
+    initialization methods, convergence monitoring based on ELBO change per
+    observation, and graphical summaries of fitted trajectories.
 URL: https://aguerozz.github.io/MPCurver/,
     https://github.com/AgueroZZ/MPCurver
 BugReports: https://github.com/AgueroZZ/MPCurver/issues

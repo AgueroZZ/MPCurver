@@ -21,6 +21,23 @@ among the same samples.
 Use `fit_mpcurve()` to fit a model, `summary()` and `plot()` to explore
 the results, and `do_mpcurve()` to run additional fitting iterations.
 
+## Convergence
+
+By default, fitting stops when the absolute ELBO change divided by
+`N * D` is below `1e-6`, where `N` is the number of samples and `D` the
+number of features. Use `tol` for a single ordering and `tol_outer` for
+multiple orderings; partition convergence is assessed at temperature
+`T = 1` after annealing. The objective must also satisfy the algorithm’s
+numerical nondecrease check. Setting the relevant tolerance to zero
+disables early stopping.
+
+`convergence = "relative"` selects the previous ELBO-relative rule. To
+restore both pre-0.3.2 default tolerances, also set `tol = 1e-6` and
+`tol_outer = 1e-5`. `do_mpcurve()` inherits the rule and tolerance
+stored in the fit; saved fits without a rule retain relative stopping.
+Stored ELBO traces are unchanged. A small increment indicates slow
+improvement, not a bound on the remaining optimization error.
+
 ## Documentation
 
 - [Getting
@@ -155,11 +172,12 @@ each ordering. The trajectory plot shows the feature’s fitted mean under
 each ordering, with the corresponding assignment probability in the
 panel title. With the default adaptive feature-assignment prior,
 `effective_intrinsic_dim` counts prior weights above the configurable
-`effective_weight_tol` (default `1e-12`); `intrinsic_dim` remains the fitted
-number of orderings. For a fixed uniform assignment prior, use
+`effective_weight_tol` (default `1e-12`); `intrinsic_dim` remains the
+fitted number of orderings. For a fixed uniform assignment prior, use
 `select_mpcurve_dimension(X, max_intrinsic_dim = 4, direction = "forward")`
-to compare final objectives across adjacent dimensions. Inspect its saved
-scores and convergence diagnostics alongside the feature groups. The [feature-partitioning
+to compare final objectives across adjacent dimensions. Inspect its
+saved scores and convergence diagnostics alongside the feature groups.
+The [feature-partitioning
 tutorial](https://aguerozz.github.io/MPCurver/articles/partition.html)
 provides background on the statistical model.
 

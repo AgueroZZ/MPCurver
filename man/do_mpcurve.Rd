@@ -23,7 +23,8 @@ do_mpcurve(
   drop_unused_ordering = NULL,
   assignment_prior = NULL,
   ordering_alpha = NULL,
-  verbose = FALSE
+  verbose = FALSE,
+  convergence = NULL
 )
 }
 \arguments{
@@ -44,7 +45,7 @@ resets \code{lambda_mat} before continuation.}
 reuse the value stored on \code{object}. Supplying a new \code{S} is only
 allowed when it matches the stored specification.}
 
-\item{tol}{Optional relative ELBO tolerance for single-ordering CAVI. If
+\item{tol}{Optional ELBO-change tolerance for single-ordering CAVI. If
 \code{NULL}, reuse the stored value.}
 
 \item{lambda_sd_prior_rate}{Optional positive rate for the induced
@@ -57,7 +58,7 @@ control value is reused. Use \code{0} to remove this penalty.}
 \item{sigma_min, sigma_max}{Optional positive bounds for \code{sigma_j^2}. If
 \code{NULL}, reuse the stored values.}
 
-\item{tol_outer}{For partition fits only: relative objective tolerance used
+\item{tol_outer}{For partition fits only: ELBO-change tolerance used
 after annealing. If \code{NULL}, reuse the stored value.}
 
 \item{freeze_unused_ordering, freeze_unused_ordering_threshold, freeze_feature, freeze_feature_weight_threshold, drop_unused_ordering}{Deprecated; leave as \code{NULL}. Explicit values are ignored with a warning.}
@@ -67,6 +68,11 @@ Continuation uses the fitted partition prior. Explicit values are ignored
 with a warning.}
 
 \item{verbose}{Logical. Print per-iteration progress?}
+
+\item{convergence}{Optional stopping rule: \code{"normalized"} or
+\code{"relative"}; see \code{fit_mpcurve()}. If \code{NULL}, reuse the
+stored rule. Fits saved before version 0.3.2 use \code{"relative"} unless
+explicitly overridden. Changing the rule does not rescale stored traces.}
 }
 \value{
 An updated \code{mpcurve} object with refined estimates and extended

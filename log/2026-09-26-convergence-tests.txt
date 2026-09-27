@@ -1,0 +1,41 @@
+ℹ Testing MPCurver
+cavi: ........................................................................................
+convergence: ................................................................................
+dimension-selection: ...................................................................
+effective-intrinsic-dim: ..................
+initialization: .........
+mpcurve-cavi: ........................................................SSSS......
+partition-cavi: ...........................................................................
+partition-m-cavi: .................................................
+partition-soft: ..........................................
+partition-structural-cavi: ..........................................
+public-api: ..............................................
+
+══ Skipped ═════════════════════════════════════════════════════════════════════
+1. greedy forward selection uses fixed-M comparison semantics ('test-mpcurve-cavi.R:190:3') - Reason: Legacy fit_mpcurve(greedy=) semantics are retired; use select_mpcurve_dimension().
+
+2. greedy backward can compact after internal comparison search ('test-mpcurve-cavi.R:224:3') - Reason: Legacy fit_mpcurve(greedy=) semantics are retired; use select_mpcurve_dimension().
+
+3. forward greedy rejects a collapsed candidate that is not larger after compaction ('test-mpcurve-cavi.R:263:3') - Reason: Active/compaction semantics do not exist in structural VI.
+
+4. do_mpcurve preserves similarity provenance for greedy-selected 1D fits ('test-mpcurve-cavi.R:379:3') - Reason: Legacy fit_mpcurve(greedy=) semantics are retired; use select_mpcurve_dimension().
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+Warning message:
+package ‘testthat’ was built under R version 4.5.2
+[WARNING] Could not fetch resource https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js: HttpExceptionRequest Request {
+    host                 = "cdn.jsdelivr.net"
+    port                 = 443
+    secure               = True
+    requestHeaders       = []
+    path                 = "/npm/mathjax@3/es5/tex-chtml-full.js"
+    queryString          = ""
+    method               = "GET"
+    proxy                = Nothing
+    rawBody              = False
+    redirectCount        = 10
+    responseTimeout      = ResponseTimeoutDefault
+    requestVersion       = HTTP/1.1
+    proxySecureMode      = ProxySecureWithConnect
+  }
+   (ConnectionFailure Network.Socket.getAddrInfo (called with preferred socket type/protocol: AddrInfo {addrFlags = [AI_ADDRCONFIG], addrFamily = AF_UNSPEC, addrSocketType = Stream, addrProtocol = 0, addrAddress = 0.0.0.0:0, addrCanonName = Nothing}, host name: "cdn.jsdelivr.net", service name: "443"): does not exist (nodename nor servname provided, or not known))

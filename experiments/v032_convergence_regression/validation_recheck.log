@@ -1,0 +1,314 @@
+       id    kind fitted_M effective_M reference_M iterations converged seconds
+1 site_M1 website        1           1           1         53      TRUE   0.851
+   recovery reference_recovery ARI reference_ARI prefix_error warnings passed
+1 0.9997575          0.9997575  NA            NA           NA        0   TRUE
+       id    kind fitted_M effective_M reference_M iterations converged seconds
+1 site_M2 website        2           2           2        125     FALSE   4.783
+   recovery reference_recovery ARI reference_ARI prefix_error warnings passed
+1 0.9982048          0.9982048   1             1           NA        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709261_N100_D10 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        784      TRUE   1.127       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709261_N200_D10 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        602      TRUE   0.987       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709261_N400_D10 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        470      TRUE   1.175       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709261_N100_D20 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        785      TRUE   1.822       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709261_N200_D20 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        683      TRUE   1.839       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709261_N400_D20 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        395      TRUE   1.291       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709261_N100_D40 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        696      TRUE   3.015       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709261_N200_D40 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        485      TRUE   2.234       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709261_N400_D40 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        395      TRUE   2.253       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709262_N100_D10 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        853      TRUE   1.179       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709262_N200_D10 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        474      TRUE   0.776       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709262_N400_D10 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        360      TRUE   0.943       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709262_N100_D20 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        753      TRUE   1.734       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709262_N200_D20 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        461      TRUE    1.24       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709262_N400_D20 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        393      TRUE   1.276       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709262_N100_D40 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        764      TRUE   3.325       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709262_N200_D40 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        609      TRUE   2.869       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709262_N400_D40 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        372      TRUE   2.149       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709263_N100_D10 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        662      TRUE   0.937       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709263_N200_D10 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        642      TRUE   1.139       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709263_N400_D10 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        421      TRUE   1.042       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709263_N100_D20 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        666      TRUE   1.568       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709263_N200_D20 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        591      TRUE   1.629       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709263_N400_D20 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        428      TRUE   1.473       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709263_N100_D40 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        632      TRUE   2.854       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709263_N200_D40 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        519      TRUE   2.419       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id            kind fitted_M effective_M reference_M
+1 seed2709263_N400_D40 nd_reproduction        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        397      TRUE   2.294       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                        id            kind fitted_M effective_M reference_M
+1 pilot_M3_S4_adaptive_M08 pilot_candidate        8           4          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        440      TRUE  135.28       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id         kind fitted_M effective_M reference_M iterations
+1 pilot_M3_S4_adaptive pilot_result        8           4           4        440
+  converged seconds  recovery reference_recovery       ARI reference_ARI
+1      TRUE  135.28 0.9933946          0.9933648 0.9751997     0.9751997
+  prefix_error warnings passed
+1           NA        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M3_S4_forward_M01 pilot_candidate        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1         52      TRUE   0.397       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M3_S4_forward_M02 pilot_candidate        2           2          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        260      TRUE  19.611       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M3_S4_forward_M03 pilot_candidate        3           3          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        450      TRUE  50.485       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M3_S4_forward_M04 pilot_candidate        4           4          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        383      TRUE  57.952       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                   id         kind fitted_M effective_M reference_M iterations
+1 pilot_M3_S4_forward pilot_result        3           3           3        450
+  converged seconds  recovery reference_recovery ARI reference_ARI prefix_error
+1      TRUE  50.485 0.9935998          0.9936011   1             1           NA
+  warnings passed
+1        0   TRUE
+                        id            kind fitted_M effective_M reference_M
+1 pilot_M4_S4_adaptive_M08 pilot_candidate        8           4          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        366      TRUE 113.201       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id         kind fitted_M effective_M reference_M iterations
+1 pilot_M4_S4_adaptive pilot_result        8           4           4        366
+  converged seconds  recovery reference_recovery ARI reference_ARI prefix_error
+1      TRUE 113.201 0.9895872          0.9895829   1             1           NA
+  warnings passed
+1        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M4_S4_forward_M01 pilot_candidate        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1         19      TRUE   0.185       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M4_S4_forward_M02 pilot_candidate        2           2          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        365      TRUE  27.681       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M4_S4_forward_M03 pilot_candidate        3           3          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        345      TRUE  38.606       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M4_S4_forward_M04 pilot_candidate        4           4          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        391      TRUE  58.826       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M4_S4_forward_M05 pilot_candidate        5           5          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        364      TRUE  69.834       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                   id         kind fitted_M effective_M reference_M iterations
+1 pilot_M4_S4_forward pilot_result        4           4           4        391
+  converged seconds  recovery reference_recovery ARI reference_ARI prefix_error
+1      TRUE  58.826 0.9895867           0.989599   1             1           NA
+  warnings passed
+1        0   TRUE
+                        id            kind fitted_M effective_M reference_M
+1 pilot_M5_S4_adaptive_M08 pilot_candidate        8           5          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        428      TRUE  133.18       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                    id         kind fitted_M effective_M reference_M iterations
+1 pilot_M5_S4_adaptive pilot_result        8           5           5        428
+  converged seconds  recovery reference_recovery ARI reference_ARI prefix_error
+1      TRUE  133.18 0.9890291          0.9889396   1             1           NA
+  warnings passed
+1        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M5_S4_forward_M01 pilot_candidate        1           1          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1         36      TRUE   0.328       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M5_S4_forward_M02 pilot_candidate        2           2          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        197      TRUE      15       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M5_S4_forward_M03 pilot_candidate        3           3          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        304      TRUE  34.325       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M5_S4_forward_M04 pilot_candidate        4           4          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        339      TRUE  51.011       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M5_S4_forward_M05 pilot_candidate        5           5          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        415      TRUE  80.863       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                       id            kind fitted_M effective_M reference_M
+1 pilot_M5_S4_forward_M06 pilot_candidate        6           6          NA
+  iterations converged seconds recovery reference_recovery ARI reference_ARI
+1        380      TRUE  88.746       NA                 NA  NA            NA
+  prefix_error warnings passed
+1            0        0   TRUE
+                   id         kind fitted_M effective_M reference_M iterations
+1 pilot_M5_S4_forward pilot_result        5           5           5        415
+  converged seconds  recovery reference_recovery ARI reference_ARI prefix_error
+1      TRUE  80.863 0.9890141          0.9889357   1             1           NA
+  warnings passed
+1        0   TRUE

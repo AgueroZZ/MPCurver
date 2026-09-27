@@ -7,6 +7,12 @@ template:
 home:
   sidebar: false
 
+navbar:
+  components:
+    news:
+      text: Changelog
+      href: https://github.com/AgueroZZ/MPCurver/blob/main/NEWS.md
+
 reference:
   - title: Model fitting
     contents:

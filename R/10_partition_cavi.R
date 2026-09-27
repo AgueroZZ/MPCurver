@@ -1013,6 +1013,7 @@
     # The partition CAVI loop (with feature weights) handles refinement.
     fits[[m]] <- cavi(
       X = X,
+      convergence = "relative",
       K = length(subset_res$fit$params$pi),
       responsibilities_init = subset_res$fit$gamma,
       position_prior_init = colMeans(subset_res$fit$gamma),
@@ -1674,6 +1675,8 @@
     discretization = disc_used,
     max_iter = max_iter,
     tol = tol,
+    # Preserve initialization across changes to the outer stopping rule.
+    convergence = "relative",
     verbose = verbose
   )
   if (is.null(S)) {
@@ -1738,6 +1741,7 @@
   if (is.null(gamma_init)) {
     return(cavi(
       X = X_sub,
+      convergence = "relative",
       K = K,
       method = method,
       S = S,
@@ -2972,6 +2976,7 @@ partition_features_twofits_cavi <- function(fitA, fitB, X = NULL, delta = 0,
   if (method == "random") {
     return(cavi(
       X = X,
+      convergence = "relative",
       K = K,
       method = "random",
       S = S,
@@ -4530,7 +4535,9 @@ init_m_trajectories_cavi <- function(X,
 #' @param n_outer Number of annealing steps.
 #' @param inner_iter Number of weighted CAVI sweeps per outer step.
 #' @param max_converge_iter Maximum number of exact \code{T=1} iterations.
-#' @param tol_outer Relative objective tolerance for the stricter \code{T=1}
+#' @param convergence Normalized (per sample-feature entry) or relative
+#'   stopping, as in fit_mpcurve().
+#' @param tol_outer ELBO-change tolerance for the stricter \code{T=1}
 #'   convergence rule used after annealing.
 #' @param rw_q Random-walk order.
 #' @param ridge Optional nugget added to the RW precision for both orderings.
@@ -4586,7 +4593,7 @@ soft_two_trajectory_cavi <- function(X,
                                      n_outer = 25L,
                                      inner_iter = 1L,
                                      max_converge_iter = 100L,
-                                     tol_outer = 1e-5,
+                                     tol_outer = 1e-6,
                                      rw_q = 2L,
                                      ridge = 0,
                                      lambda_sd_prior_rate = NULL,
@@ -4606,7 +4613,9 @@ soft_two_trajectory_cavi <- function(X,
                                      freeze_feature = NULL,
                                      freeze_feature_weight_threshold = NULL,
                                      drop_unused_ordering = NULL,
-                                     verbose = TRUE) {
+                                     verbose = TRUE,
+                                     convergence = c("normalized", "relative")) {
+  convergence <- match.arg(convergence)
   init_method <- match.arg(init_method)
   init_method1 <- match.arg(init_method1)
   discretization <- match.arg(discretization)
@@ -4662,6 +4671,7 @@ soft_two_trajectory_cavi <- function(X,
     T_start = T_start, T_end = T_end,
     n_outer = n_outer, inner_iter = inner_iter,
     max_converge_iter = max_converge_iter, tol_outer = tol_outer,
+    convergence = convergence,
     rw_q = rw_q, ridge = ridge,
     lambda_sd_prior_rate = lambda_sd_prior_rate,
     lambda_min = lambda_min, lambda_max = lambda_max,

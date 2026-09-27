@@ -2475,7 +2475,7 @@ plot.mpcurve <- function(
 #' @param S Optional known measurement standard deviations. If \code{NULL},
 #'   reuse the value stored on \code{object}. Supplying a new \code{S} is only
 #'   allowed when it matches the stored specification.
-#' @param tol Optional relative ELBO tolerance for single-ordering CAVI. If
+#' @param tol Optional ELBO-change tolerance for single-ordering CAVI. If
 #'   \code{NULL}, reuse the stored value.
 #' @param lambda_sd_prior_rate Optional positive rate for the induced
 #'   exponential prior on \code{1 / sqrt(lambda_j)}. If \code{NULL}, the stored
@@ -2484,7 +2484,7 @@ plot.mpcurve <- function(
 #'   \code{NULL}, reuse the stored values.
 #' @param sigma_min,sigma_max Optional positive bounds for \code{sigma_j^2}. If
 #'   \code{NULL}, reuse the stored values.
-#' @param tol_outer For partition fits only: relative objective tolerance used
+#' @param tol_outer For partition fits only: ELBO-change tolerance used
 #'   after annealing. If \code{NULL}, reuse the stored value.
 #' @param freeze_unused_ordering,freeze_unused_ordering_threshold,freeze_feature,freeze_feature_weight_threshold,drop_unused_ordering
 #'   Deprecated; leave as \code{NULL}. Explicit values are ignored with a warning.
@@ -2492,6 +2492,11 @@ plot.mpcurve <- function(
 #'   Continuation uses the fitted partition prior. Explicit values are ignored
 #'   with a warning.
 #' @param verbose Logical. Print per-iteration progress?
+#'
+#' @param convergence Optional stopping rule: \code{"normalized"} or
+#'   \code{"relative"}; see \code{fit_mpcurve()}. If \code{NULL}, reuse the
+#'   stored rule. Fits saved before version 0.3.2 use \code{"relative"} unless
+#'   explicitly overridden. Changing the rule does not rescale stored traces.
 #'
 #' @return An updated \code{mpcurve} object with refined estimates and extended
 #'   convergence traces.
@@ -2514,7 +2519,8 @@ do_mpcurve <- function(object,
                        drop_unused_ordering = NULL,
                        assignment_prior = NULL,
                        ordering_alpha = NULL,
-                       verbose = FALSE) {
+                       verbose = FALSE,
+                       convergence = NULL) {
   if (!inherits(object, "mpcurve")) {
     stop("object must be an 'mpcurve' object.")
   }
@@ -2559,6 +2565,7 @@ do_mpcurve <- function(object,
         lambda = lambda,
         S = S,
         tol_outer = tol_outer,
+        convergence = convergence,
         lambda_sd_prior_rate = lambda_sd_prior_rate,
         lambda_min = lambda_min,
         lambda_max = lambda_max,
@@ -2843,6 +2850,7 @@ do_mpcurve <- function(object,
     sigma_min = sigma_min,
     sigma_max = sigma_max,
     tol = tol_use,
+    convergence = convergence,
     verbose = verbose
   )
 
@@ -2920,7 +2928,9 @@ do_mpcurve <- function(object,
 #' @param fix_lambda Logical; if \code{TRUE}, keep all smoothness parameters
 #'   fixed at the supplied initial value.
 #' @param iter Maximum number of CAVI sweeps for the single-ordering fit.
-#' @param tol Relative ELBO tolerance for the single-ordering CAVI fit.
+#' @param tol ELBO-change tolerance for the single-ordering fit, interpreted
+#'   using \code{convergence}. Defaults to \code{1e-6}; zero disables early
+#'   stopping.
 #' @param num_cores Integer >= 1. Workers for parallel multi-method
 #'   single-ordering runs.
 #' @param intrinsic_dim Integer intrinsic dimensionality of the latent ordering
@@ -3006,11 +3016,26 @@ do_mpcurve <- function(object,
 #' @param inner_iter Number of structural coordinate sweeps per annealing step.
 #' @param max_converge_iter Maximum number of exact \code{T = 1} partition
 #'   iterations after annealing. Defaults to \code{iter} when \code{NULL}.
-#' @param tol_outer Relative objective tolerance for partition convergence
-#'   after annealing.
+#' @param tol_outer ELBO-change tolerance for partition convergence at
+#'   \eqn{T=1} after annealing, interpreted using \code{convergence}. Defaults
+#'   to \code{1e-6}; zero disables early stopping.
 #' @param freeze_unused_ordering,freeze_unused_ordering_threshold,freeze_feature,freeze_feature_weight_threshold,drop_unused_ordering
 #'   Deprecated; leave as \code{NULL}. Explicit values are ignored with a warning.
 #' @param verbose Logical; print per-iteration progress?
+#' @param convergence Stopping rule. The default, \code{"normalized"}, uses
+#'   \eqn{|\mathrm{ELBO}_{new} - \mathrm{ELBO}_{old}|/(ND)}, with
+#'   \eqn{N = nrow(X)} samples and \eqn{D = ncol(X)} features. The denominator
+#'   excludes the number of orderings and grid positions. The fit stops at the first
+#'   eligible increment below \code{tol} (one ordering) or \code{tol_outer}
+#'   (multiple orderings). Single-ordering increments must be nonnegative;
+#'   partition fits retain a numerical decrease allowance of
+#'   \eqn{10^{-8}(|\mathrm{ELBO}_{old}|+1)}. The optional \code{"relative"}
+#'   rule divides by \eqn{|\mathrm{ELBO}_{old}|+1} for one ordering and
+#'   \eqn{|\mathrm{ELBO}_{old}|+10^{-12}} for partition fits. To reproduce
+#'   the pre-0.3.2 defaults, use \code{convergence = "relative"},
+#'   \code{tol = 1e-6}, and \code{tol_outer = 1e-5}. The rule is saved in
+#'   \code{fit$fit$control$convergence}. ELBO traces remain on their original
+#'   scale. A small increment does not bound the remaining optimization gap.
 #' @param ... Additional variational fitting options, including initialization
 #'   controls such as \code{responsibilities_init}, \code{fits_init},
 #'   \code{init_methods}, \code{pca_components}, or \code{hard_assign_final}.
@@ -3074,15 +3099,17 @@ fit_mpcurve <- function(
     n_outer = 25L,
     inner_iter = 1L,
     max_converge_iter = NULL,
-    tol_outer = 1e-5,
+    tol_outer = 1e-6,
     freeze_unused_ordering = NULL,
     freeze_unused_ordering_threshold = NULL,
     freeze_feature = NULL,
     freeze_feature_weight_threshold = NULL,
     drop_unused_ordering = NULL,
     verbose = FALSE,
+    convergence = c("normalized", "relative"),
     ...
 ) {
+  convergence <- match.arg(convergence)
   method_missing <- missing(method)
   num_cores <- as.integer(num_cores)
   intrinsic_dim <- as.integer(intrinsic_dim)
@@ -3127,6 +3154,7 @@ fit_mpcurve <- function(
     fix_lambda = fix_lambda,
     iter = iter,
     tol = tol,
+    convergence = convergence,
     num_cores = num_cores,
     intrinsic_dim = intrinsic_dim,
     partition_init = partition_init,
@@ -3238,6 +3266,7 @@ fit_mpcurve <- function(
         inner_iter = inner_iter,
         max_converge_iter = max_converge_iter,
         tol_outer = tol_outer,
+        convergence = convergence,
         ridge = ridge,
         lambda_sd_prior_rate = lambda_sd_prior_rate,
         lambda_min = lambda_min,
@@ -3287,6 +3316,7 @@ fit_mpcurve <- function(
         position_prior_init = position_prior_init,
         max_iter = iter,
         tol = tol,
+        convergence = convergence,
         verbose = verbose
       ),
       dots

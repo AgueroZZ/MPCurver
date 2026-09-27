@@ -44,13 +44,14 @@ fit_mpcurve(
   n_outer = 25L,
   inner_iter = 1L,
   max_converge_iter = NULL,
-  tol_outer = 1e-05,
+  tol_outer = 1e-06,
   freeze_unused_ordering = NULL,
   freeze_unused_ordering_threshold = NULL,
   freeze_feature = NULL,
   freeze_feature_weight_threshold = NULL,
   drop_unused_ordering = NULL,
   verbose = FALSE,
+  convergence = c("normalized", "relative"),
   ...
 )
 }
@@ -89,7 +90,9 @@ fixed at the supplied initial value.}
 
 \item{iter}{Maximum number of CAVI sweeps for the single-ordering fit.}
 
-\item{tol}{Relative ELBO tolerance for the single-ordering CAVI fit.}
+\item{tol}{ELBO-change tolerance for the single-ordering fit, interpreted
+using \code{convergence}. Defaults to \code{1e-6}; zero disables early
+stopping.}
 
 \item{num_cores}{Integer >= 1. Workers for parallel multi-method
 single-ordering runs.}
@@ -201,12 +204,28 @@ changing the temperature changes the objective.}
 \item{max_converge_iter}{Maximum number of exact \code{T = 1} partition
 iterations after annealing. Defaults to \code{iter} when \code{NULL}.}
 
-\item{tol_outer}{Relative objective tolerance for partition convergence
-after annealing.}
+\item{tol_outer}{ELBO-change tolerance for partition convergence at
+\eqn{T=1} after annealing, interpreted using \code{convergence}. Defaults
+to \code{1e-6}; zero disables early stopping.}
 
 \item{freeze_unused_ordering, freeze_unused_ordering_threshold, freeze_feature, freeze_feature_weight_threshold, drop_unused_ordering}{Deprecated; leave as \code{NULL}. Explicit values are ignored with a warning.}
 
 \item{verbose}{Logical; print per-iteration progress?}
+
+\item{convergence}{Stopping rule. The default, \code{"normalized"}, uses
+\eqn{|\mathrm{ELBO}_{new} - \mathrm{ELBO}_{old}|/(ND)}, with
+\eqn{N = nrow(X)} samples and \eqn{D = ncol(X)} features. The denominator
+excludes the number of orderings and grid positions. The fit stops at the first
+eligible increment below \code{tol} (one ordering) or \code{tol_outer}
+(multiple orderings). Single-ordering increments must be nonnegative;
+partition fits retain a numerical decrease allowance of
+\eqn{10^{-8}(|\mathrm{ELBO}_{old}|+1)}. The optional \code{"relative"}
+rule divides by \eqn{|\mathrm{ELBO}_{old}|+1} for one ordering and
+\eqn{|\mathrm{ELBO}_{old}|+10^{-12}} for partition fits. To reproduce
+the pre-0.3.2 defaults, use \code{convergence = "relative"},
+\code{tol = 1e-6}, and \code{tol_outer = 1e-5}. The rule is saved in
+\code{fit$fit$control$convergence}. ELBO traces remain on their original
+scale. A small increment does not bound the remaining optimization gap.}
 
 \item{...}{Additional variational fitting options, including initialization
 controls such as \code{responsibilities_init}, \code{fits_init},

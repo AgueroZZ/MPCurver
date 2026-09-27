@@ -1,0 +1,13 @@
+[1] ‘0.3.2’
+$convergence
+c("normalized", "relative")
+
+$tol
+[1] 1e-06
+
+$tol_outer
+[1] 1e-06
+
+M=1: normalized verified
+M=2: normalized verified
+/Users/ziangzhang/Library/R/arm64/4.5/library/MPCurver

@@ -1,0 +1,5 @@
+Reference sources: InferOrder experiments/mpcurve_v030_site,
+elbo_nd_stopping_v031 and estimate_intrinsic_m_v031.
+ND and intrinsic-M references: MPCurver 0.3.1 commit
+e38a69a563e338a549382b4b3ece74d655c4654f.
+Input bundle SHA256: 795674fd3a4a3c7a76df443f7662f6ea9c1166a703639cd20dbc7520c32acf73

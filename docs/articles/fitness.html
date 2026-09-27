@@ -21,7 +21,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -43,6 +43,7 @@
     <li><a class="dropdown-item" href="../articles/fitness.html">Analyzing the eLife Fitness Dataset with MPCurver</a></li>
   </ul>
 </li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/AgueroZZ/MPCurver/blob/main/NEWS.md">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -97,7 +98,7 @@ trajectories?</li>
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"MPCurver"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://aguerozz.github.io/MPCurver/">MPCurver</a></span><span class="op">)</span></span>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"devtools"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/devtools/man/load_all.html" class="external-link">load_all</a></span><span class="op">(</span><span class="st">"."</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span>  <span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://devtools.r-lib.org/reference/load_all.html" class="external-link">load_all</a></span><span class="op">(</span><span class="st">"."</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
 <span>  <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"Need either an installed MPCurver package or devtools::load_all()."</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
@@ -359,9 +360,9 @@ Larger values encourage smoother trajectories.</p>
 <span><span class="co">#&gt;   Model          : homoskedastic</span></span>
 <span><span class="co">#&gt;   Intrinsic dim  : 1</span></span>
 <span><span class="co">#&gt;   n / d / K      : 421 / 45 / 50</span></span>
-<span><span class="co">#&gt;   Iterations     : 349</span></span>
+<span><span class="co">#&gt;   Iterations     : 341</span></span>
 <span><span class="co">#&gt;   Converged      : yes</span></span>
-<span><span class="co">#&gt;   ELBO (last)    : 11842.508096</span></span></code></pre></div>
+<span><span class="co">#&gt;   ELBO (last)    : 11842.393573</span></span></code></pre></div>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
@@ -380,7 +381,7 @@ ordering itself, or mainly changes the trajectory estimates.</p>
 <span>  <span class="va">fit_unidir_smooth</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span>,</span>
 <span>  <span class="va">fit_unidir</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 0.952165</span></span>
+<span><span class="co">#&gt; [1] 0.9522832</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span></span>
 <span>  <span class="va">fit_unidir_smooth</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span>,</span>
@@ -430,10 +431,10 @@ model-selection assessment.</p>
 <span><span class="co">#&gt;   Intrinsic dim  : 2 (fixed)</span></span>
 <span><span class="co">#&gt;   Effective dim  : 2</span></span>
 <span><span class="co">#&gt;   n / d / K      : 421 / 45 / 50</span></span>
-<span><span class="co">#&gt;   Iterations     : 210</span></span>
+<span><span class="co">#&gt;   Iterations     : 525</span></span>
 <span><span class="co">#&gt;   Partition      : A=27, B=18</span></span>
-<span><span class="co">#&gt;   Objective (last): 12946.251465</span></span>
-<span><span class="co">#&gt;   Converged      : TRUE</span></span></code></pre></div>
+<span><span class="co">#&gt;   Objective (last): 13072.351457</span></span>
+<span><span class="co">#&gt;   Converged      : FALSE</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="inspect-trajectories-under-each-ordering">Inspect trajectories under each ordering<a class="anchor" aria-label="anchor" href="#inspect-trajectories-under-each-ordering"></a>
 </h3>
@@ -727,11 +728,11 @@ distinct orderings.</p>
 <tr class="odd">
 <td align="left">A</td>
 <td align="right">1.000</td>
-<td align="right">0.866</td>
+<td align="right">0.857</td>
 </tr>
 <tr class="even">
 <td align="left">B</td>
-<td align="right">0.866</td>
+<td align="right">0.857</td>
 <td align="right">1.000</td>
 </tr>
 </tbody>
@@ -801,10 +802,10 @@ this noise model.</p>
 <span><span class="co">#&gt;   Intrinsic dim  : 2 (fixed)</span></span>
 <span><span class="co">#&gt;   Effective dim  : 2</span></span>
 <span><span class="co">#&gt;   n / d / K      : 421 / 45 / 50</span></span>
-<span><span class="co">#&gt;   Iterations     : 304</span></span>
+<span><span class="co">#&gt;   Iterations     : 525</span></span>
 <span><span class="co">#&gt;   Partition      : A=13, B=32</span></span>
-<span><span class="co">#&gt;   Objective (last): 13909.645485</span></span>
-<span><span class="co">#&gt;   Converged      : TRUE</span></span></code></pre></div>
+<span><span class="co">#&gt;   Objective (last): 13939.840025</span></span>
+<span><span class="co">#&gt;   Converged      : FALSE</span></span></code></pre></div>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition_known_sd</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">31</span><span class="op">)</span></span></code></pre></div>
 <p><img src="fitness_files/figure-html/known-sd-partition-trajectories-1.png" class="r-plt" alt="Conditional posterior mean trajectory for environment dimension 31 under each of two fixed orderings with known measurement SDs." width="100%"></p>
