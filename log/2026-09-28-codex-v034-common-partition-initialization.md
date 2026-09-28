@@ -45,4 +45,12 @@ search entries, with no errors.
 - Source archive: `/tmp/MPCurver_0.3.4.tar.gz`, SHA-256
   `58d0c99c6170994c82eedba190fb1c28a63eb47530c575705323c3cf3992b7c6`.
 
-Publication verification will be appended after the authorized push.
+## Publication verification
+
+The release commit is `15f2b0bbe5dfa61cd46da5160b2bc251e75a0475` on
+`origin/main`. GitHub Pages deployment
+[36499279949](https://github.com/AgueroZZ/MPCurver/actions/runs/36499279949)
+completed successfully for that exact commit. The live `fit_mpcurve()`
+reference and partition article both show version 0.3.4 and document that a
+length-one method is applied independently to every selected feature block;
+the live pages also state that default PCA uses each block's own PC1.
