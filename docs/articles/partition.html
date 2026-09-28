@@ -21,7 +21,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -112,7 +112,9 @@ trajectory families.</p>
 <span><span class="va">truth</span> <span class="op">&lt;-</span> <span class="va">sim</span><span class="op">$</span><span class="va">true_assign</span></span></code></pre></div>
 <p>Fit two orderings using 50 grid positions and a second-order
 random-walk prior. The default initialization groups similar features
-and uses PCA to initialize a sample ordering within each group.</p>
+and uses PCA to initialize a sample ordering within each group. Each
+group is treated as its own feature subset and uses its own PC1; the PCA
+component is not incremented across groups.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_partition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
 <span>  <span class="va">X</span>,</span>
@@ -138,7 +140,7 @@ several orderings describe the feature similarly well.</p>
 <span><span class="co">#&gt; [1,] 1  0.000000e+00</span></span>
 <span><span class="co">#&gt; [2,] 0  1.000000e+00</span></span>
 <span><span class="co">#&gt; [3,] 1  0.000000e+00</span></span>
-<span><span class="co">#&gt; [4,] 1 1.508606e-216</span></span>
+<span><span class="co">#&gt; [4,] 1 3.153261e-216</span></span>
 <span><span class="co">#&gt; [5,] 0  1.000000e+00</span></span>
 <span><span class="co">#&gt; [6,] 0  1.000000e+00</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">fit_partition</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">assign</span><span class="op">)</span></span>
@@ -284,7 +286,7 @@ objectives.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Final objective increments:\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Final objective increments:</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">tail</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diff.html" class="external-link">diff</a></span><span class="op">(</span><span class="va">t1_objective</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 0.8311716 0.7412944 0.7044794 0.6753721 0.6311281 0.5810605</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 0.5547101 0.5869190 0.6144451 0.6123581 0.5810581 0.5452227</span></span></code></pre></div>
 <p>If the increments remain appreciable at the iteration limit, run
 additional iterations:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
@@ -391,14 +393,17 @@ interpreted separately.</p>
 <h3 id="initialization">Initialization<a class="anchor" aria-label="anchor" href="#initialization"></a>
 </h3>
 <p>The default <code>partition_init = "similarity"</code> clusters
-features by similarity and initializes one ordering per feature group.
-The fast <code>similarity_metric = "spline_r2"</code> option orders the
-samples by each predictor feature, fits the other features with a
-natural cubic spline of fixed degrees of freedom, and uses the
-proportion of response variance explained as a directional similarity.
-The two directions are combined into a symmetric score.
-<code>spline_r2_df</code> controls the spline degrees of freedom and
-defaults to 5. Alternatively,
+features by similarity and initializes one ordering per feature group. A
+length-one <code>method</code> is applied independently to every group.
+The default <code>method = "PCA"</code> therefore uses each group’s own
+PC1; <code>method = "isomap"</code> or <code>method = "fiedler"</code>
+applies that same method separately to every group. The fast
+<code>similarity_metric = "spline_r2"</code> option orders the samples
+by each predictor feature, fits the other features with a natural cubic
+spline of fixed degrees of freedom, and uses the proportion of response
+variance explained as a directional similarity. The two directions are
+combined into a symmetric score. <code>spline_r2_df</code> controls the
+spline degrees of freedom and defaults to 5. Alternatively,
 <code>partition_init = "ordering_methods"</code> uses the specified
 ordering methods:</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">

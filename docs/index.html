@@ -23,7 +23,7 @@
 
     <a class="navbar-brand me-2" href="index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -149,6 +149,7 @@
 </h2>
 <p>A single ordering may describe some features well while missing the patterns in others. Set <code>intrinsic_dim = M</code> to fit <span class="math inline">M</span> orderings of the same samples. MPCurver jointly estimates those orderings, smooth trajectories, and a probability distribution over orderings for each feature. For example, two groups of genes may vary along different cell-state axes.</p>
 <p>Inference uses structural variational inference: a feature’s trajectory distribution is conditional on its ordering assignment. This preserves the dependence between which ordering a feature follows and the shape of its trajectory. Each feature has one noise variance shared across the candidate orderings, while smoothness can vary with the feature and ordering.</p>
+<p>The default similarity initialization clusters the features, then applies one ordering method independently within every feature group. PCA is the default, using each group’s own PC1. Setting <code>method = "isomap"</code> or <code>method = "fiedler"</code> applies that method separately to all groups.</p>
 <p>For a two-ordering analysis of your sample-by-feature data matrix <code>X</code>:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_multi</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span><span class="va">X</span>, intrinsic_dim <span class="op">=</span> <span class="fl">2</span>, K <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>

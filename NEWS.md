@@ -1,3 +1,13 @@
+# MPCurver 0.3.4
+
+- Similarity-based partition initialization now applies a length-one ordering
+  method independently within every selected feature block. The default PCA
+  initialization uses each block's own PC1 instead of assigning successive
+  components (PC1, PC2, ...) across unrelated blocks. Explicit per-block
+  methods and `pca_components` remain supported, and
+  `partition_init = "ordering_methods"` retains its successive-PC behavior on
+  the common full feature matrix.
+
 # MPCurver 0.3.3
 
 - `fit_mpcurve(intrinsic_dim = "auto")` can now use the feature-similarity

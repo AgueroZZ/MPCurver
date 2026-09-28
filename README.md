@@ -139,6 +139,12 @@ its trajectory. Each feature has one noise variance shared across the
 candidate orderings, while smoothness can vary with the feature and
 ordering.
 
+The default similarity initialization clusters the features, then
+applies one ordering method independently within every feature group.
+PCA is the default, using each group’s own PC1. Setting
+`method = "isomap"` or `method = "fiedler"` applies that method
+separately to all groups.
+
 For a two-ordering analysis of your sample-by-feature data matrix `X`:
 
 ``` r

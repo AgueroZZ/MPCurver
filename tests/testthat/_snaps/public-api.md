@@ -18,7 +18,7 @@
       Effective dim  : 2
       n / d / K      : 60 / 8 / 6
       Iterations     : 4
-      Partition      : A=2, B=6
-      Objective (last): -554.977747
+      Partition      : A=3, B=5
+      Objective (last): -582.299828
       Converged      : FALSE
 

@@ -63,7 +63,9 @@ truth <- sim$true_assign
 
 Fit two orderings using 50 grid positions and a second-order random-walk
 prior. The default initialization groups similar features and uses PCA to
-initialize a sample ordering within each group.
+initialize a sample ordering within each group. Each group is treated as its
+own feature subset and uses its own PC1; the PCA component is not incremented
+across groups.
 
 ```{r fit-soft}
 fit_partition <- fit_mpcurve(
@@ -277,7 +279,10 @@ different estimators and should be interpreted separately.
 ### Initialization
 
 The default `partition_init = "similarity"` clusters features by similarity
-and initializes one ordering per feature group. The fast
+and initializes one ordering per feature group. A length-one `method` is
+applied independently to every group. The default `method = "PCA"` therefore
+uses each group's own PC1; `method = "isomap"` or `method = "fiedler"` applies
+that same method separately to every group. The fast
 `similarity_metric = "spline_r2"` option orders the samples by each predictor
 feature, fits the other features with a natural cubic spline of fixed degrees
 of freedom, and uses the proportion of response variance explained as a

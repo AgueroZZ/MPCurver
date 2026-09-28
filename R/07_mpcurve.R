@@ -2965,7 +2965,10 @@ do_mpcurve <- function(object,
 #'   single-ordering case, multiple methods are all attempted only when
 #'   \code{num_cores > 1}; otherwise only \code{method[[1]]} is fitted. For
 #'   partition fits, \code{length(method)} must be either 1 or
-#'   \code{intrinsic_dim}.
+#'   \code{intrinsic_dim}. With \code{partition_init = "similarity"}, a
+#'   length-one method is applied independently within every selected feature
+#'   block. The default is PCA using that block's own first principal
+#'   component.
 #' @param K Integer number of mixture components (grid knots).
 #' @param rw_q Integer random-walk order for the GMRF prior.
 #' @param lambda Positive initial smoothness value(s). A single-ordering fit
@@ -3007,7 +3010,8 @@ do_mpcurve <- function(object,
 #' @param partition_init For partition fits only: either
 #'   \code{"similarity"} for feature-similarity-driven block initialization or
 #'   \code{"ordering_methods"} for method-based initial orderings. The
-#'   default is \code{"similarity"}.
+#'   default is \code{"similarity"}; it applies the selected ordering method
+#'   separately to each feature block.
 #' @param discretization Optional discretization method passed to ordering-based
 #'   initialization. For partition fits, MPCurver enforces a common \code{K}
 #'   across orderings; if quantile cuts collapse, it falls back to equal-width

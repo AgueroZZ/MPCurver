@@ -74,6 +74,10 @@ test_that("fit_mpcurve supports fixed structural M=2 and M=3", {
   expect_equal(fit3$params$sigma2, fit3$fit$params$sigma2)
   expect_equal(length(fit2$fits), 2L)
   expect_equal(length(fit3$fits), 3L)
+  expect_equal(
+    unname(vapply(fit3$fit$init_info, `[[`, integer(1), "pca_component")),
+    1:3
+  )
 })
 
 test_that("partition lambda and sigma initialization are shared and explicit", {

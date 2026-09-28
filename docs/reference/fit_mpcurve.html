@@ -17,7 +17,7 @@ uncertainty in both sample positions and feature trajectories."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -137,7 +137,10 @@ variational inference, the supported fitting method.</p></dd>
 single-ordering case, multiple methods are all attempted only when
 <code>num_cores &gt; 1</code>; otherwise only <code>method[[1]]</code> is fitted. For
 partition fits, <code>length(method)</code> must be either 1 or
-<code>intrinsic_dim</code>.</p></dd>
+<code>intrinsic_dim</code>. With <code>partition_init = "similarity"</code>, a
+length-one method is applied independently within every selected feature
+block. The default is PCA using that block's own first principal
+component.</p></dd>
 
 
 <dt id="arg-k">K<a class="anchor" aria-label="anchor" href="#arg-k"></a></dt>
@@ -206,7 +209,8 @@ are unsupported.</p></dd>
 <dd><p>For partition fits only: either
 <code>"similarity"</code> for feature-similarity-driven block initialization or
 <code>"ordering_methods"</code> for method-based initial orderings. The
-default is <code>"similarity"</code>.</p></dd>
+default is <code>"similarity"</code>; it applies the selected ordering method
+separately to each feature block.</p></dd>
 
 
 <dt id="arg-discretization">discretization<a class="anchor" aria-label="anchor" href="#arg-discretization"></a></dt>

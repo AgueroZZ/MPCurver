@@ -135,6 +135,33 @@ test_that("soft_partition_cavi supports similarity-based initialization metadata
     unname(vapply(res$init_info, `[[`, character(1), "method_requested")),
     c("PCA", "random", "PCA")
   )
+  expect_equal(
+    unname(vapply(res$init_info, `[[`, integer(1), "pca_component_requested")),
+    c(1L, NA_integer_, 1L)
+  )
+  expect_equal(
+    unname(res$similarity_init$pca_components),
+    c(1L, NA_integer_, 1L)
+  )
+})
+
+test_that("similarity initialization applies one method independently to every block", {
+  resolve_methods <- ns_fn(".cavi_resolve_similarity_methods")
+
+  default_pca <- resolve_methods(methods = NULL, pca_components = NULL, M = 4L)
+  expect_identical(unname(default_pca$methods), rep("PCA", 4L))
+  expect_identical(default_pca$pca_components, rep(1L, 4L))
+
+  isomap <- resolve_methods(methods = "isomap", pca_components = NULL, M = 3L)
+  expect_identical(unname(isomap$methods), rep("isomap", 3L))
+  expect_true(all(is.na(isomap$pca_components)))
+
+  explicit_components <- resolve_methods(
+    methods = "PCA",
+    pca_components = 1:3,
+    M = 3L
+  )
+  expect_identical(explicit_components$pca_components, 1:3)
 })
 
 test_that("soft_partition_cavi stores smooth-fit similarity diagnostics", {

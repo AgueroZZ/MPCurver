@@ -45,6 +45,13 @@
   out
 }
 
+.cavi_default_subset_pca_components <- function(methods) {
+  methods <- as.character(methods)
+  out <- rep(NA_integer_, length(methods))
+  out[methods == "PCA"] <- 1L
+  out
+}
+
 .cavi_validate_cluster_linkage <- function(cluster_linkage = "single") {
   valid <- c("ward.D", "ward.D2", "single", "complete",
              "average", "mcquitty", "median", "centroid")
@@ -987,7 +994,10 @@
   }
 
   if (is.null(pca_components)) {
-    pca_components <- .cavi_default_pca_components(methods)
+    # Similarity initialization fits each ordering on a different feature
+    # subset. A repeated PCA method therefore means PC1 within every subset,
+    # rather than successive PCs across otherwise unrelated feature blocks.
+    pca_components <- .cavi_default_subset_pca_components(methods)
   } else {
     pca_components <- as.integer(pca_components)
     if (length(pca_components) == 1L) {
@@ -3508,9 +3518,14 @@ init_two_trajectories_cavi <- function(X,
 #' @param X Numeric matrix (\code{n x d}).
 #' @param M Integer >= 2. Number of orderings.
 #' @param methods Character vector of length M. Each element is an ordering
-#'   method (e.g., \code{"PCA"}, \code{"fiedler"}, \code{"random"}).
+#'   method (e.g., \code{"PCA"}, \code{"fiedler"}, \code{"random"}). With
+#'   similarity initialization, a length-one method is applied independently
+#'   to every selected feature block.
 #' @param pca_components Integer vector of length M. For PCA-based methods,
-#'   which PC component to use. Ignored for non-PCA methods.
+#'   which PC component to use. Similarity initialization defaults to PC1
+#'   within every feature block. Method-based initialization on the full data
+#'   instead uses successive PCs for repeated PCA methods. Ignored for
+#'   non-PCA methods.
 #' @param partition_init Either \code{"similarity"} for feature-similarity
 #'   clustering followed by block-specific ordering initialization or
 #'   \code{"ordering_methods"} for the existing per-ordering warm starts. The
