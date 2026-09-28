@@ -59,3 +59,12 @@ frozen release archive and is recorded in the InferOrder repository.
 The release was prepared with R 4.3.3, testthat 3.3.2, roxygen2 8.1.0,
 rmarkdown 2.26, and knitr 1.52. Publication verification is appended after the
 authorized push.
+
+## Publication verification
+
+The release commit is `c905901424e43eab78b58bdcc0d1de367ec8fd73` on
+`origin/main`. GitHub Pages deployment
+[36487823465](https://github.com/AgueroZZ/MPCurver/actions/runs/36487823465)
+completed successfully for that exact commit. The live `fit_mpcurve()`
+reference page exposes `intrinsic_dim = "auto"`, `spline_r2_df = 5`, and
+`similarity_min_cluster_size = 2`.
