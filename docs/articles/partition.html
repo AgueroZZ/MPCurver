@@ -21,7 +21,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -300,14 +300,16 @@ objective history.</p>
 <div class="section level3">
 <h3 id="number-of-orderings">Number of orderings<a class="anchor" aria-label="anchor" href="#number-of-orderings"></a>
 </h3>
-<p><code>intrinsic_dim</code> determines the number of orderings fitted
-and stays fixed during fitting. The returned
-<code>effective_intrinsic_dim</code> records the number of orderings
-supported by the selected feature-assignment prior. With a fixed prior
-it equals the fitted <code>intrinsic_dim</code>. With the default
-adaptive empirical-Bayes prior, it counts fitted assignment-prior
-weights exceeding <code>effective_weight_tol</code> (default
-<code>1e-12</code>). The raw weights remain available through
+<p>Set <code>intrinsic_dim</code> to an integer to fit that number of
+orderings. Alternatively, <code>intrinsic_dim = "auto"</code> uses the
+feature-similarity tree to choose an initialization dimension before
+fitting. In either case the fitted model keeps that dimension fixed. The
+returned <code>effective_intrinsic_dim</code> records the number of
+orderings supported by the selected feature-assignment prior. With a
+fixed prior it equals the fitted <code>intrinsic_dim</code>. With the
+default adaptive empirical-Bayes prior, it counts fitted
+assignment-prior weights exceeding <code>effective_weight_tol</code>
+(default <code>1e-12</code>). The raw weights remain available through
 <code>fitted_prior(fit_partition, type = "partition")$omega</code>.</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_partition</span><span class="op">$</span><span class="va">effective_intrinsic_dim</span></span>
@@ -319,6 +321,43 @@ weights exceeding <code>effective_weight_tol</code> (default
 distribution over <span class="math inline">M</span>. The fitted model
 still contains all <code>intrinsic_dim</code> orderings. A smaller
 effective count does not remove or refit any trajectory.</p>
+<p>Automatic initialization evaluates hierarchical-clustering cuts up to
+<code>max_intrinsic_dim</code> and selects the eligible cut with the
+largest mean silhouette. A cut is eligible only when every cluster
+contains at least <code>similarity_min_cluster_size</code> features. The
+default minimum of two rules out a singleton feature as the sole
+evidence for an ordering: ordering that feature by its own values would
+otherwise produce a tautologically smooth trajectory.</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fit_auto</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
+<span>  <span class="va">X</span>,</span>
+<span>  intrinsic_dim <span class="op">=</span> <span class="st">"auto"</span>,</span>
+<span>  max_intrinsic_dim <span class="op">=</span> <span class="fl">8</span>,</span>
+<span>  similarity_metric <span class="op">=</span> <span class="st">"spline_r2"</span>,</span>
+<span>  spline_r2_df <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  similarity_min_cluster_size <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  partition_prior <span class="op">=</span> <span class="st">"adaptive"</span>,</span>
+<span>  K <span class="op">=</span> <span class="fl">50</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">fit_auto</span><span class="op">$</span><span class="va">intrinsic_dim</span></span>
+<span><span class="va">fit_auto</span><span class="op">$</span><span class="va">effective_intrinsic_dim</span></span></code></pre></div>
+<p>If no multi-ordering cut satisfies the minimum size, the automatic
+procedure fits one ordering. For an eligible cut with cluster sizes
+<span class="math inline">d_1,\ldots,d_M</span>, an adaptive fit
+initializes the global ordering probabilities as <span class="math inline">\omega_m=d_m/D</span>, where <span class="math inline">D</span> is the number of features. Every feature
+starts from this same probability vector; the tree cut does not impose
+hard feature assignments, and subsequent empirical-Bayes updates may
+reduce the effective number of orderings.</p>
+<p>The minimum-size requirement addresses initialization
+identifiability, not garbage-feature classification. A singleton branch
+can represent noise, a weakly measured member of a supported ordering,
+model mismatch, or a feature that does not follow any ordering. MPCurver
+does not currently distinguish these cases with a separate background
+component. The requirement applies to automatic dimension
+initialization; a numeric <code>intrinsic_dim</code> continues to
+request that exact fitted dimension.</p>
 <p>For a fixed <strong>uniform</strong> feature-assignment prior, use a
 separate greedy selector to compare final soft <span class="math inline">T=1</span> objectives across adjacent values of
 <span class="math inline">M</span>. If an extra ordering receives no
@@ -328,7 +367,7 @@ smaller model, where <span class="math inline">D</span> is the number of
 features. The selector fits both similarity and ordering-method
 initializations at each candidate <span class="math inline">M</span> and
 records the scores and convergence diagnostics used in its decision.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">selected</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/select_mpcurve_dimension.html">select_mpcurve_dimension</a></span><span class="op">(</span></span>
 <span>  <span class="va">X</span>,</span>
 <span>  max_intrinsic_dim <span class="op">=</span> <span class="fl">4</span>,</span>
@@ -353,9 +392,16 @@ interpreted separately.</p>
 </h3>
 <p>The default <code>partition_init = "similarity"</code> clusters
 features by similarity and initializes one ordering per feature group.
-Alternatively, <code>partition_init = "ordering_methods"</code> uses the
-specified ordering methods:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+The fast <code>similarity_metric = "spline_r2"</code> option orders the
+samples by each predictor feature, fits the other features with a
+natural cubic spline of fixed degrees of freedom, and uses the
+proportion of response variance explained as a directional similarity.
+The two directions are combined into a symmetric score.
+<code>spline_r2_df</code> controls the spline degrees of freedom and
+defaults to 5. Alternatively,
+<code>partition_init = "ordering_methods"</code> uses the specified
+ordering methods:</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit3</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
 <span>  <span class="va">X</span>,</span>
 <span>  intrinsic_dim <span class="op">=</span> <span class="fl">3</span>,</span>

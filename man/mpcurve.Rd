@@ -85,6 +85,10 @@ adaptive prior, using \code{effective_weight_tol}; it equals the fitted
 \code{M} for a fixed prior. This count does not remove fitted orderings.
 Fits returned by \code{\link{select_mpcurve_dimension}} also include
 \code{$dimension_selection} with candidate scores and greedy decisions.
+Fits requested with \code{fit_mpcurve(intrinsic_dim = "auto")} also include
+\code{$dimension_initialization} with candidate silhouettes, cut
+eligibility, selected clusters, similarity diagnostics, and the ordering
+probabilities used to initialize the fit.
 }
 
 \keyword{models}

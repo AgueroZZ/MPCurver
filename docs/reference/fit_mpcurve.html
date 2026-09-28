@@ -17,7 +17,7 @@ uncertainty in both sample positions and feature trajectories."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -94,7 +94,7 @@ uncertainty in both sample positions and feature trajectories.</p>
 <span>  effective_weight_tol <span class="op">=</span> <span class="fl">1e-12</span>,</span>
 <span>  assignment_prior <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  ordering_alpha <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  similarity_metric <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"spearman"</span>, <span class="st">"pearson"</span>, <span class="st">"smooth_fit"</span><span class="op">)</span>,</span>
+<span>  similarity_metric <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"spearman"</span>, <span class="st">"pearson"</span>, <span class="st">"smooth_fit"</span>, <span class="st">"spline_r2"</span><span class="op">)</span>,</span>
 <span>  smooth_fit_lambda_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"optimize"</span>, <span class="st">"fixed"</span><span class="op">)</span>,</span>
 <span>  smooth_fit_lambda_value <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  cluster_linkage <span class="op">=</span> <span class="st">"single"</span>,</span>
@@ -112,6 +112,9 @@ uncertainty in both sample positions and feature trajectories.</p>
 <span>  drop_unused_ordering <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  convergence <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"normalized"</span>, <span class="st">"relative"</span><span class="op">)</span>,</span>
+<span>  max_intrinsic_dim <span class="op">=</span> <span class="fl">8L</span>,</span>
+<span>  spline_r2_df <span class="op">=</span> <span class="fl">5L</span>,</span>
+<span>  similarity_min_cluster_size <span class="op">=</span> <span class="fl">2L</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -187,8 +190,10 @@ single-ordering runs.</p></dd>
 
 <dt id="arg-intrinsic-dim">intrinsic_dim<a class="anchor" aria-label="anchor" href="#arg-intrinsic-dim"></a></dt>
 <dd><p>Integer intrinsic dimensionality of the latent ordering
-system. <code>intrinsic_dim = 1</code> fits the standard single-ordering model.
-Values <code>&gt;= 2</code> fit the fixed-\(M\) structural partition model.</p></dd>
+system, or <code>"auto"</code>. <code>intrinsic_dim = 1</code> fits the standard
+single-ordering model. Values <code>&gt;= 2</code> fit the fixed-\(M\) structural
+partition model. <code>"auto"</code> cuts the feature-similarity tree at the
+eligible dimension with the largest mean silhouette before fitting.</p></dd>
 
 
 <dt id="arg-greedy">greedy<a class="anchor" aria-label="anchor" href="#arg-greedy"></a></dt>
@@ -288,11 +293,14 @@ uniform prior; <code>"dirichlet"</code> specifies a Dirichlet prior using
 <dt id="arg-similarity-metric">similarity_metric<a class="anchor" aria-label="anchor" href="#arg-similarity-metric"></a></dt>
 <dd><p>For <code>partition_init = "similarity"</code> only:
 feature-similarity metric used to construct feature blocks. One of
-<code>"spearman"</code>, <code>"pearson"</code>, or <code>"smooth_fit"</code>. The
+<code>"spearman"</code>, <code>"pearson"</code>, <code>"smooth_fit"</code>, or
+<code>"spline_r2"</code>. The
 <code>"smooth_fit"</code> metric scores how well features follow each other's
 orderings under a random-walk smoother. With <code>ridge = 0</code>, this score
 uses the rank and generalized determinant of the intrinsic precision.
-With positive <code>ridge</code>, it uses a proper Gaussian prior.</p></dd>
+With positive <code>ridge</code>, it uses a proper Gaussian prior. When
+<code>intrinsic_dim = "auto"</code> and this argument is omitted,
+<code>"spline_r2"</code> is used.</p></dd>
 
 
 <dt id="arg-smooth-fit-lambda-mode">smooth_fit_lambda_mode<a class="anchor" aria-label="anchor" href="#arg-smooth-fit-lambda-mode"></a></dt>
@@ -371,6 +379,27 @@ the pre-0.3.2 defaults, use <code>convergence = "relative"</code>,
 scale. A small increment does not bound the remaining optimization gap.</p></dd>
 
 
+<dt id="arg-max-intrinsic-dim">max_intrinsic_dim<a class="anchor" aria-label="anchor" href="#arg-max-intrinsic-dim"></a></dt>
+<dd><p>For <code>intrinsic_dim = "auto"</code>, the largest
+candidate number of orderings. Candidates also cannot exceed one less
+than the number of features because silhouette is undefined for an
+all-singleton cut.</p></dd>
+
+
+<dt id="arg-spline-r-df">spline_r2_df<a class="anchor" aria-label="anchor" href="#arg-spline-r-df"></a></dt>
+<dd><p>For <code>similarity_metric = "spline_r2"</code>, fixed
+degrees of freedom for the natural cubic spline used to calculate
+directional variance explained. Defaults to 5.</p></dd>
+
+
+<dt id="arg-similarity-min-cluster-size">similarity_min_cluster_size<a class="anchor" aria-label="anchor" href="#arg-similarity-min-cluster-size"></a></dt>
+<dd><p>For <code>intrinsic_dim = "auto"</code>, the
+minimum number of features allowed in every selected cluster. The default
+of 2 prevents a single feature from serving as the sole evidence for an
+initialized ordering. If no multi-ordering cut is eligible, one ordering
+is fitted.</p></dd>
+
+
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Additional variational fitting options, including initialization
 controls such as <code>responsibilities_init</code>, <code>fits_init</code>,
@@ -394,8 +423,12 @@ controls such as <code>responsibilities_init</code>, <code>fits_init</code>,
   <code>$partition$pi_weights</code>. Every fit has
   <code>$effective_intrinsic_dim</code>; adaptive partition fits calculate it
   from the fitted ordering prior using <code>effective_weight_tol</code>, while
-  other fits set it to the fitted <code>M</code>. See <code><a href="mpcurve.html">mpcurve</a></code> for the complete
-  object description.</p>
+  other fits set it to the fitted <code>M</code>. Fits requested with
+  <code>intrinsic_dim = "auto"</code> also store
+  <code>$dimension_initialization</code>, including candidate silhouettes,
+  eligibility, selected clusters, similarity diagnostics, and the initial
+  ordering probabilities. See <code><a href="mpcurve.html">mpcurve</a></code> for the complete object
+  description.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>

@@ -645,12 +645,92 @@
   )
 }
 
+.compute_same_ordering_similarity_spline_r2 <- function(X,
+                                                        spline_r2_df = 5L,
+                                                        min_feature_sd = 1e-8) {
+  X <- as.matrix(X)
+  n <- nrow(X)
+  d <- ncol(X)
+  spline_r2_df_raw <- spline_r2_df
+  spline_r2_df <- as.integer(spline_r2_df)
+  min_feature_sd <- as.numeric(min_feature_sd)[1]
+  if (length(spline_r2_df_raw) != 1L || !is.finite(spline_r2_df_raw) ||
+      is.na(spline_r2_df) || spline_r2_df_raw != spline_r2_df ||
+      spline_r2_df < 1L || spline_r2_df > n - 2L) {
+    stop("spline_r2_df must be a single integer between 1 and nrow(X) - 2.",
+         call. = FALSE)
+  }
+  if (!is.finite(min_feature_sd) || min_feature_sd < 0) {
+    stop("min_feature_sd must be a single finite nonnegative number.",
+         call. = FALSE)
+  }
+
+  feature_names <- colnames(X) %||% paste0("V", seq_len(d))
+  feature_sd <- apply(X, 2L, stats::sd)
+  low_variance <- !is.finite(feature_sd) | feature_sd < min_feature_sd
+  rank_position <- (seq_len(n) - 0.5) / n
+  spline_basis <- cbind(
+    "(Intercept)" = 1,
+    splines::ns(rank_position, df = spline_r2_df, intercept = FALSE)
+  )
+  basis_qr <- qr(spline_basis)
+  if (basis_qr$rank != ncol(spline_basis)) {
+    stop("The fixed-df spline basis is rank deficient.", call. = FALSE)
+  }
+  Q <- qr.Q(basis_qr)
+  centered_X <- sweep(X, 2L, colMeans(X), FUN = "-")
+  total_sum_squares <- colSums(centered_X^2)
+  valid_response <- !low_variance &
+    total_sum_squares > sqrt(.Machine$double.eps)
+  directional_r2 <- matrix(
+    0, nrow = d, ncol = d,
+    dimnames = list(feature_names, feature_names)
+  )
+
+  for (predictor in seq_len(d)) {
+    if (low_variance[predictor]) next
+    ordered_X <- X[order(X[, predictor], method = "radix"), , drop = FALSE]
+    projected_coordinates <- crossprod(Q, ordered_X)
+    residual_sum_squares <- pmax(
+      colSums(ordered_X^2) - colSums(projected_coordinates^2), 0
+    )
+    directional_r2[predictor, valid_response] <-
+      1 - residual_sum_squares[valid_response] /
+        total_sum_squares[valid_response]
+  }
+  directional_r2 <- pmin(pmax(directional_r2, 0), 1)
+  similarity <- pmax(directional_r2, t(directional_r2))
+  if (any(low_variance)) {
+    similarity[low_variance, ] <- 0
+    similarity[, low_variance] <- 0
+  }
+  diag(similarity) <- 1
+  dimnames(similarity) <- list(feature_names, feature_names)
+  distance <- 1 - similarity
+  dimnames(distance) <- dimnames(similarity)
+
+  list(
+    S = similarity,
+    distance = distance,
+    metric = "spline_r2",
+    feature_info = data.frame(
+      feature = feature_names,
+      sd = as.numeric(feature_sd),
+      low_variance = low_variance,
+      stringsAsFactors = FALSE
+    ),
+    directional_r2 = directional_r2,
+    spline_r2_df = spline_r2_df
+  )
+}
+
 .compute_same_ordering_similarity <- function(X,
                                               S = NULL,
-                                              metric = c("spearman", "pearson", "smooth_fit"),
+                                              metric = c("spearman", "pearson", "smooth_fit", "spline_r2"),
                                               use = "pairwise.complete.obs",
                                               abs_value = TRUE,
                                               min_feature_sd = 1e-8,
+                                              spline_r2_df = 5L,
                                               K = NULL,
                                               rw_q = 2L,
                                               ridge = 0,
@@ -669,6 +749,14 @@
       metric = metric,
       use = use,
       abs_value = abs_value,
+      min_feature_sd = min_feature_sd
+    ))
+  }
+
+  if (identical(metric, "spline_r2")) {
+    return(.compute_same_ordering_similarity_spline_r2(
+      X = X,
+      spline_r2_df = spline_r2_df,
       min_feature_sd = min_feature_sd
     ))
   }
@@ -708,6 +796,176 @@
     cluster_order = cluster_order,
     cluster_members = cluster_members,
     cluster_sizes = vapply(cluster_members, length, integer(1))
+  )
+}
+
+.cavi_validate_positive_integer <- function(x, name) {
+  x_raw <- x
+  x <- suppressWarnings(as.integer(x))
+  if (!is.numeric(x_raw) || length(x_raw) != 1L || !is.finite(x_raw) ||
+      is.na(x) || x_raw != x || x < 1L) {
+    stop(name, " must be a single positive integer.", call. = FALSE)
+  }
+  x
+}
+
+.cavi_validate_similarity_distance <- function(distance) {
+  distance <- as.matrix(distance)
+  if (!is.numeric(distance) || length(dim(distance)) != 2L ||
+      nrow(distance) != ncol(distance) || nrow(distance) < 1L) {
+    stop("distance must be a nonempty square numeric matrix.", call. = FALSE)
+  }
+  if (any(!is.finite(distance))) {
+    stop("distance must contain only finite values.", call. = FALSE)
+  }
+  tolerance <- 1e-10
+  if (any(distance < -tolerance) ||
+      max(abs(distance - t(distance))) > tolerance ||
+      max(abs(diag(distance))) > tolerance) {
+    stop(
+      "distance must be symmetric, nonnegative, and have a zero diagonal.",
+      call. = FALSE
+    )
+  }
+  distance <- pmax(distance, 0)
+  diag(distance) <- 0
+  distance
+}
+
+.cavi_mean_silhouette <- function(distance, cluster_assign) {
+  distance <- .cavi_validate_similarity_distance(distance)
+  cluster_assign <- as.integer(cluster_assign)
+  d <- nrow(distance)
+  if (length(cluster_assign) != d || anyNA(cluster_assign)) {
+    stop("cluster_assign must contain one finite cluster label per feature.",
+         call. = FALSE)
+  }
+  cluster_ids <- sort(unique(cluster_assign))
+  if (length(cluster_ids) < 2L) {
+    return(NA_real_)
+  }
+
+  silhouette <- numeric(d)
+  for (j in seq_len(d)) {
+    own_members <- which(cluster_assign == cluster_assign[j])
+    if (length(own_members) == 1L) {
+      silhouette[j] <- 0
+      next
+    }
+    within_distance <- mean(distance[j, own_members[own_members != j]])
+    other_clusters <- cluster_ids[cluster_ids != cluster_assign[j]]
+    between_distance <- min(vapply(
+      other_clusters,
+      function(cluster_id) {
+        mean(distance[j, cluster_assign == cluster_id])
+      },
+      numeric(1)
+    ))
+    denominator <- max(within_distance, between_distance)
+    silhouette[j] <- if (denominator > 0) {
+      (between_distance - within_distance) / denominator
+    } else {
+      0
+    }
+  }
+  mean(silhouette)
+}
+
+.cavi_select_similarity_dimension <- function(
+    distance,
+    cluster_linkage = "single",
+    max_intrinsic_dim = 8L,
+    min_cluster_size = 2L) {
+  distance <- .cavi_validate_similarity_distance(distance)
+  cluster_linkage <- .cavi_validate_cluster_linkage(cluster_linkage)
+  max_intrinsic_dim <- .cavi_validate_positive_integer(
+    max_intrinsic_dim, "max_intrinsic_dim"
+  )
+  min_cluster_size <- .cavi_validate_positive_integer(
+    min_cluster_size, "min_cluster_size"
+  )
+  d <- nrow(distance)
+  feature_names <- rownames(distance) %||% paste0("V", seq_len(d))
+  candidate_max <- min(max_intrinsic_dim, d - 1L)
+  candidate_M <- if (candidate_max >= 2L) {
+    seq.int(2L, candidate_max)
+  } else {
+    integer(0)
+  }
+  hc <- if (d >= 2L) {
+    stats::hclust(stats::as.dist(distance), method = cluster_linkage)
+  } else {
+    NULL
+  }
+
+  cluster_assignments <- vector("list", length(candidate_M))
+  cluster_sizes <- vector("list", length(candidate_M))
+  mean_silhouette <- rep(NA_real_, length(candidate_M))
+  minimum_cluster_size <- rep(NA_integer_, length(candidate_M))
+  maximum_cluster_size <- rep(NA_integer_, length(candidate_M))
+  feasible <- rep(FALSE, length(candidate_M))
+
+  for (idx in seq_along(candidate_M)) {
+    raw_cluster <- stats::cutree(hc, k = candidate_M[idx])
+    cluster_info <- .cavi_canonicalize_feature_clusters(raw_cluster)
+    cluster_assignments[[idx]] <- cluster_info$feature_cluster
+    cluster_sizes[[idx]] <- cluster_info$cluster_sizes
+    mean_silhouette[idx] <- .cavi_mean_silhouette(
+      distance, cluster_info$feature_cluster
+    )
+    minimum_cluster_size[idx] <- min(cluster_info$cluster_sizes)
+    maximum_cluster_size[idx] <- max(cluster_info$cluster_sizes)
+    feasible[idx] <- minimum_cluster_size[idx] >= min_cluster_size
+  }
+
+  diagnostics <- data.frame(
+    M = candidate_M,
+    mean_silhouette = mean_silhouette,
+    minimum_cluster_size = minimum_cluster_size,
+    maximum_cluster_size = maximum_cluster_size,
+    feasible = feasible,
+    stringsAsFactors = FALSE
+  )
+  diagnostics$cluster_sizes <- I(cluster_sizes)
+
+  eligible_idx <- which(feasible & is.finite(mean_silhouette))
+  if (length(eligible_idx)) {
+    best_idx <- eligible_idx[which.max(mean_silhouette[eligible_idx])]
+    selected_M <- candidate_M[best_idx]
+    selected_cluster <- cluster_assignments[[best_idx]]
+    selected_sizes <- cluster_sizes[[best_idx]]
+    fallback_reason <- NULL
+  } else {
+    selected_M <- 1L
+    selected_cluster <- rep(1L, d)
+    selected_sizes <- stats::setNames(d, "ordering_1")
+    fallback_reason <- paste0(
+      "No cut with M >= 2 had every cluster size at least ",
+      min_cluster_size, "; used one ordering."
+    )
+  }
+
+  selected_info <- .cavi_canonicalize_feature_clusters(selected_cluster)
+  selected_cluster <- selected_info$feature_cluster
+  selected_sizes <- selected_info$cluster_sizes
+  ordering_labels <- .cavi_partition_order_labels(selected_M)
+  names(selected_sizes) <- ordering_labels
+  names(selected_cluster) <- feature_names
+  cluster_proportions <- selected_sizes / d
+
+  list(
+    selected_M = as.integer(selected_M),
+    feature_cluster = selected_cluster,
+    cluster_sizes = selected_sizes,
+    cluster_proportions = cluster_proportions,
+    criterion = "maximum_mean_silhouette_among_feasible_cuts",
+    fallback_reason = fallback_reason,
+    max_intrinsic_dim = as.integer(candidate_max),
+    requested_max_intrinsic_dim = max_intrinsic_dim,
+    min_cluster_size = min_cluster_size,
+    cluster_linkage = cluster_linkage,
+    diagnostics = diagnostics,
+    hclust = hc
   )
 }
 
@@ -926,9 +1184,11 @@
                                                  sigma_max = 1e10,
                                                  discretization = c("quantile", "equal", "kmeans"),
                                                  num_iter = 0L,
-                                                 similarity_metric = c("spearman", "pearson", "smooth_fit"),
+                                                 similarity_metric = c("spearman", "pearson", "smooth_fit", "spline_r2"),
                                                  cluster_linkage = "single",
                                                  similarity_min_feature_sd = 1e-8,
+                                                 spline_r2_df = 5L,
+                                                 similarity_precomputed = NULL,
                                                  verbose = FALSE) {
   X <- as.matrix(X)
   M <- as.integer(M)
@@ -960,23 +1220,46 @@
     M = M
   )
 
-  similarity <- .compute_same_ordering_similarity(
-    X = X,
-    S = S,
-    metric = similarity_metric,
-    min_feature_sd = similarity_min_feature_sd,
-    K = K_use,
-    rw_q = rw_q,
-    ridge = ridge,
-    lambda_sd_prior_rate = lambda_sd_prior_rate,
-    smooth_fit_lambda_mode = smooth_fit_lambda_mode,
-    smooth_fit_lambda_value = smooth_fit_lambda_value,
-    lambda_min = lambda_min,
-    lambda_max = lambda_max,
-    sigma_min = sigma_min,
-    sigma_max = sigma_max,
-    discretization = discretization
-  )
+  if (is.null(similarity_precomputed)) {
+    similarity <- .compute_same_ordering_similarity(
+      X = X,
+      S = S,
+      metric = similarity_metric,
+      min_feature_sd = similarity_min_feature_sd,
+      spline_r2_df = spline_r2_df,
+      K = K_use,
+      rw_q = rw_q,
+      ridge = ridge,
+      lambda_sd_prior_rate = lambda_sd_prior_rate,
+      smooth_fit_lambda_mode = smooth_fit_lambda_mode,
+      smooth_fit_lambda_value = smooth_fit_lambda_value,
+      lambda_min = lambda_min,
+      lambda_max = lambda_max,
+      sigma_min = sigma_min,
+      sigma_max = sigma_max,
+      discretization = discretization
+    )
+  } else {
+    similarity <- similarity_precomputed
+    if (!is.list(similarity) || is.null(similarity$S) ||
+        is.null(similarity$distance) ||
+        !identical(as.character(similarity$metric)[1], similarity_metric)) {
+      stop(
+        "similarity_precomputed must contain S and distance for similarity_metric.",
+        call. = FALSE
+      )
+    }
+    similarity$distance <- .cavi_validate_similarity_distance(
+      similarity$distance
+    )
+    similarity$S <- as.matrix(similarity$S)
+    if (!all(dim(similarity$S) == c(d, d)) ||
+        !all(dim(similarity$distance) == c(d, d)) ||
+        any(!is.finite(similarity$S))) {
+      stop("similarity_precomputed matrices must be finite d x d matrices.",
+           call. = FALSE)
+    }
+  }
   hc <- stats::hclust(stats::as.dist(similarity$distance), method = cluster_linkage)
   raw_cluster <- stats::cutree(hc, k = M)
   cluster_info <- .cavi_canonicalize_feature_clusters(raw_cluster)
@@ -1057,6 +1340,9 @@
     similarity_metric = similarity_metric,
     cluster_linkage = cluster_linkage,
     similarity_min_feature_sd = as.numeric(similarity_min_feature_sd)[1],
+    spline_r2_df = if (identical(similarity_metric, "spline_r2")) {
+      similarity$spline_r2_df %||% as.integer(spline_r2_df)[1]
+    } else NULL,
     smooth_fit_lambda_mode = smooth_fit_lambda_mode,
     smooth_fit_lambda_value = as.numeric(smooth_fit_lambda_value)[1],
     S = similarity$S,
@@ -1069,6 +1355,7 @@
     init_methods = method_info$methods,
     pca_components = method_info$pca_components,
     hclust_order = hc$order,
+    directional_r2 = similarity$directional_r2 %||% NULL,
     directional_score = similarity$directional_score %||% NULL,
     directional_delta = similarity$directional_delta %||% NULL,
     directional_success = similarity$directional_success %||% NULL,
@@ -3230,7 +3517,7 @@ init_two_trajectories_cavi <- function(X,
 #'   default is \code{"similarity"}.
 #' @param similarity_metric For \code{partition_init = "similarity"} only:
 #'   feature-similarity metric used to construct the clustering. One of
-#'   \code{"spearman"}, \code{"pearson"}, or \code{"smooth_fit"}.
+#'   \code{"spearman"}, \code{"pearson"}, \code{"smooth_fit"}, or \code{"spline_r2"}.
 #'   \code{"smooth_fit"} can be used with \code{ridge = 0}, but for
 #'   \code{M > 1} this uses an intrinsic-RW pseudo-evidence rather than a
 #'   fully proper marginal likelihood; use a small positive \code{ridge} if
@@ -3242,6 +3529,9 @@ init_two_trajectories_cavi <- function(X,
 #'   only: fixed \code{lambda} value used when
 #'   \code{smooth_fit_lambda_mode = "fixed"}, and the starting value when
 #'   \code{smooth_fit_lambda_mode = "optimize"}.
+#' @param spline_r2_df For \code{similarity_metric = "spline_r2"} only:
+#'   fixed degrees of freedom for the natural cubic spline used to calculate
+#'   directional variance explained.
 #' @param cluster_linkage For \code{partition_init = "similarity"} only:
 #'   hierarchical-clustering linkage applied to \code{1 - S(X)}.
 #' @param similarity_min_feature_sd For \code{partition_init = "similarity"}
@@ -3294,9 +3584,11 @@ init_m_trajectories_cavi <- function(X,
                                      sigma_max = 1e10,
                                      discretization = c("quantile", "equal", "kmeans"),
                                      partition_init = c("similarity", "ordering_methods"),
-                                     similarity_metric = c("spearman", "pearson", "smooth_fit"),
+                                     similarity_metric = c("spearman", "pearson", "smooth_fit", "spline_r2"),
                                      cluster_linkage = "single",
                                      similarity_min_feature_sd = 1e-8,
+                                     spline_r2_df = 5L,
+                                     similarity_precomputed = NULL,
                                      num_iter = 5L,
                                      verbose = FALSE) {
   X <- as.matrix(X)
@@ -3329,6 +3621,8 @@ init_m_trajectories_cavi <- function(X,
       similarity_metric = similarity_metric,
       cluster_linkage = cluster_linkage,
       similarity_min_feature_sd = similarity_min_feature_sd,
+      spline_r2_df = spline_r2_df,
+      similarity_precomputed = similarity_precomputed,
       verbose = verbose
     ))
   }

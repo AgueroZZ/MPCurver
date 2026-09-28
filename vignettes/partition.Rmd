@@ -186,9 +186,11 @@ parameters at $T=1$, extending the objective history.
 
 ### Number of orderings
 
-`intrinsic_dim` determines the number of orderings fitted and stays fixed
-during fitting. The returned `effective_intrinsic_dim` records the number of
-orderings supported by the selected feature-assignment prior. With a fixed
+Set `intrinsic_dim` to an integer to fit that number of orderings. Alternatively,
+`intrinsic_dim = "auto"` uses the feature-similarity tree to choose an
+initialization dimension before fitting. In either case the fitted model keeps
+that dimension fixed. The returned `effective_intrinsic_dim` records the number
+of orderings supported by the selected feature-assignment prior. With a fixed
 prior it equals the fitted `intrinsic_dim`. With the default adaptive
 empirical-Bayes prior, it counts fitted assignment-prior weights exceeding
 `effective_weight_tol` (default `1e-12`). The raw weights remain available
@@ -202,6 +204,46 @@ fitted_prior(fit_partition, type = "partition")$omega
 This count is a numerical occupancy estimate, not a posterior distribution
 over $M$. The fitted model still contains all `intrinsic_dim` orderings. A
 smaller effective count does not remove or refit any trajectory.
+
+Automatic initialization evaluates hierarchical-clustering cuts up to
+`max_intrinsic_dim` and selects the eligible cut with the largest mean
+silhouette. A cut is eligible only when every cluster contains at least
+`similarity_min_cluster_size` features. The default minimum of two rules out a
+singleton feature as the sole evidence for an ordering: ordering that feature
+by its own values would otherwise produce a tautologically smooth trajectory.
+
+```{r automatic-dimension, eval=FALSE}
+fit_auto <- fit_mpcurve(
+  X,
+  intrinsic_dim = "auto",
+  max_intrinsic_dim = 8,
+  similarity_metric = "spline_r2",
+  spline_r2_df = 5,
+  similarity_min_cluster_size = 2,
+  partition_prior = "adaptive",
+  K = 50,
+  verbose = FALSE
+)
+
+fit_auto$intrinsic_dim
+fit_auto$effective_intrinsic_dim
+```
+
+If no multi-ordering cut satisfies the minimum size, the automatic procedure
+fits one ordering. For an eligible cut with cluster sizes
+$d_1,\ldots,d_M$, an adaptive fit initializes the global ordering
+probabilities as $\omega_m=d_m/D$, where $D$ is the number of features. Every
+feature starts from this same probability vector; the tree cut does not impose
+hard feature assignments, and subsequent empirical-Bayes updates may reduce
+the effective number of orderings.
+
+The minimum-size requirement addresses initialization identifiability, not
+garbage-feature classification. A singleton branch can represent noise, a
+weakly measured member of a supported ordering, model mismatch, or a feature
+that does not follow any ordering. MPCurver does not currently distinguish
+these cases with a separate background component. The requirement applies to
+automatic dimension initialization; a numeric `intrinsic_dim` continues to
+request that exact fitted dimension.
 
 For a fixed **uniform** feature-assignment prior, use a separate greedy
 selector to compare final soft $T=1$ objectives across adjacent values of
@@ -235,7 +277,13 @@ different estimators and should be interpreted separately.
 ### Initialization
 
 The default `partition_init = "similarity"` clusters features by similarity
-and initializes one ordering per feature group. Alternatively,
+and initializes one ordering per feature group. The fast
+`similarity_metric = "spline_r2"` option orders the samples by each predictor
+feature, fits the other features with a natural cubic spline of fixed degrees
+of freedom, and uses the proportion of response variance explained as a
+directional similarity. The two directions are combined into a symmetric
+score. `spline_r2_df` controls the spline degrees of freedom and defaults to
+5. Alternatively,
 `partition_init = "ordering_methods"` uses the specified ordering methods:
 
 ```{r fit-methods, eval=FALSE}

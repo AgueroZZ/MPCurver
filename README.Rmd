@@ -143,6 +143,31 @@ fit_multi$effective_intrinsic_dim
 plot(fit_multi, plot_type = "mu", dims = 1)
 ```
 
+When the number of orderings is unknown, `intrinsic_dim = "auto"` can choose
+an initialization dimension from the feature-similarity tree before fitting
+the adaptive model:
+
+``` r
+fit_auto <- fit_mpcurve(
+  X,
+  intrinsic_dim = "auto",
+  max_intrinsic_dim = 8,
+  similarity_min_cluster_size = 2,
+  K = 40
+)
+
+fit_auto$dimension_initialization$diagnostics
+fit_auto$effective_intrinsic_dim
+```
+
+Automatic initialization uses the fast spline-R-squared metric
+(`similarity_metric = "spline_r2"`) by default, with five spline degrees of
+freedom. It selects the eligible cut with the largest mean silhouette, where
+every cluster must contain at least `similarity_min_cluster_size` features
+(default 2). For adaptive fitting, the selected cluster-size proportions
+initialize the global ordering probabilities; subsequent empirical-Bayes
+updates can reduce the effective number of orderings.
+
 The assignment probabilities describe how strongly each feature supports
 each ordering. The trajectory plot shows the feature's fitted mean under
 each ordering, with the corresponding assignment probability in the panel

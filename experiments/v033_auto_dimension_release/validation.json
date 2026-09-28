@@ -1,0 +1,22 @@
+{
+  "package_version": "0.3.3",
+  "source_base_commit": "dd1a903c9c316717419b18bb2b5f325c3a4c9185",
+  "archive_sha256": "cb57e1f6e8d859b7ff9aeda17c97d538fae0686eb0ceb616f126023a26d645f9",
+  "test_blocks": 85,
+  "successful_expectations": 638,
+  "skipped_expectations": 4,
+  "failed_expectations": 0,
+  "check_errors": 0,
+  "check_warnings": 0,
+  "check_notes": 1,
+  "check_note": "Optional Suggests devtools and fields unavailable",
+  "site_pages": 27,
+  "site_local_targets": 903,
+  "site_search_entries": 138,
+  "site_errors": 0,
+  "pilot_datasets": 9,
+  "pilot_exact_initial_M": 9,
+  "pilot_exact_effective_M": 9,
+  "pilot_mean_ARI": 1.0,
+  "pilot_warnings": 0
+}

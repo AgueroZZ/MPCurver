@@ -21,7 +21,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -346,15 +346,15 @@ position.
 <span><span class="co">#&gt;   Model          : homoskedastic</span></span>
 <span><span class="co">#&gt;   Intrinsic dim  : 1</span></span>
 <span><span class="co">#&gt;   n / d / K      : 1000 / 2 / 60</span></span>
-<span><span class="co">#&gt;   Iterations     : 53</span></span>
+<span><span class="co">#&gt;   Iterations     : 54</span></span>
 <span><span class="co">#&gt;   Converged      : yes</span></span>
-<span><span class="co">#&gt;   ELBO (last)    : -4787.619215</span></span></code></pre></div>
+<span><span class="co">#&gt;   ELBO (last)    : -4793.168899</span></span></code></pre></div>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="co">#&gt; MPCurve Model Summary</span></span>
 <span><span class="co">#&gt; Algorithm : cavi  |  Model : homoskedastic  |  n=1000  d=2  K=60</span></span>
 <span><span class="co">#&gt; Position prior : adaptive</span></span>
-<span><span class="co">#&gt; Current pi range : [7.653e-12, 0.02495]</span></span>
+<span><span class="co">#&gt; Current pi range : [7.705e-14, 0.02498]</span></span>
 <span><span class="co">#&gt; Converged : yes</span></span>
 <span><span class="co">#&gt; Underlying fit summary</span></span>
 <span><span class="co">#&gt; &lt;summary.cavi&gt;</span></span>
@@ -363,16 +363,16 @@ position.
 <span><span class="co">#&gt;   noise model = estimated_feature_variance</span></span>
 <span><span class="co">#&gt;   init = fiedler, discretization = quantile, adaptive = variational</span></span>
 <span><span class="co">#&gt;   position prior = adaptive</span></span>
-<span><span class="co">#&gt;   iter = 53, converged = yes</span></span>
-<span><span class="co">#&gt;   last ELBO = -4787.6192 (delta last = 0.001955)</span></span>
-<span><span class="co">#&gt;   last logLik = -4474.9793 (delta last = -8.511e-06)</span></span>
-<span><span class="co">#&gt;   pi range = [7.653e-12, 0.02495]</span></span>
-<span><span class="co">#&gt;   sigma2 range = [0.1072, 0.1197]</span></span>
-<span><span class="co">#&gt;   lambda range = [0.7523, 2.968]</span></span>
+<span><span class="co">#&gt;   iter = 54, converged = yes</span></span>
+<span><span class="co">#&gt;   last ELBO = -4793.1689 (delta last = 0.001822)</span></span>
+<span><span class="co">#&gt;   last logLik = -4473.3999 (delta last = 0.007133)</span></span>
+<span><span class="co">#&gt;   pi range = [7.705e-14, 0.02498]</span></span>
+<span><span class="co">#&gt;   sigma2 range = [0.1072, 0.1193]</span></span>
+<span><span class="co">#&gt;   lambda range = [0.6632, 2.627]</span></span>
 <span><span class="co">#&gt;   relative change (last step):</span></span>
-<span><span class="co">#&gt;     ELBO: 4.08e-07</span></span>
-<span><span class="co">#&gt;     logLik: 1.9e-09</span></span>
-<span><span class="co">#&gt;     lambda_vec (L2 rel): 6.45e-05</span></span></code></pre></div>
+<span><span class="co">#&gt;     ELBO: 3.8e-07</span></span>
+<span><span class="co">#&gt;     logLik: 1.59e-06</span></span>
+<span><span class="co">#&gt;     lambda_vec (L2 rel): 6.93e-05</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="check-convergence-and-recovery">5 Check convergence and recovery<a class="anchor" aria-label="anchor" href="#check-convergence-and-recovery"></a>
@@ -384,7 +384,7 @@ fitting.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"ELBO monotone:"</span>, <span class="cn">TRUE</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; ELBO monotone: TRUE</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"ELBO range:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">elbo_trace</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; ELBO range: -7595.206 -4787.619</span></span></code></pre></div>
+<span><span class="co">#&gt; ELBO range: -7599.588 -4793.169</span></span></code></pre></div>
 <p>We can also compare the inferred ordering to the true latent
 parameter using the posterior-mean component index <span class="math display">
 \hat c_i = \sum_{k=1}^K k \, r_{ik}.
@@ -394,7 +394,7 @@ parameter using the posterior-mean component index <span class="math display">
 <span><span class="va">rho_t</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span><span class="va">pseudotime_hat</span>, <span class="va">t_true</span>, method <span class="op">=</span> <span class="st">"spearman"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Absolute Spearman correlation with true t:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">rho_t</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Absolute Spearman correlation with true t: 0.9998</span></span></code></pre></div>
+<span><span class="co">#&gt; Absolute Spearman correlation with true t: 0.9997</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="visualize-the-fitted-ordering">6 Visualize the fitted ordering<a class="anchor" aria-label="anchor" href="#visualize-the-fitted-ordering"></a>

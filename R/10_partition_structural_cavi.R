@@ -461,10 +461,14 @@
     pca_components,
     partition_init,
     similarity_metric,
+    spline_r2_df,
     smooth_fit_lambda_mode,
     smooth_fit_lambda_value,
     cluster_linkage,
     similarity_min_feature_sd,
+    similarity_min_cluster_size,
+    similarity_precomputed,
+    initial_partition_probabilities,
     K,
     discretization,
     rw_q,
@@ -503,6 +507,7 @@
       lambda_sd_prior_rate = lambda_sd_prior_rate,
       smooth_fit_lambda_mode = smooth_fit_lambda_mode,
       smooth_fit_lambda_value = smooth_fit_lambda_value,
+      spline_r2_df = spline_r2_df,
       lambda_min = lambda_min,
       lambda_max = lambda_max,
       sigma_min = sigma_min,
@@ -512,6 +517,7 @@
       similarity_metric = similarity_metric,
       cluster_linkage = cluster_linkage,
       similarity_min_feature_sd = similarity_min_feature_sd,
+      similarity_precomputed = similarity_precomputed,
       num_iter = 2L,
       verbose = verbose
     )
@@ -606,7 +612,27 @@
       ordering_label = labels[m]
     )
   }), labels)
-  weights <- matrix(1 / M, nrow = d, ncol = M, dimnames = list(colnames(X), labels))
+  if (is.null(initial_partition_probabilities)) {
+    initial_partition_probabilities <- rep(1 / M, M)
+  } else {
+    initial_partition_probabilities <- as.numeric(initial_partition_probabilities)
+    if (length(initial_partition_probabilities) != M ||
+        any(!is.finite(initial_partition_probabilities)) ||
+        any(initial_partition_probabilities < 0) ||
+        sum(initial_partition_probabilities) <= 0) {
+      stop(
+        "initial_partition_probabilities must be a nonnegative length-M vector with positive sum.",
+        call. = FALSE
+      )
+    }
+    initial_partition_probabilities <-
+      initial_partition_probabilities / sum(initial_partition_probabilities)
+  }
+  names(initial_partition_probabilities) <- labels
+  weights <- matrix(
+    rep(initial_partition_probabilities, each = d),
+    nrow = d, ncol = M, dimnames = list(colnames(X), labels)
+  )
   control <- list(
     variational_family = "structured",
     position_prior = position_ctl$position_prior,
@@ -625,10 +651,13 @@
     discretization = discretization,
     partition_init = partition_init,
     similarity_metric = similarity_metric,
+    spline_r2_df = as.integer(spline_r2_df)[1],
     smooth_fit_lambda_mode = smooth_fit_lambda_mode,
     smooth_fit_lambda_value = smooth_fit_lambda_value,
     cluster_linkage = cluster_linkage,
     similarity_min_feature_sd = similarity_min_feature_sd,
+    similarity_min_cluster_size = similarity_min_cluster_size,
+    initial_partition_probabilities = initial_partition_probabilities,
     noise_model = noise_info$noise_model
   )
   local_blocks <- .structural_partition_local_blocks(
@@ -773,6 +802,7 @@
       init_info = state$init_info,
       ordering_similarity = state$ordering_similarity,
       similarity_init = state$similarity_init,
+      dimension_initialization = state$dimension_initialization %||% NULL,
       converged = isTRUE(converged),
       convergence_info = list(
         tol_outer = state$control$tol_outer,
@@ -813,11 +843,15 @@
     init_methods = NULL,
     pca_components = NULL,
     partition_init = c("similarity", "ordering_methods"),
-    similarity_metric = c("spearman", "pearson", "smooth_fit"),
+    similarity_metric = c("spearman", "pearson", "smooth_fit", "spline_r2"),
+    spline_r2_df = 5L,
     smooth_fit_lambda_mode = c("optimize", "fixed"),
     smooth_fit_lambda_value = 1,
     cluster_linkage = "single",
     similarity_min_feature_sd = 1e-8,
+    similarity_min_cluster_size = 2L,
+    similarity_precomputed = NULL,
+    initial_partition_probabilities = NULL,
     K = NULL,
     discretization = c("quantile", "equal", "kmeans"),
     T_start = 5,
@@ -893,10 +927,14 @@
     pca_components = pca_components,
     partition_init = partition_init,
     similarity_metric = similarity_metric,
+    spline_r2_df = spline_r2_df,
     smooth_fit_lambda_mode = smooth_fit_lambda_mode,
     smooth_fit_lambda_value = smooth_fit_lambda_value,
     cluster_linkage = cluster_linkage,
     similarity_min_feature_sd = similarity_min_feature_sd,
+    similarity_min_cluster_size = similarity_min_cluster_size,
+    similarity_precomputed = similarity_precomputed,
+    initial_partition_probabilities = initial_partition_probabilities,
     K = K,
     discretization = discretization,
     rw_q = rw_q,
@@ -1069,7 +1107,8 @@
     control = fit$control,
     init_info = fit$init_info,
     ordering_similarity = fit$ordering_similarity,
-    similarity_init = fit$similarity_init
+    similarity_init = fit$similarity_init,
+    dimension_initialization = fit$dimension_initialization %||% NULL
   )
 }
 

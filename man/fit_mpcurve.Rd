@@ -34,7 +34,7 @@ fit_mpcurve(
   effective_weight_tol = 1e-12,
   assignment_prior = NULL,
   ordering_alpha = NULL,
-  similarity_metric = c("spearman", "pearson", "smooth_fit"),
+  similarity_metric = c("spearman", "pearson", "smooth_fit", "spline_r2"),
   smooth_fit_lambda_mode = c("optimize", "fixed"),
   smooth_fit_lambda_value = 1,
   cluster_linkage = "single",
@@ -52,6 +52,9 @@ fit_mpcurve(
   drop_unused_ordering = NULL,
   verbose = FALSE,
   convergence = c("normalized", "relative"),
+  max_intrinsic_dim = 8L,
+  spline_r2_df = 5L,
+  similarity_min_cluster_size = 2L,
   ...
 )
 }
@@ -98,8 +101,10 @@ stopping.}
 single-ordering runs.}
 
 \item{intrinsic_dim}{Integer intrinsic dimensionality of the latent ordering
-system. \code{intrinsic_dim = 1} fits the standard single-ordering model.
-Values \code{>= 2} fit the fixed-\eqn{M} structural partition model.}
+system, or \code{"auto"}. \code{intrinsic_dim = 1} fits the standard
+single-ordering model. Values \code{>= 2} fit the fixed-\eqn{M} structural
+partition model. \code{"auto"} cuts the feature-similarity tree at the
+eligible dimension with the largest mean silhouette before fitting.}
 
 \item{greedy}{Use \code{"none"}; specify the number of orderings through
 \code{intrinsic_dim}. The values \code{"forward"} and \code{"backward"}
@@ -169,11 +174,14 @@ uniform prior; \code{"dirichlet"} specifies a Dirichlet prior using
 
 \item{similarity_metric}{For \code{partition_init = "similarity"} only:
 feature-similarity metric used to construct feature blocks. One of
-\code{"spearman"}, \code{"pearson"}, or \code{"smooth_fit"}. The
+\code{"spearman"}, \code{"pearson"}, \code{"smooth_fit"}, or
+\code{"spline_r2"}. The
 \code{"smooth_fit"} metric scores how well features follow each other's
 orderings under a random-walk smoother. With \code{ridge = 0}, this score
 uses the rank and generalized determinant of the intrinsic precision.
-With positive \code{ridge}, it uses a proper Gaussian prior.}
+With positive \code{ridge}, it uses a proper Gaussian prior. When
+\code{intrinsic_dim = "auto"} and this argument is omitted,
+\code{"spline_r2"} is used.}
 
 \item{smooth_fit_lambda_mode}{For \code{similarity_metric = "smooth_fit"}
 only: whether the directional smoother optimizes \code{lambda} or keeps it
@@ -227,6 +235,21 @@ the pre-0.3.2 defaults, use \code{convergence = "relative"},
 \code{fit$fit$control$convergence}. ELBO traces remain on their original
 scale. A small increment does not bound the remaining optimization gap.}
 
+\item{max_intrinsic_dim}{For \code{intrinsic_dim = "auto"}, the largest
+candidate number of orderings. Candidates also cannot exceed one less
+than the number of features because silhouette is undefined for an
+all-singleton cut.}
+
+\item{spline_r2_df}{For \code{similarity_metric = "spline_r2"}, fixed
+degrees of freedom for the natural cubic spline used to calculate
+directional variance explained. Defaults to 5.}
+
+\item{similarity_min_cluster_size}{For \code{intrinsic_dim = "auto"}, the
+minimum number of features allowed in every selected cluster. The default
+of 2 prevents a single feature from serving as the sole evidence for an
+initialized ordering. If no multi-ordering cut is eligible, one ordering
+is fitted.}
+
 \item{...}{Additional variational fitting options, including initialization
 controls such as \code{responsibilities_init}, \code{fits_init},
 \code{init_methods}, \code{pca_components}, or \code{hard_assign_final}.}
@@ -247,8 +270,12 @@ An \code{\link{mpcurve}} object, or (for parallel multi-method
   \code{$partition$pi_weights}. Every fit has
   \code{$effective_intrinsic_dim}; adaptive partition fits calculate it
   from the fitted ordering prior using \code{effective_weight_tol}, while
-  other fits set it to the fitted \code{M}. See \code{\link{mpcurve}} for the complete
-  object description.
+  other fits set it to the fitted \code{M}. Fits requested with
+  \code{intrinsic_dim = "auto"} also store
+  \code{$dimension_initialization}, including candidate silhouettes,
+  eligibility, selected clusters, similarity diagnostics, and the initial
+  ordering probabilities. See \code{\link{mpcurve}} for the complete object
+  description.
 }
 \description{
 Fits a Gaussian trajectory model to a sample-by-feature matrix. With

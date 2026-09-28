@@ -15,7 +15,7 @@ plot.mpcurve to visualize trajectories and sample orderings."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -136,7 +136,11 @@ of orderings with nontrivial fitted assignment-prior weight under an
 adaptive prior, using <code>effective_weight_tol</code>; it equals the fitted
 <code>M</code> for a fixed prior. This count does not remove fitted orderings.
 Fits returned by <code><a href="select_mpcurve_dimension.html">select_mpcurve_dimension</a></code> also include
-<code>$dimension_selection</code> with candidate scores and greedy decisions.</p>
+<code>$dimension_selection</code> with candidate scores and greedy decisions.
+Fits requested with <code>fit_mpcurve(intrinsic_dim = "auto")</code> also include
+<code>$dimension_initialization</code> with candidate silhouettes, cut
+eligibility, selected clusters, similarity diagnostics, and the ordering
+probabilities used to initialize the fit.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

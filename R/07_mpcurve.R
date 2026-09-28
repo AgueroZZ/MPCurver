@@ -1393,6 +1393,7 @@ as_mpcurve.cavi <- function(x, ...) {
       init_info     = x$init_info %||% NULL,
       ordering_similarity = x$ordering_similarity %||% NULL,
       similarity_init = x$similarity_init %||% NULL,
+      dimension_initialization = x$dimension_initialization %||% NULL,
       converged     = x$converged %||% NULL,
       convergence_info = x$convergence_info %||% NULL,
       control       = x$control %||% list(),
@@ -1518,6 +1519,7 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
         init_info = x$init_info,
         ordering_similarity = x$ordering_similarity,
         similarity_init = x$similarity_init,
+        dimension_initialization = x$dimension_initialization %||% NULL,
         converged = x$converged,
         convergence_info = x$convergence_info,
         control = x$control,
@@ -1650,6 +1652,15 @@ print.mpcurve <- function(x, ...) {
         selection_info$selected_M
       ))
     }
+    initialization_info <- x$dimension_initialization %||% NULL
+    if (!is.null(initialization_info)) {
+      cat(sprintf(
+        "  Auto M init    : mean silhouette (upper bound %d -> selected %d; min size %d)\n",
+        initialization_info$requested_max_intrinsic_dim,
+        initialization_info$selected_M,
+        initialization_info$min_cluster_size
+      ))
+    }
     greedy_info <- x$greedy_selection %||% NULL
     if (!is.null(greedy_info)) {
       cat(sprintf(
@@ -1710,6 +1721,15 @@ print.mpcurve <- function(x, ...) {
         selection_info$selected_M
       ))
     }
+    initialization_info <- x$dimension_initialization %||% NULL
+    if (!is.null(initialization_info)) {
+      cat(sprintf(
+        "  Auto M init    : mean silhouette (upper bound %d -> selected %d; min size %d)\n",
+        initialization_info$requested_max_intrinsic_dim,
+        initialization_info$selected_M,
+        initialization_info$min_cluster_size
+      ))
+    }
     greedy_info <- x$greedy_selection %||% NULL
     if (!is.null(greedy_info)) {
       cat(sprintf(
@@ -1748,6 +1768,8 @@ print.mpcurve <- function(x, ...) {
 #'   \code{$effective_intrinsic_dim},
 #'   \code{$dimension_selection} when returned by
 #'   \code{select_mpcurve_dimension()},
+#'   \code{$dimension_initialization} when \code{intrinsic_dim = "auto"} was
+#'   used,
 #'   \code{$K}, \code{$n}, \code{$d}, \code{$priors}, and
 #'   \code{$converged}. A single-ordering result also contains
 #'   \code{$underlying}. A structural partition result instead contains
@@ -1788,7 +1810,8 @@ summary.mpcurve <- function(object, ...) {
       variational_family = object$variational_family %||%
         (object$control %||% list())$variational_family,
       greedy_selection = object$greedy_selection %||% NULL,
-      dimension_selection = object$dimension_selection %||% NULL
+      dimension_selection = object$dimension_selection %||% NULL,
+      dimension_initialization = object$dimension_initialization %||% NULL
     )
   } else {
     underlying <- summary(object$fit, ...)
@@ -1806,7 +1829,8 @@ summary.mpcurve <- function(object, ...) {
       converged     = object$converged %||% underlying$converged %||% NULL,
       underlying    = underlying,
       greedy_selection = object$greedy_selection %||% NULL,
-      dimension_selection = object$dimension_selection %||% NULL
+      dimension_selection = object$dimension_selection %||% NULL,
+      dimension_initialization = object$dimension_initialization %||% NULL
     )
   }
   class(result) <- "summary.mpcurve"
@@ -1835,6 +1859,15 @@ print.summary.mpcurve <- function(x, ...) {
                   selection_info$direction,
                   selection_info$max_intrinsic_dim,
                   selection_info$selected_M))
+    }
+    initialization_info <- x$dimension_initialization %||% NULL
+    if (!is.null(initialization_info)) {
+      cat(sprintf(
+        "Auto M init : mean silhouette  |  upper bound = %d  |  selected = %d  |  min size = %d\n",
+        initialization_info$requested_max_intrinsic_dim,
+        initialization_info$selected_M,
+        initialization_info$min_cluster_size
+      ))
     }
     greedy_info <- x$greedy_selection %||% NULL
     if (!is.null(greedy_info)) {
@@ -1930,6 +1963,15 @@ print.summary.mpcurve <- function(x, ...) {
                   selection_info$direction,
                   selection_info$max_intrinsic_dim,
                   selection_info$selected_M))
+    }
+    initialization_info <- x$dimension_initialization %||% NULL
+    if (!is.null(initialization_info)) {
+      cat(sprintf(
+        "Auto M init : mean silhouette  |  upper bound = %d  |  selected = %d  |  min size = %d\n",
+        initialization_info$requested_max_intrinsic_dim,
+        initialization_info$selected_M,
+        initialization_info$min_cluster_size
+      ))
     }
     greedy_info <- x$greedy_selection %||% NULL
     if (!is.null(greedy_info)) {
@@ -2578,6 +2620,11 @@ do_mpcurve <- function(object,
       if (!is.null(out$dimension_selection)) {
         out$dimension_selection$continued_after_selection <- TRUE
       }
+      out$dimension_initialization <-
+        object$dimension_initialization %||% raw$dimension_initialization %||% NULL
+      if (!is.null(out$dimension_initialization)) {
+        out$fit$dimension_initialization <- out$dimension_initialization
+      }
       return(out)
     }
     stop(
@@ -2858,11 +2905,18 @@ do_mpcurve <- function(object,
     new_fit,
     .mpcurve_extract_greedy_provenance(object)
   )
+  new_fit$dimension_initialization <-
+    object$dimension_initialization %||%
+    object$fit$dimension_initialization %||% NULL
   out <- as_mpcurve(new_fit)
   out$greedy_selection <- object$greedy_selection %||% NULL
   out$dimension_selection <- object$dimension_selection %||% NULL
+  out$dimension_initialization <- object$dimension_initialization %||% NULL
   if (!is.null(out$dimension_selection)) {
     out$dimension_selection$continued_after_selection <- TRUE
+  }
+  if (!is.null(out$dimension_initialization)) {
+    out$fit$dimension_initialization <- out$dimension_initialization
   }
   out$requested_intrinsic_dim <- object$requested_intrinsic_dim %||% out$intrinsic_dim
   out
@@ -2934,8 +2988,19 @@ do_mpcurve <- function(object,
 #' @param num_cores Integer >= 1. Workers for parallel multi-method
 #'   single-ordering runs.
 #' @param intrinsic_dim Integer intrinsic dimensionality of the latent ordering
-#'   system. \code{intrinsic_dim = 1} fits the standard single-ordering model.
-#'   Values \code{>= 2} fit the fixed-\eqn{M} structural partition model.
+#'   system, or \code{"auto"}. \code{intrinsic_dim = 1} fits the standard
+#'   single-ordering model. Values \code{>= 2} fit the fixed-\eqn{M} structural
+#'   partition model. \code{"auto"} cuts the feature-similarity tree at the
+#'   eligible dimension with the largest mean silhouette before fitting.
+#' @param max_intrinsic_dim For \code{intrinsic_dim = "auto"}, the largest
+#'   candidate number of orderings. Candidates also cannot exceed one less
+#'   than the number of features because silhouette is undefined for an
+#'   all-singleton cut.
+#' @param similarity_min_cluster_size For \code{intrinsic_dim = "auto"}, the
+#'   minimum number of features allowed in every selected cluster. The default
+#'   of 2 prevents a single feature from serving as the sole evidence for an
+#'   initialized ordering. If no multi-ordering cut is eligible, one ordering
+#'   is fitted.
 #' @param greedy Use \code{"none"}; specify the number of orderings through
 #'   \code{intrinsic_dim}. The values \code{"forward"} and \code{"backward"}
 #'   are unsupported.
@@ -2990,11 +3055,17 @@ do_mpcurve <- function(object,
 #'   \code{assignment_prior = "dirichlet"} option.
 #' @param similarity_metric For \code{partition_init = "similarity"} only:
 #'   feature-similarity metric used to construct feature blocks. One of
-#'   \code{"spearman"}, \code{"pearson"}, or \code{"smooth_fit"}. The
+#'   \code{"spearman"}, \code{"pearson"}, \code{"smooth_fit"}, or
+#'   \code{"spline_r2"}. The
 #'   \code{"smooth_fit"} metric scores how well features follow each other's
 #'   orderings under a random-walk smoother. With \code{ridge = 0}, this score
 #'   uses the rank and generalized determinant of the intrinsic precision.
-#'   With positive \code{ridge}, it uses a proper Gaussian prior.
+#'   With positive \code{ridge}, it uses a proper Gaussian prior. When
+#'   \code{intrinsic_dim = "auto"} and this argument is omitted,
+#'   \code{"spline_r2"} is used.
+#' @param spline_r2_df For \code{similarity_metric = "spline_r2"}, fixed
+#'   degrees of freedom for the natural cubic spline used to calculate
+#'   directional variance explained. Defaults to 5.
 #' @param smooth_fit_lambda_mode For \code{similarity_metric = "smooth_fit"}
 #'   only: whether the directional smoother optimizes \code{lambda} or keeps it
 #'   fixed at \code{smooth_fit_lambda_value}.
@@ -3055,8 +3126,12 @@ do_mpcurve <- function(object,
 #'   \code{$partition$pi_weights}. Every fit has
 #'   \code{$effective_intrinsic_dim}; adaptive partition fits calculate it
 #'   from the fitted ordering prior using \code{effective_weight_tol}, while
-#'   other fits set it to the fitted \code{M}. See \code{\link{mpcurve}} for the complete
-#'   object description.
+#'   other fits set it to the fitted \code{M}. Fits requested with
+#'   \code{intrinsic_dim = "auto"} also store
+#'   \code{$dimension_initialization}, including candidate silhouettes,
+#'   eligibility, selected clusters, similarity diagnostics, and the initial
+#'   ordering probabilities. See \code{\link{mpcurve}} for the complete object
+#'   description.
 #'
 #' @export
 fit_mpcurve <- function(
@@ -3089,7 +3164,7 @@ fit_mpcurve <- function(
     effective_weight_tol = 1e-12,
     assignment_prior = NULL,
     ordering_alpha = NULL,
-    similarity_metric = c("spearman", "pearson", "smooth_fit"),
+    similarity_metric = c("spearman", "pearson", "smooth_fit", "spline_r2"),
     smooth_fit_lambda_mode = c("optimize", "fixed"),
     smooth_fit_lambda_value = 1,
     cluster_linkage = "single",
@@ -3107,15 +3182,26 @@ fit_mpcurve <- function(
     drop_unused_ordering = NULL,
     verbose = FALSE,
     convergence = c("normalized", "relative"),
+    max_intrinsic_dim = 8L,
+    spline_r2_df = 5L,
+    similarity_min_cluster_size = 2L,
     ...
 ) {
   convergence <- match.arg(convergence)
   method_missing <- missing(method)
+  similarity_metric_missing <- missing(similarity_metric)
   num_cores <- as.integer(num_cores)
-  intrinsic_dim <- as.integer(intrinsic_dim)
-  effective_weight_tol <- .mpcurve_validate_effective_weight_tol(
-    effective_weight_tol, intrinsic_dim
-  )
+  automatic_dimension <- is.character(intrinsic_dim) &&
+    length(intrinsic_dim) == 1L && !is.na(intrinsic_dim) &&
+    identical(intrinsic_dim, "auto")
+  if (is.character(intrinsic_dim) && !automatic_dimension) {
+    stop("intrinsic_dim must be a positive integer or \"auto\".", call. = FALSE)
+  }
+  if (!automatic_dimension) {
+    intrinsic_dim <- .cavi_validate_positive_integer(
+      intrinsic_dim, "intrinsic_dim"
+    )
+  }
   greedy <- match.arg(greedy)
   algorithm <- match.arg(algorithm)
   partition_init <- match.arg(partition_init)
@@ -3128,11 +3214,27 @@ fit_mpcurve <- function(
       partition_prior <- if (identical(assignment_prior_chr, "uniform")) "fixed" else "adaptive"
     }
   }
-  similarity_metric <- match.arg(similarity_metric)
+  similarity_metric <- if (automatic_dimension && similarity_metric_missing) {
+    "spline_r2"
+  } else {
+    match.arg(similarity_metric)
+  }
   smooth_fit_lambda_mode <- match.arg(smooth_fit_lambda_mode)
   lambda_sd_prior_rate <- .normalize_lambda_sd_prior_rate(lambda_sd_prior_rate)
   dots <- list(...)
   .mpcurve_check_legacy_public_args(dots, caller = "fit_mpcurve()")
+  reserved_initialization_args <- intersect(
+    names(dots),
+    c("similarity_precomputed", "initial_partition_probabilities",
+      "dimension_initialization")
+  )
+  if (length(reserved_initialization_args)) {
+    stop(
+      paste(reserved_initialization_args, collapse = ", "),
+      " are internal initialization arguments and cannot be supplied through the ellipsis.",
+      call. = FALSE
+    )
+  }
   max_converge_iter <- max_converge_iter %||% as.integer(iter)
 
   if (!identical(algorithm, "cavi")) {
@@ -3142,6 +3244,105 @@ fit_mpcurve <- function(
       call. = FALSE
     )
   }
+
+  if (!identical(greedy, "none")) {
+    stop(
+      "greedy dimension selection is temporarily unavailable for structural VI. ",
+      "Use select_mpcurve_dimension() for fixed-uniform-prior ELBO selection.",
+      call. = FALSE
+    )
+  }
+
+  similarity_precomputed <- NULL
+  initial_partition_probabilities <- NULL
+  dimension_initialization <- NULL
+  if (automatic_dimension) {
+    if (!identical(partition_init, "similarity")) {
+      stop(
+        "intrinsic_dim = \"auto\" requires partition_init = \"similarity\".",
+        call. = FALSE
+      )
+    }
+    if ("fits_init" %in% names(dots)) {
+      stop(
+        "fits_init cannot be supplied when intrinsic_dim = \"auto\" because ",
+        "the selected feature cut defines the ordering initializations.",
+        call. = FALSE
+      )
+    }
+    max_intrinsic_dim <- .cavi_validate_positive_integer(
+      max_intrinsic_dim, "max_intrinsic_dim"
+    )
+    similarity_min_cluster_size <- .cavi_validate_positive_integer(
+      similarity_min_cluster_size, "similarity_min_cluster_size"
+    )
+    cluster_linkage <- .cavi_validate_cluster_linkage(cluster_linkage)
+
+    X_similarity <- as.matrix(X)
+    discretization_similarity <- match.arg(
+      discretization %||% "quantile",
+      c("quantile", "equal", "kmeans")
+    )
+    K_similarity <- .cavi_resolve_K(X_similarity, K)
+    similarity_precomputed <- .compute_same_ordering_similarity(
+      X = X_similarity,
+      S = S,
+      metric = similarity_metric,
+      min_feature_sd = similarity_min_feature_sd,
+      spline_r2_df = spline_r2_df,
+      K = K_similarity,
+      rw_q = rw_q,
+      ridge = ridge,
+      lambda_sd_prior_rate = lambda_sd_prior_rate,
+      smooth_fit_lambda_mode = smooth_fit_lambda_mode,
+      smooth_fit_lambda_value = smooth_fit_lambda_value,
+      lambda_min = lambda_min,
+      lambda_max = lambda_max,
+      sigma_min = sigma_min,
+      sigma_max = sigma_max,
+      discretization = discretization_similarity
+    )
+    dimension_initialization <- .cavi_select_similarity_dimension(
+      distance = similarity_precomputed$distance,
+      cluster_linkage = cluster_linkage,
+      max_intrinsic_dim = max_intrinsic_dim,
+      min_cluster_size = similarity_min_cluster_size
+    )
+    intrinsic_dim <- dimension_initialization$selected_M
+    cluster_linkage <- dimension_initialization$cluster_linkage
+    if (intrinsic_dim >= 2L && identical(partition_prior, "adaptive")) {
+      initial_partition_probabilities <-
+        dimension_initialization$cluster_proportions
+    }
+    actual_initial_probabilities <- if (intrinsic_dim == 1L) {
+      stats::setNames(1, .cavi_partition_order_labels(1L))
+    } else if (is.null(initial_partition_probabilities)) {
+      stats::setNames(
+        rep(1 / intrinsic_dim, intrinsic_dim),
+        .cavi_partition_order_labels(intrinsic_dim)
+      )
+    } else {
+      initial_partition_probabilities
+    }
+    dimension_initialization$automatic <- TRUE
+    dimension_initialization$similarity_metric <- similarity_metric
+    dimension_initialization$spline_r2_df <- if (
+      identical(similarity_metric, "spline_r2")
+    ) {
+      similarity_precomputed$spline_r2_df %||% as.integer(spline_r2_df)[1]
+    } else NULL
+    dimension_initialization$initial_partition_probabilities <-
+      actual_initial_probabilities
+    dimension_initialization$similarity <- similarity_precomputed$S
+    dimension_initialization$distance <- similarity_precomputed$distance
+
+    if (intrinsic_dim == 1L && method_missing) {
+      method <- "PCA"
+    }
+  }
+  effective_weight_tol <- .mpcurve_validate_effective_weight_tol(
+    effective_weight_tol, intrinsic_dim
+  )
 
   fit_args <- list(
     X = X,
@@ -3157,6 +3358,7 @@ fit_mpcurve <- function(
     convergence = convergence,
     num_cores = num_cores,
     intrinsic_dim = intrinsic_dim,
+    max_intrinsic_dim = max_intrinsic_dim,
     partition_init = partition_init,
     discretization = discretization,
     ridge = ridge,
@@ -3173,10 +3375,12 @@ fit_mpcurve <- function(
     assignment_prior = assignment_prior,
     ordering_alpha = ordering_alpha,
     similarity_metric = similarity_metric,
+    spline_r2_df = spline_r2_df,
     smooth_fit_lambda_mode = smooth_fit_lambda_mode,
     smooth_fit_lambda_value = smooth_fit_lambda_value,
     cluster_linkage = cluster_linkage,
     similarity_min_feature_sd = similarity_min_feature_sd,
+    similarity_min_cluster_size = similarity_min_cluster_size,
     T_start = T_start,
     T_end = T_end,
     n_outer = n_outer,
@@ -3190,14 +3394,6 @@ fit_mpcurve <- function(
     drop_unused_ordering = drop_unused_ordering,
     verbose = verbose
   )
-
-  if (!identical(greedy, "none")) {
-    stop(
-      "greedy dimension selection is temporarily unavailable for structural VI. ",
-      "Use select_mpcurve_dimension() for fixed-uniform-prior ELBO selection.",
-      call. = FALSE
-    )
-  }
 
   # ---- Partition model (intrinsic_dim >= 2) ----
   if (intrinsic_dim >= 2L) {
@@ -3251,10 +3447,14 @@ fit_mpcurve <- function(
         pca_components = pca_components,
         partition_init = partition_init,
         similarity_metric = similarity_metric,
+        spline_r2_df = spline_r2_df,
         smooth_fit_lambda_mode = smooth_fit_lambda_mode,
         smooth_fit_lambda_value = smooth_fit_lambda_value,
         cluster_linkage = cluster_linkage,
         similarity_min_feature_sd = similarity_min_feature_sd,
+        similarity_min_cluster_size = similarity_min_cluster_size,
+        similarity_precomputed = similarity_precomputed,
+        initial_partition_probabilities = initial_partition_probabilities,
         K = K,
         rw_q = rw_q,
         lambda_init = lambda,
@@ -3291,7 +3491,16 @@ fit_mpcurve <- function(
     )
     raw <- do.call(soft_partition_cavi, sp_args)
     raw$control$effective_weight_tol <- effective_weight_tol
-    return(as_mpcurve(raw))
+    if (automatic_dimension) {
+      raw$control$max_intrinsic_dim <- max_intrinsic_dim
+      raw$dimension_initialization <- dimension_initialization
+    }
+    out <- as_mpcurve(raw)
+    if (automatic_dimension) {
+      out$dimension_initialization <- dimension_initialization
+      out$fit$dimension_initialization <- dimension_initialization
+    }
+    return(out)
   }
 
   parallel <- num_cores > 1L && length(method) > 1L
@@ -3361,7 +3570,15 @@ fit_mpcurve <- function(
       stringsAsFactors = FALSE
     )
 
-    out <- lapply(fit_info, function(x) if (!is.null(x$result)) as_mpcurve(x$result) else NULL)
+    out <- lapply(fit_info, function(x) {
+      if (is.null(x$result)) return(NULL)
+      fitted <- as_mpcurve(x$result)
+      if (automatic_dimension) {
+        fitted$dimension_initialization <- dimension_initialization
+        fitted$fit$dimension_initialization <- dimension_initialization
+      }
+      fitted
+    })
     attr(out, "summary") <- smry
     return(out)
   }
@@ -3381,5 +3598,15 @@ fit_mpcurve <- function(
     stop("fit_mpcurve() failed to produce a valid cavi fit for unknown reasons.", call. = FALSE)
   }
 
-  as_mpcurve(fit_info$result)
+  if (automatic_dimension) {
+    fit_info$result$dimension_initialization <- dimension_initialization
+    fit_info$result$control$max_intrinsic_dim <- max_intrinsic_dim
+    fit_info$result$control$similarity_metric <- similarity_metric
+    fit_info$result$control$spline_r2_df <- as.integer(spline_r2_df)[1]
+    fit_info$result$control$similarity_min_cluster_size <-
+      as.integer(similarity_min_cluster_size)[1]
+  }
+  out <- as_mpcurve(fit_info$result)
+  if (automatic_dimension) out$dimension_initialization <- dimension_initialization
+  out
 }

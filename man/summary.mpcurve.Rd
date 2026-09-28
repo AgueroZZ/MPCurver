@@ -23,6 +23,8 @@ An object of class \code{summary.mpcurve}. Every result contains
   \code{$effective_intrinsic_dim},
   \code{$dimension_selection} when returned by
   \code{select_mpcurve_dimension()},
+  \code{$dimension_initialization} when \code{intrinsic_dim = "auto"} was
+  used,
   \code{$K}, \code{$n}, \code{$d}, \code{$priors}, and
   \code{$converged}. A single-ordering result also contains
   \code{$underlying}. A structural partition result instead contains

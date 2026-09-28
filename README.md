@@ -4,7 +4,6 @@
 # MPCurver
 
 <!-- badges: start -->
-
 <!-- badges: end -->
 
 `MPCurver` estimates latent sample orderings and smooth feature
@@ -58,7 +57,7 @@ plot(sim$obs, pch = 16, cex = 0.35, col = "grey80",
      xlab = "x1", ylab = "x2", main = "Noisy 2D spiral")
 ```
 
-<img src="man/figures/README-unnamed-chunk-2-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-2-1.png" alt="" width="100%" />
 
 Fit a model with 40 grid positions and a second-order random-walk prior.
 The first plot shows the inferred ordering and trajectory; the second
@@ -79,13 +78,13 @@ fit <- fit_mpcurve(
 plot(fit)
 ```
 
-<img src="man/figures/README-unnamed-chunk-3-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-3-1.png" alt="" width="100%" />
 
 ``` r
 plot(fit, plot_type = "elbo")
 ```
 
-<img src="man/figures/README-unnamed-chunk-3-2.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-3-2.png" alt="" width="100%" />
 
 Initialization can affect the fitted ordering, especially for curved or
 weakly separated patterns. Here we compare three starting orderings
@@ -149,6 +148,32 @@ fit_multi$partition$pi_weights
 fit_multi$effective_intrinsic_dim
 plot(fit_multi, plot_type = "mu", dims = 1)
 ```
+
+When the number of orderings is unknown, `intrinsic_dim = "auto"` can
+choose an initialization dimension from the feature-similarity tree
+before fitting the adaptive model:
+
+``` r
+fit_auto <- fit_mpcurve(
+  X,
+  intrinsic_dim = "auto",
+  max_intrinsic_dim = 8,
+  similarity_min_cluster_size = 2,
+  K = 40
+)
+
+fit_auto$dimension_initialization$diagnostics
+fit_auto$effective_intrinsic_dim
+```
+
+Automatic initialization uses the fast spline-R-squared metric
+(`similarity_metric = "spline_r2"`) by default, with five spline degrees
+of freedom. It selects the eligible cut with the largest mean
+silhouette, where every cluster must contain at least
+`similarity_min_cluster_size` features (default 2). For adaptive
+fitting, the selected cluster-size proportions initialize the global
+ordering probabilities; subsequent empirical-Bayes updates can reduce
+the effective number of orderings.
 
 The assignment probabilities describe how strongly each feature supports
 each ordering. The trajectory plot shows the feature’s fitted mean under
