@@ -2,6 +2,10 @@
 
 override <- list(home = list(sidebar = FALSE))
 
+if (!isTRUE(l10n_info()[["UTF-8"]])) {
+  stop("The public site must be built in a UTF-8 locale.")
+}
+
 public_reference_topics <- c(
   "MPCurver",
   "mpcurve",
@@ -126,6 +130,11 @@ for (name in public_articles) {
     new_process = FALSE,
     quiet = TRUE
   )
+}
+
+fitness_html <- readLines("docs/articles/fitness.html", warn = FALSE)
+if (any(grepl("<ce>|<bc>", fitness_html, fixed = FALSE))) {
+  stop("The fitness article contains malformed UTF-8 markup.")
 }
 
 pkgdown:::build_search(pkg_home)

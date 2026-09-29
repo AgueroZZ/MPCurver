@@ -54,3 +54,13 @@ completed successfully for that exact commit. The live `fit_mpcurve()`
 reference and partition article both show version 0.3.4 and document that a
 length-one method is applied independently to every selected feature block;
 the live pages also state that default PCA uses each block's own PC1.
+
+## UTF-8 site correction
+
+The fitness article was rebuilt under a valid UTF-8 locale after the initial
+deployment was found to render the micro symbol as malformed HTML tags in
+seven environment labels. The corrected article preserves `μg/ml` and `μM`.
+`scripts/build_public_site.R` now refuses a non-UTF-8 locale and checks the
+rendered fitness article for the malformed tag pattern before completing.
+This correction changes generated documentation only; the validated 0.3.4
+package source archive and statistical results are unchanged.
