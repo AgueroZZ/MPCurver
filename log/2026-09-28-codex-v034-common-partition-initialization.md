@@ -64,3 +64,10 @@ seven environment labels. The corrected article preserves `μg/ml` and `μM`.
 rendered fitness article for the malformed tag pattern before completing.
 This correction changes generated documentation only; the validated 0.3.4
 package source archive and statistical results are unchanged.
+
+Documentation commit `eeaf65bcf4c8b021d590c88ad411506359202f1f` was pushed
+to `origin/main`. GitHub Pages deployment
+[36501178440](https://github.com/AgueroZZ/MPCurver/actions/runs/36501178440)
+completed successfully for that exact commit. The live fitness article is
+byte-identical to the committed HTML and contains all seven expected
+`μg/ml`/`μM` labels without malformed tags.
