@@ -1,9 +1,5 @@
-source("R/00_utils.R")
-source("R/01_initialization.R")
-source("R/02_prior.R")
-source("R/06_cSmoothEM.R")
-source("R/09_cavi.R")
-source("R/benchmarking_curves.R")
+# Run from the MPCurver package root.
+pkgload::load_all(".", quiet = TRUE)
 
 args <- commandArgs(trailingOnly = TRUE)
 plot_out <- if (length(args) >= 1L) args[[1L]] else NULL
@@ -44,16 +40,15 @@ score_fit <- function(fit, sim, K) {
 }
 
 run_method <- function(method, discretization = "quantile", sim, K = 100L) {
-  fit <- cavi(
+  fit <- fit_mpcurve(
     as.matrix(sim$obs),
-    K = K,
-    method = method,
-    discretization = discretization,
-    rw_q = 2,
+    num_bins = K,
+    initial_method = method,
+    init_control = mpcurve_init_control(discretization = discretization),
     max_iter = 250,
     tol = 1e-6,
     verbose = FALSE
-  )
+  )$fit
 
   score <- score_fit(fit, sim, K)
   list(
@@ -80,7 +75,7 @@ run_method <- function(method, discretization = "quantile", sim, K = 100L) {
 sim <- simulate_swiss_roll_1d_2d(
   n = 1500,
   t_range = c(1.5 * base::pi, 4.5 * base::pi),
-  sigma = 0.12,
+  noise_sd = 0.12,
   seed = 123
 )
 

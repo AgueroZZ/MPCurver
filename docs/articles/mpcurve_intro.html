@@ -21,7 +21,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,13 +37,18 @@
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
     <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver</a></li>
-    <li><a class="dropdown-item" href="../articles/partition.html">Feature Partitioning with MPCurver</a></li>
+    <li><a class="dropdown-item" href="../articles/partition.html">Multiple Orderings with MPCurver</a></li>
+    <li><a class="dropdown-item" href="../articles/intrinsic_dimension.html">Estimating Intrinsic Dimension with MPCurver</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Case studies</h6></li>
     <li><a class="dropdown-item" href="../articles/fitness.html">Analyzing the eLife Fitness Dataset with MPCurver</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Algorithm details</h6></li>
+    <li><a class="dropdown-item" href="../articles/cavi_single.html">Single-ordering CAVI</a></li>
+    <li><a class="dropdown-item" href="../articles/cavi_partition.html">Multi-ordering CAVI</a></li>
   </ul>
 </li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/AgueroZZ/MPCurver/blob/main/NEWS.md">Changelog</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -76,12 +81,12 @@
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://aguerozz.github.io/MPCurver/">MPCurver</a></span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">42</span><span class="op">)</span></span></code></pre></div>
 <p><code>MPCurver</code> estimates an ordering of samples and smooth
-feature trajectories along that ordering. This vignette introduces the
-statistical model and its coordinate-ascent variational inference (CAVI)
-algorithm, then uses a simulated spiral to show how to fit a model,
-assess convergence, and interpret pseudotime.</p>
+feature trajectories along that ordering. This tutorial introduces the
+model, then uses a simulated spiral to show how to fit a model, assess
+convergence, and extract results. The <a href="cavi_single.html">algorithm details</a> are available
+separately.</p>
 <div class="section level2">
-<h2 id="statistical-model">1 Statistical model<a class="anchor" aria-label="anchor" href="#statistical-model"></a>
+<h2 id="statistical-model">Statistical model<a class="anchor" aria-label="anchor" href="#statistical-model"></a>
 </h2>
 <p>We observe a data matrix <span class="math display">
 X = (x_{ij}) \in \mathbb{R}^{n \times d},
@@ -114,178 +119,14 @@ default intrinsic prior penalizes differences along the trajectory; the
 likelihood identifies directions left unpenalized by the prior.</li>
 </ol>
 <p>The model estimates a separate noise variance <span class="math inline">\sigma_j^2</span> and smoothness parameter <span class="math inline">\lambda_j</span> for each feature. The noise
-variance is shared across grid positions. To describe uncertainty in
-positions and trajectories, CAVI uses the variational family</p>
-<p><span class="math display">
-q(C,U) = \prod_{i=1}^n q_i(c_i)\prod_{j=1}^d q_j(\boldsymbol{u}_j).
-</span></p>
+variance is shared across grid positions. The position prior is <span class="math inline">\Pr(c_i=k)=\pi_k</span>, with <span class="math inline">\sum_k\pi_k=1</span>. By default these probabilities
+are also estimated from the data.</p>
+<p>The fitting algorithm estimates position and trajectory distributions
+together with the model parameters. Its objective, coordinate updates,
+and stopping rule are described in <a href="cavi_single.html">Single-ordering CAVI</a>.</p>
 </div>
 <div class="section level2">
-<h2 id="variational-algorithm">2 Variational algorithm<a class="anchor" aria-label="anchor" href="#variational-algorithm"></a>
-</h2>
-<p><code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> alternates between updates of the
-posterior distributions and model parameters to maximize the evidence
-lower bound (ELBO). Write <span class="math display">
-r_{ik} := q_i(c_i = k),
-\qquad
-N_k := \sum_{i=1}^n r_{ik},
-</span> and for each feature <span class="math inline">j</span>, <span class="math display">
-q_j(\boldsymbol{u}_j) = N(\boldsymbol{m}_j, S_j).
-</span></p>
-<p>Under the mean-field family <span class="math display">
-q(C,U)=\prod_{i=1}^n q_i(c_i)\prod_{j=1}^d q_j(\boldsymbol{u}_j),
-</span> the ELBO can be written, up to additive constants, as <span class="math display">
-\mathcal L(q)
-=
-\sum_{i=1}^n\sum_{k=1}^K r_{ik}\log \pi_k
-- \sum_{i=1}^n\sum_{k=1}^K r_{ik}\log r_{ik}
-</span> <span class="math display">
-- \frac12 \sum_{i=1}^n\sum_{k=1}^K\sum_{j=1}^d
-r_{ik}
-\left[
-\log(2\pi \sigma_j^2)
-+
-\frac{(x_{ij}-m_{jk})^2 + S_{j,kk}}{\sigma_j^2}
-\right]
-</span> <span class="math display">
-+ \frac12 \sum_{j=1}^d
-\left[
-\operatorname{rank}(Q_K)\log \lambda_j
-- \lambda_j\Big(\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j +
-\operatorname{tr}(Q_K S_j)\Big)
-+ \log |S_j|
-\right].
-</span></p>
-<p>This objective, including its additive constants, is recorded in
-<code>elbo_trace</code>. For the intrinsic prior, normalization uses the
-rank and generalized determinant of <span class="math inline">Q_K</span>, with a fixed reference measure on its
-null space. It provides a within-model fitting objective. The updates
-below maximize it one block at a time, with estimated noise, adaptive
-position probabilities, and no additional smoothness-parameter prior.
-Parameter estimates are restricted to the configured bounds.</p>
-<div class="section level3">
-<h3 id="update-for-qboldsymbolu_j">2.1 Update for <span class="math inline">q(\boldsymbol{u}_j)</span><a class="anchor" aria-label="anchor" href="#update-for-qboldsymbolu_j"></a>
-</h3>
-<p>Fix <span class="math inline">r_{ik}</span>, <span class="math inline">\sigma_j^2</span>, and <span class="math inline">\lambda_j</span>. The ELBO terms involving <span class="math inline">\boldsymbol{u}_j</span> are quadratic, so the
-optimal variational factor is Gaussian: <span class="math display">
-\log q_j^\star(\boldsymbol{u}_j)
-=
--\frac12 \boldsymbol{u}_j^\top A_j \boldsymbol{u}_j
-+ \boldsymbol{u}_j^\top \boldsymbol{b}_j + \text{const},
-</span> where <span class="math display">
-A_j
-=
-\lambda_j Q_K +
-\operatorname{diag}\!\left(N_1/\sigma_j^2,\dots,N_K/\sigma_j^2\right),
-</span> and <span class="math display">
-b_{jk}
-=
-\frac{1}{\sigma_j^2}\sum_{i=1}^n r_{ik} x_{ij}.
-</span> Therefore, <span class="math display">
-S_j = A_j^{-1},
-\qquad
-\boldsymbol{m}_j = S_j \boldsymbol{b}_j.
-</span></p>
-<p>The diagonal likelihood term supplies information at the grid
-positions, while the random-walk precision shares information between
-neighboring positions. Their combination determines both the fitted
-trajectory and its uncertainty.</p>
-</div>
-<div class="section level3">
-<h3 id="update-for-qc_i">2.2 Update for <span class="math inline">q(c_i)</span><a class="anchor" aria-label="anchor" href="#update-for-qc_i"></a>
-</h3>
-<p>Fix <span class="math inline">q(U)</span>, <span class="math inline">\pi</span>, and <span class="math inline">\sigma_j^2</span>. Collecting the ELBO terms
-involving the row <span class="math inline">r_{i\cdot}</span> gives
-<span class="math display">
-\log r_{ik}
-= a_i +
-\log \pi_k
-- \frac12 \sum_{j=1}^d
-\left[
-\log(2\pi \sigma_j^2)
-+
-\frac{(x_{ij}-m_{jk})^2 + S_{j,kk}}{\sigma_j^2}
-\right].
-</span> So the cell-position posterior is updated by a row-wise softmax:
-<span class="math display">
-r_{i\cdot} \leftarrow
-\operatorname{softmax}\!\big(\ell_{i1},\dots,\ell_{iK}\big),
-</span> with <span class="math inline">\ell_{ik}</span> equal to the
-position-specific terms above and <span class="math inline">a_i</span>
-the normalizing constant.</p>
-<p>The <span class="math inline">S_{j,kk}</span> term accounts for
-trajectory uncertainty when assigning a sample to a grid position.</p>
-</div>
-<div class="section level3">
-<h3 id="update-for-pi_k">2.3 Update for <span class="math inline">\pi_k</span><a class="anchor" aria-label="anchor" href="#update-for-pi_k"></a>
-</h3>
-<p>Fixing everything else, we maximize <span class="math display">
-\sum_{k=1}^K N_k \log \pi_k
-</span> subject to <span class="math inline">\sum_k \pi_k = 1</span>. A
-Lagrange multiplier gives <span class="math display">
-\pi_k = \frac{N_k}{n}.
-</span></p>
-</div>
-<div class="section level3">
-<h3 id="update-for-sigma_j2">2.4 Update for <span class="math inline">\sigma_j^2</span><a class="anchor" aria-label="anchor" href="#update-for-sigma_j2"></a>
-</h3>
-<p>Fixing <span class="math inline">q(U)</span> and <span class="math inline">q(C)</span>, differentiate the ELBO with respect to
-<span class="math inline">\sigma_j^2</span>. The stationary point is
-<span class="math display">
-\sigma_j^2
-=
-\frac{1}{n}
-\sum_{i=1}^n \sum_{k=1}^K
-r_{ik}\Big[(x_{ij}-m_{jk})^2 + S_{j,kk}\Big].
-</span></p>
-<p>So each feature variance is updated from the posterior expected
-residual sum of squares.</p>
-</div>
-<div class="section level3">
-<h3 id="update-for-lambda_j">2.5 Update for <span class="math inline">\lambda_j</span><a class="anchor" aria-label="anchor" href="#update-for-lambda_j"></a>
-</h3>
-<p>Fixing <span class="math inline">q(U)</span>, only the prior part of
-the ELBO depends on <span class="math inline">\lambda_j</span>: <span class="math display">
-\frac12 \operatorname{rank}(Q_K)\log \lambda_j
-- \frac12 \lambda_j
-\Big(\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j + \operatorname{tr}(Q_K
-S_j)\Big).
-</span> Setting the derivative to zero yields <span class="math display">
-\lambda_j
-=
-\frac{\operatorname{rank}(Q_K)}
-{\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j + \operatorname{tr}(Q_K
-S_j)}.
-</span></p>
-</div>
-<div class="section level3">
-<h3 id="assessing-convergence">2.6 Assessing convergence<a class="anchor" aria-label="anchor" href="#assessing-convergence"></a>
-</h3>
-<p>Each update maximizes one objective block while holding the others
-fixed, so <code>elbo_trace</code> should be nondecreasing up to
-numerical tolerance. A plateau indicates that successive iterations are
-making small improvements. Because the objective can have multiple
-optima, compare several initializations when the trajectory is complex
-or weakly identified.</p>
-<p>By default, fitting stops when the absolute ELBO change divided by
-<code>N * D</code> is below <code>1e-6</code>, where <code>N</code> is
-the number of samples and <code>D</code> the number of features. Use
-<code>tol</code> for a single ordering and <code>tol_outer</code> for
-multiple orderings; partition convergence is assessed at temperature
-<code>T = 1</code> after annealing. The objective must also satisfy the
-algorithm’s numerical nondecrease check. Setting the relevant tolerance
-to zero disables early stopping.</p>
-<p><code>convergence = "relative"</code> selects the previous
-ELBO-relative rule. To restore both pre-0.3.2 default tolerances, also
-set <code>tol = 1e-6</code> and <code>tol_outer = 1e-5</code>.
-<code><a href="../reference/do_mpcurve.html">do_mpcurve()</a></code> inherits the rule and tolerance stored in the
-fit; saved fits without a rule retain relative stopping. Stored ELBO
-traces are unchanged. A small increment indicates slow improvement, not
-a bound on the remaining optimization error.</p>
-</div>
-</div>
-<div class="section level2">
-<h2 id="simulated-spiral-example">3 Simulated spiral example<a class="anchor" aria-label="anchor" href="#simulated-spiral-example"></a>
+<h2 id="simulated-spiral-example">Simulated spiral example<a class="anchor" aria-label="anchor" href="#simulated-spiral-example"></a>
 </h2>
 <p>We simulate a two-dimensional spiral with:</p>
 <ul>
@@ -293,13 +134,13 @@ a bound on the remaining optimization error.</p>
 <code>n = 1000</code> cells,</li>
 <li>latent range <code>t in [1.5*pi, 4.5*pi]</code>,</li>
 <li>measurement standard deviation <code>sigma = 0.12</code>,</li>
-<li>and a fitting grid of <code>K = 60</code> positions.</li>
+<li>and a fitting grid of <code>num_bins = 60</code> positions.</li>
 </ul>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simulate_swiss_roll_1d_2d.html">simulate_swiss_roll_1d_2d</a></span><span class="op">(</span></span>
 <span>  n <span class="op">=</span> <span class="fl">1000</span>,</span>
 <span>  t_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1.5</span> <span class="op">*</span> <span class="va">pi</span>, <span class="fl">4.5</span> <span class="op">*</span> <span class="va">pi</span><span class="op">)</span>,</span>
-<span>  sigma <span class="op">=</span> <span class="fl">0.12</span>,</span>
+<span>  noise_sd <span class="op">=</span> <span class="fl">0.12</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">1</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -310,6 +151,8 @@ a bound on the remaining optimization error.</p>
 <span><span class="co">#&gt; Data dimensions: 1000 x 2</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"t range:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">t_true</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; t range: 4.725 14.137</span></span></code></pre></div>
+<p>Figure 1 shows simulated spiral observations, colored by the
+generating latent position.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pal</span> <span class="op">&lt;-</span> <span class="fu">grDevices</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/grDevices/colorRamp.html" class="external-link">colorRampPalette</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"#1F3A5F"</span>, <span class="st">"#2E8A99"</span>, <span class="st">"#F2C14E"</span>, <span class="st">"#E76F51"</span><span class="op">)</span></span>
@@ -320,22 +163,29 @@ a bound on the remaining optimization error.</p>
 <span>     xlab <span class="op">=</span> <span class="st">"x"</span>, ylab <span class="op">=</span> <span class="st">"y"</span>,</span>
 <span>     main <span class="op">=</span> <span class="st">"Observed spiral, coloured by true pseudotime"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
-<img src="mpcurve_intro_files/figure-html/plot-data-1.png" class="r-plt" alt="Simulated spiral observations, colored by the generating latent position." width="672"><p class="caption">
-Simulated spiral observations, colored by the generating latent
-position.
+<img src="mpcurve_intro_files/figure-html/plot-data-1.png" class="r-plt" alt="Figure 1. Simulated spiral observations, colored by the generating latent position." width="672"><p class="caption">
+Figure 1. Simulated spiral observations, colored by the generating
+latent position.
 </p>
 </div>
 </div>
 <div class="section level2">
-<h2 id="fit-the-model">4 Fit the model<a class="anchor" aria-label="anchor" href="#fit-the-model"></a>
+<h2 id="fit-the-model">Fit the model<a class="anchor" aria-label="anchor" href="#fit-the-model"></a>
 </h2>
+<p>For your own data, supply a numeric matrix or data frame with samples
+in rows and features in columns. Values must be finite: handle missing
+values before fitting. MPCurver does not impute or standardize the
+fitting data. Optional measurement standard deviations <code>S</code>
+use the same units and positional order as <code>X</code>, as a feature
+vector or a matrix of the same dimensions. See <code><a href="../reference/fit_mpcurve.html">?fit_mpcurve</a></code>
+for the complete input contract.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  <span class="va">X</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"fiedler"</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">60</span>,</span>
-<span>  iter <span class="op">=</span> <span class="fl">120</span></span>
-<span><span class="op">)</span></span>
+<span>    <span class="va">X</span>,</span>
+<span>    initial_method <span class="op">=</span> <span class="st">"fiedler"</span>,</span>
+<span>    num_bins <span class="op">=</span> <span class="fl">60</span>,</span>
+<span>    max_iter <span class="op">=</span> <span class="fl">120</span></span>
+<span>  <span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/class.html" class="external-link">inherits</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"mpcurve"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">algorithm</span>, <span class="st">"cavi"</span><span class="op">)</span><span class="op">)</span></span>
@@ -375,7 +225,7 @@ position.
 <span><span class="co">#&gt;     lambda_vec (L2 rel): 6.93e-05</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="check-convergence-and-recovery">5 Check convergence and recovery<a class="anchor" aria-label="anchor" href="#check-convergence-and-recovery"></a>
+<h2 id="check-convergence-and-recovery">Check convergence and recovery<a class="anchor" aria-label="anchor" href="#check-convergence-and-recovery"></a>
 </h2>
 <p>First, check whether the variational objective increases throughout
 fitting.</p>
@@ -386,53 +236,57 @@ fitting.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"ELBO range:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">elbo_trace</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; ELBO range: -7599.588 -4793.169</span></span></code></pre></div>
 <p>We can also compare the inferred ordering to the true latent
-parameter using the posterior-mean component index <span class="math display">
-\hat c_i = \sum_{k=1}^K k \, r_{ik}.
-</span></p>
+parameter using the posterior-mean pseudotime on the normalized
+grid.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">pseudotime_hat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">gamma</span> <span class="op"><a href="https://rdrr.io/r/base/matmult.html" class="external-link">%*%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">gamma</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">pseudotime_hat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fitted_positions.html">fitted_positions</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span></span>
 <span><span class="va">rho_t</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span><span class="va">pseudotime_hat</span>, <span class="va">t_true</span>, method <span class="op">=</span> <span class="st">"spearman"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Absolute Spearman correlation with true t:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">rho_t</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Absolute Spearman correlation with true t: 0.9997</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="visualize-the-fitted-ordering">6 Visualize the fitted ordering<a class="anchor" aria-label="anchor" href="#visualize-the-fitted-ordering"></a>
+<h2 id="visualize-the-fitted-ordering">Visualize the fitted ordering<a class="anchor" aria-label="anchor" href="#visualize-the-fitted-ordering"></a>
 </h2>
+<p>Figure 2 shows true pseudotime (left) and inferred CAVI pseudotime
+(right).</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">col_fit</span> <span class="op">&lt;-</span> <span class="va">pal</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/cut.html" class="external-link">cut</a></span><span class="op">(</span><span class="va">pseudotime_hat</span>, breaks <span class="op">=</span> <span class="fl">256</span>, labels <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">]</span></span>
 <span></span>
-<span><span class="va">op</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">2.5</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">op</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">3.5</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">X</span>, col <span class="op">=</span> <span class="va">col_true</span>, pch <span class="op">=</span> <span class="fl">19</span>, cex <span class="op">=</span> <span class="fl">0.5</span>,</span>
 <span>     xlab <span class="op">=</span> <span class="st">"x"</span>, ylab <span class="op">=</span> <span class="st">"y"</span>, main <span class="op">=</span> <span class="st">"Truth"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">X</span>, col <span class="op">=</span> <span class="va">col_fit</span>, pch <span class="op">=</span> <span class="fl">19</span>, cex <span class="op">=</span> <span class="fl">0.5</span>,</span>
 <span>     xlab <span class="op">=</span> <span class="st">"x"</span>, ylab <span class="op">=</span> <span class="st">"y"</span>, main <span class="op">=</span> <span class="st">"CAVI fit"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
-<img src="mpcurve_intro_files/figure-html/plot-fit-1.png" class="r-plt" alt="True pseudotime (left) and inferred CAVI pseudotime (right)." width="672"><p class="caption">
-True pseudotime (left) and inferred CAVI pseudotime (right).
+<img src="mpcurve_intro_files/figure-html/plot-fit-1.png" class="r-plt" alt="Figure 2. True pseudotime (left) and inferred CAVI pseudotime (right)." width="672"><p class="caption">
+Figure 2. True pseudotime (left) and inferred CAVI pseudotime (right).
 </p>
 </div>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span><span class="va">op</span><span class="op">)</span></span></code></pre></div>
 <p>The fitted object also provides plots of the objective and posterior
 mean trajectory.</p>
+<p>Figure 3 shows the CAVI trace plot from the fitted mpcurve
+object.</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
-<img src="mpcurve_intro_files/figure-html/plot-trace-1.png" class="r-plt" alt="CAVI trace plot from the fitted mpcurve object." width="672"><p class="caption">
-CAVI trace plot from the fitted mpcurve object.
+<img src="mpcurve_intro_files/figure-html/plot-trace-1.png" class="r-plt" alt="Figure 3. CAVI trace plot from the fitted mpcurve object." width="672"><p class="caption">
+Figure 3. CAVI trace plot from the fitted mpcurve object.
 </p>
 </div>
+<p>Figure 4 shows posterior mean trajectories across the K bins.</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
-<img src="mpcurve_intro_files/figure-html/plot-mu-1.png" class="r-plt" alt="Posterior mean trajectories across the K bins." width="672"><p class="caption">
-Posterior mean trajectories across the K bins.
+<img src="mpcurve_intro_files/figure-html/plot-mu-1.png" class="r-plt" alt="Figure 4. Posterior mean trajectories across the K bins." width="672"><p class="caption">
+Figure 4. Posterior mean trajectories across the K bins.
 </p>
 </div>
 </div>
 <div class="section level2">
-<h2 id="using-the-results">7 Using the results<a class="anchor" aria-label="anchor" href="#using-the-results"></a>
+<h2 id="using-the-results">Using the results<a class="anchor" aria-label="anchor" href="#using-the-results"></a>
 </h2>
 <p>The ordering-recovery statistic above compares estimated sample
 positions with the generating latent variable. Its absolute value
@@ -440,15 +294,38 @@ accounts for the arbitrary direction of an inferred ordering. In an
 application, use known sample annotations to help interpret that
 direction and assess whether nearby samples have similar feature
 profiles.</p>
-<p>Normalized positions are available in
-<code>fit$locations$mean$pseudotime</code>, trajectory means in
-<code>fit$params$mu</code>, and trajectory covariance matrices in
-<code>fit$fit$posterior$cov</code>. If the objective is still increasing
-at the iteration limit, continue with
-<code>fit &lt;- do_mpcurve(fit, iter = 100)</code>.</p>
+<p>The extraction functions use the same dimensions for one or multiple
+orderings:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">positions</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fitted_positions.html">fitted_positions</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>                 <span class="co"># samples x orderings</span></span>
+<span><span class="va">trajectories</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fitted_trajectories.html">fitted_trajectories</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>            <span class="co"># features x bins x orderings</span></span>
+<span><span class="va">trajectory_sd</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fitted_trajectories.html">fitted_trajectories</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"sd"</span><span class="op">)</span></span>
+<span><span class="va">assignment_probabilities</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fitted_assignments.html">fitted_assignments</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span> <span class="co"># features x orderings</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">positions</span><span class="op">)</span></span>
+<span><span class="co">#&gt;      ordering1</span></span>
+<span><span class="co">#&gt; [1,] 0.7449450</span></span>
+<span><span class="co">#&gt; [2,] 0.6264146</span></span>
+<span><span class="co">#&gt; [3,] 0.4185339</span></span>
+<span><span class="co">#&gt; [4,] 0.1016949</span></span>
+<span><span class="co">#&gt; [5,] 0.7988938</span></span>
+<span><span class="co">#&gt; [6,] 0.1016949</span></span></code></pre></div>
+<p>Use <code>fitted_positions(fit, "probability")</code> for the full
+position probabilities and
+<code>fitted_trajectories(fit, "covariance")</code> for trajectory
+covariance matrices. Input sample and feature names are preserved. Even
+a single ordering retains its matrix or array dimension. If the
+objective is still increasing at the iteration limit, continue with
+<code>fit &lt;- do_mpcurve(fit, max_iter = 100)</code>. Continuation
+inherits the fitted settings. Use
+<code>control = mpcurve_continue_control(lambda_init = 5, fix_lambda = TRUE)</code>
+to reset and fix precision at 5, or <code>fix_lambda = FALSE</code> to
+resume its updates. Changing the random-walk order or measurement errors
+requires a new fit.</p>
 <p>When different feature groups may follow different sample orderings,
-see the <a href="partition.html">feature-partitioning tutorial</a>. For
-data with supplied measurement uncertainty, see the <a href="fitness.html">fitness analysis</a>.</p>
+see the <a href="partition.html">multiple-ordering tutorial</a>. To
+choose the dimension, see <a href="intrinsic_dimension.html">Estimating
+intrinsic dimension</a>. For data with supplied measurement uncertainty,
+see the <a href="fitness.html">fitness analysis</a>.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

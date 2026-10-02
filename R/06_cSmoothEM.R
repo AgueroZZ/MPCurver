@@ -1585,6 +1585,7 @@ initialize_ordering_csmooth <- function(
     modelName = c("homoskedastic", "heteroskedastic"),
     nugget = 0,
     eps = 1e-12,
+    init_on_failure = "error",
     ...
 ) {
   method <- match.arg(method)
@@ -1628,15 +1629,9 @@ initialize_ordering_csmooth <- function(
   }
 
   # non-random: ordering score + make_init_csmooth()
-  ordering_result <- switch(
-    method,
-    PCA     = PCA_ordering(X, ...),
-    tSNE    = tSNE_ordering(X, ...),
-    pcurve  = pcurve_ordering(X, ...),
-    fiedler = fiedler_ordering(X, ...),
-    isomap  = isomap_ordering(X, ...),
-    stop("Unknown method: ", method)
-  )
+  ordering_result <- .cavi_get_ordering_result(
+    X, method, method_args = list(...), init_on_failure = init_on_failure)
+
 
   init <- make_init_csmooth(
     X = X,
@@ -1649,7 +1644,9 @@ initialize_ordering_csmooth <- function(
     eps = eps
   )
 
-  ordering <- c(ordering_result, list(method = method))
+  ordering <- c(ordering_result,
+    list(method = attr(ordering_result, "init_info")$method_used))
+  attr(ordering, "init_info") <- attr(ordering_result, "init_info")
   list(
     params       = list(pi = init$pi, mu = init$mu, sigma2 = init$sigma2),
     keep_idx     = init$keep_idx,

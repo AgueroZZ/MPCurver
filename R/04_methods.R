@@ -539,6 +539,7 @@ plot_EM_embedding2D <- function(
 
   if (K >= 2) {
     for (k in 1:(K - 1)) {
+      if (!.mpcurve_visible_segment(mup[k, ], mup[k + 1, ])) next
       graphics::arrows(
         mup[k, 1], mup[k, 2],
         mup[k + 1, 1], mup[k + 1, 2],

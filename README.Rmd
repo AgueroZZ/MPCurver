@@ -35,11 +35,16 @@ results, and `do_mpcurve()` to run additional fitting iterations.
 ## Documentation
 
 - [Getting started](https://aguerozz.github.io/MPCurver/articles/mpcurve_intro.html):
-  the model, variational inference, and a simulated trajectory example.
-- [Feature partitioning](https://aguerozz.github.io/MPCurver/articles/partition.html):
-  fitting multiple orderings and interpreting feature assignments.
+  the single-ordering model and a simulated trajectory example.
+- [Multiple orderings](https://aguerozz.github.io/MPCurver/articles/partition.html):
+  the multi-ordering model and an example fit.
+- [Estimating intrinsic dimension](https://aguerozz.github.io/MPCurver/articles/intrinsic_dimension.html):
+  automatic initialization, adaptive feature support, and dimension selection.
 - [Fitness data analysis](https://aguerozz.github.io/MPCurver/articles/fitness.html):
   a worked example with smoothing and measurement uncertainty.
+
+- Optional algorithm details: [Single-ordering CAVI](https://aguerozz.github.io/MPCurver/articles/cavi_single.html)
+  and [Multi-ordering CAVI](https://aguerozz.github.io/MPCurver/articles/cavi_partition.html).
 
 ## Installation
 
@@ -49,7 +54,41 @@ Install `MPCurver` from GitHub:
 pak::pak("AgueroZZ/MPCurver")
 ```
 
-## Example
+## Quick start
+
+```{r quick-start}
+library(MPCurver)
+sim_small <- simulate_mpcurve(n = 60, d = 6, num_bins = 8, seed = 1)
+fit_small <- fit_mpcurve(sim_small$X, num_bins = 8)
+summary(fit_small)
+positions <- fitted_positions(fit_small)                 # samples x orderings
+trajectories <- fitted_trajectories(fit_small)            # features x bins x orderings
+assignment_probabilities <- fitted_assignments(fit_small) # features x orderings
+```
+
+Figure 1 shows the inferred ordering and trajectory. Inspect `summary(fit_small)`
+and the objective trace when assessing convergence; use
+`do_mpcurve(fit_small, max_iter = 100)` to continue a fit.
+
+```{r quick-plot, fig.cap="Figure 1. Sample observations colored by posterior-mean pseudotime, with the fitted mean trajectory in orange."}
+plot(fit_small)
+```
+
+The extraction functions retain the ordering dimension even for one ordering.
+Use `fitted_positions(fit_small, "sd")` or
+`fitted_trajectories(fit_small, "sd")` for posterior standard deviations.
+
+### Your data
+
+Supply a numeric matrix or all-numeric data frame, with samples in rows and
+features in columns. Sample and feature names are retained; `plot(fit, dims =
+"gene_name")` selects a named feature. Values must be finite: handle missing
+values before fitting. MPCurver does not impute or standardize the fitting data.
+Optional measurement SDs `S` must be finite and nonnegative, in the same units
+and positional order as `X`, as a feature vector or a matrix matching `X`.
+Names do not trigger reordering. See `?fit_mpcurve` for details.
+
+## Worked spiral example
 
 The example below recovers a latent ordering from a noisy two-dimensional
 spiral.
@@ -58,29 +97,29 @@ spiral.
 library(MPCurver)
 ```
 
-First, generate the observations:
+Generate the observations shown in Figure 2:
 
-```{r}
-sim <- simulate_spiral2d(n = 1500, turns = 1, noise = 0.08, seed = 123)
+```{r spiral-data, fig.cap="Figure 2. Noisy two-dimensional spiral observations."}
+sim <- simulate_spiral2d(n = 1500, turns = 1, noise_sd = 0.08, seed = 123)
 plot(sim$obs, pch = 16, cex = 0.35, col = "grey80",
      xlab = "x1", ylab = "x2", main = "Noisy 2D spiral")
 ```
 
 Fit a model with 40 grid positions and a second-order random-walk prior. The
-first plot shows the inferred ordering and trajectory; the second shows the
+inferred ordering and trajectory appear in Figure 3; Figure 4 shows the
 variational objective over fitting iterations.
 
-```{r}
+```{r spiral-fit, fig.cap=c("Figure 3. Inferred sample ordering and smooth trajectory for the noisy spiral.", "Figure 4. Variational objective over fitting iterations for the spiral model.")}
 set.seed(123)
 fit <- fit_mpcurve(
-  X = as.matrix(sim$obs),
-  method = "isomap",
-  K = 40,
-  rw_q = 2,
-  iter = 150,
-  discretization = "equal",
-  tol = 1e-8
-)
+    X = as.matrix(sim$obs),
+    initial_method = "isomap",
+    num_bins = 40,
+    max_iter = 150,
+    tol = 1e-8,
+    control = mpcurve_control(rw_order = 2),
+    init_control = mpcurve_init_control(discretization = "equal")
+  )
 
 plot(fit)
 plot(fit, plot_type = "elbo")
@@ -95,14 +134,14 @@ init_methods <- c("PCA", "fiedler", "isomap")
 fits <- setNames(
   lapply(init_methods, function(init_method) {
     fit_mpcurve(
-      X = as.matrix(sim$obs),
-      method = init_method,
-      K = 40,
-      rw_q = 2,
-      iter = 150,
-      discretization = "equal",
-      tol = 1e-8
-    )
+    X = as.matrix(sim$obs),
+    initial_method = init_method,
+    num_bins = 40,
+    max_iter = 150,
+    tol = 1e-8,
+    control = mpcurve_control(rw_order = 2),
+    init_control = mpcurve_init_control(discretization = "equal")
+  )
   }),
   init_methods
 )
@@ -116,10 +155,52 @@ data.frame(
 For these fits with the same model and data, a larger final ELBO indicates a
 better variational objective. Inspect the fitted trajectories as well as this
 numerical comparison. Sample positions are available in
-`fit$locations$mean$pseudotime`, and `fit$params$mu` contains the estimated
+`fitted_positions(fit)`, and `fitted_trajectories(fit)` contains the estimated
 feature trajectories.
 
+Model settings are collected in `mpcurve_control()`. The default RW2 prior
+uses empirical-Bayes smoothness updates. For RW3 with precision fixed at 5:
+
+```{r advanced-control, eval=FALSE}
+fit_rw3_fixed <- fit_mpcurve(
+  X = as.matrix(sim$obs),
+  initial_method = "isomap",
+  control = mpcurve_control(rw_order = 3, lambda_init = 5, fix_lambda = TRUE)
+)
+```
+
+Use `lambda_bounds` and `sigma2_bounds` in the same constructor to set parameter
+limits. `mpcurve_init_control()` configures feature grouping and ordering-helper
+arguments. For example, `method_args = list(num_neighbors = 10)` controls the neighborhood
+size when `initial_method = "isomap"`.
+
+Invalid initialization settings raise an error. If the requested ordering
+computation fails, fitting warns with the cause and retries using PCA component
+1. Use `init_control = mpcurve_init_control(on_failure = "error")` to stop
+instead. If PCA fails, fitting stops; the initialization metadata records any
+successful fallback and its original cause.
+
+Continue a fit with `do_mpcurve(fit, max_iter = 100)`. It inherits the stored
+model and measurement errors. To change precision while continuing, use
+`control = mpcurve_continue_control(lambda_init = 5, fix_lambda = TRUE)`;
+`fix_lambda = FALSE` enables empirical-Bayes updates again. Omitted
+continuation settings inherit their fitted values.
+
+Ordering helpers keep method-specific advanced settings in a named `control`
+list. When fitting, nest this list inside `method_args`, for example
+`mpcurve_init_control(method_args = list(num_neighbors = 10,
+control = list(num_landmarks = 100)))` for Isomap. Reference pages list all
+accepted settings and defaults. Simulation helpers consistently use `n` for
+samples, `d` or block-specific counts for features, and `noise_sd` for Gaussian
+noise standard deviations; trajectory-shape settings use their own `control`.
+
 ## Multiple orderings and feature groups
+
+When the number of orderings is unknown, start with
+`fit_mpcurve(X, intrinsic_dim = "auto")` using the default adaptive partition
+prior. It is computationally simpler than candidate model comparison: it fits
+one adaptively weighted model after similarity initialization, then removes
+orderings with numerical-zero estimated prior weights.
 
 A single ordering may describe some features well while missing the patterns
 in others. Set `intrinsic_dim = M` to fit $M$ orderings of the same samples.
@@ -135,16 +216,20 @@ orderings, while smoothness can vary with the feature and ordering.
 
 The default similarity initialization clusters the features, then applies one
 ordering method independently within every feature group. PCA is the default,
-using each group's own PC1. Setting `method = "isomap"` or
-`method = "fiedler"` applies that method separately to all groups.
+using each group's own PC1. Setting `initial_method = "isomap"` or
+`initial_method = "fiedler"` applies that method separately to all groups.
 
 For a two-ordering analysis of your sample-by-feature data matrix `X`:
 
 ``` r
-fit_multi <- fit_mpcurve(X, intrinsic_dim = 2, K = 40)
+fit_multi <- fit_mpcurve(
+    X,
+    intrinsic_dim = 2,
+    num_bins = 40
+  )
 summary(fit_multi)
-fit_multi$partition$pi_weights
-fit_multi$effective_intrinsic_dim
+fitted_assignments(fit_multi)
+fit_multi$intrinsic_dim
 plot(fit_multi, plot_type = "mu", dims = 1)
 ```
 
@@ -154,37 +239,52 @@ the adaptive model:
 
 ``` r
 fit_auto <- fit_mpcurve(
-  X,
-  intrinsic_dim = "auto",
-  max_intrinsic_dim = 8,
-  similarity_min_cluster_size = 2,
-  K = 40
-)
+    X,
+    intrinsic_dim = "auto",
+    num_bins = 40,
+    init_control = mpcurve_init_control(max_intrinsic_dim = 8, min_cluster_size = 2)
+  )
 
 fit_auto$dimension_initialization$diagnostics
-fit_auto$effective_intrinsic_dim
+fit_auto$intrinsic_dim
 ```
 
 Automatic initialization uses the fast spline-R-squared metric
 (`similarity_metric = "spline_r2"`) by default, with five spline degrees of
 freedom. It selects the eligible cut with the largest mean silhouette, where
-every cluster must contain at least `similarity_min_cluster_size` features
+every cluster must contain at least `init_control$min_cluster_size` features
 (default 2). For adaptive fitting, the selected cluster-size proportions
 initialize the global ordering probabilities; subsequent empirical-Bayes
-updates can reduce the effective number of orderings.
+updates can leave some orderings with estimated prior weights numerically
+close to zero.
+Automatic fitting removes those orderings without additional fitting and
+returns a model with the estimated dimension. Initial and final dimensions
+and any removed orderings are recorded in `fit_auto$dimension_estimation`.
 
 The assignment probabilities describe how strongly each feature supports
 each ordering. The trajectory plot shows the feature's fitted mean under
 each ordering, with the corresponding assignment probability in the panel
-title. With the default adaptive feature-assignment prior,
-`effective_intrinsic_dim` counts prior weights above the configurable
-`effective_weight_tol` (default `1e-12`); `intrinsic_dim` remains the fitted
-number of orderings. For a fixed uniform assignment prior, use
-`select_mpcurve_dimension(X, max_intrinsic_dim = 4, direction = "forward")`
-to compare final objectives across adjacent dimensions. Inspect its saved
+title. `intrinsic_dim` is the actual number of orderings in the returned
+model. An integer supplied by the user retains that dimension. Automatic
+adaptive fitting removes orderings whose estimated prior weights are at or
+below `control$effective_count_tol / P`, where $P$ is the number of feature
+columns and the tolerance defaults to `1e-8`. This tolerance identifies
+numerical zeros; values above `1e-6` trigger a warning during automatic
+adaptive pruning because they may remove supported orderings.
+For a fixed uniform assignment prior, use
+`select_mpcurve_dimension(
+  X,
+  max_intrinsic_dim = 4,
+    direction = "forward"
+  )`
+to compare final objectives across adjacent dimensions. This fits multiple
+candidate models under a different prior and may choose a different dimension
+from adaptive fitting. Inspect its saved
 scores and convergence diagnostics alongside the feature groups. The
-[feature-partitioning tutorial](https://aguerozz.github.io/MPCurver/articles/partition.html)
-provides background on the statistical model.
+[multiple-ordering tutorial](https://aguerozz.github.io/MPCurver/articles/partition.html)
+introduces the statistical model. The
+[intrinsic-dimension tutorial](https://aguerozz.github.io/MPCurver/articles/intrinsic_dimension.html)
+explains estimation and dimension selection.
 
 ## Measurement uncertainty
 

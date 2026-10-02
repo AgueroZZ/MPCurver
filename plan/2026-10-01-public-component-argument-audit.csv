@@ -1,0 +1,160 @@
+function_name,argument,default,current_location,decision,reason
+do_mpcurve,object,,object,retained,"Useful setting retained in a small, coherent interface."
+do_mpcurve,iter,1,max_iter,renamed or made explicit,Use consistent names and expose accepted settings directly.
+do_mpcurve,lambda,NULL,control$lambda_init,advanced control,Advanced setting remains available with documented default and scope.
+do_mpcurve,S,NULL,stored measurement_sd,removed from public arguments,Continuation inherits the saved measurement-error model; changes require refitting.
+do_mpcurve,tol,NULL,tol,retained,"Useful setting retained in a small, coherent interface."
+do_mpcurve,lambda_sd_prior_rate,NULL,control$lambda_sd_prior_rate,advanced control,Advanced setting remains available with documented default and scope.
+do_mpcurve,lambda_min,NULL,control$lambda_bounds[1],advanced control,Advanced setting remains available with documented default and scope.
+do_mpcurve,lambda_max,NULL,control$lambda_bounds[2],advanced control,Advanced setting remains available with documented default and scope.
+do_mpcurve,sigma_min,NULL,control$sigma2_bounds[1],advanced control,Advanced setting remains available with documented default and scope.
+do_mpcurve,sigma_max,NULL,control$sigma2_bounds[2],advanced control,Advanced setting remains available with documented default and scope.
+do_mpcurve,verbose,FALSE,verbose,retained,"Useful setting retained in a small, coherent interface."
+do_mpcurve,convergence,NULL,control$convergence,advanced control,Advanced setting remains available with documented default and scope.
+fiedler_ordering,X,,X,retained,"Useful setting retained in a small, coherent interface."
+fiedler_ordering,k,15,num_neighbors,renamed or made explicit,Use consistent names and expose accepted settings directly.
+fiedler_ordering,weight,"c(""binary"", ""rbf"", ""inv"")",control$weight,advanced control,Advanced setting remains available with documented default and scope.
+fiedler_ordering,sigma,NULL,control$sigma,advanced control,Advanced setting remains available with documented default and scope.
+fiedler_ordering,keep,"c(""giant"", ""all"")",control$keep,advanced control,Advanced setting remains available with documented default and scope.
+fiedler_ordering,return_full,TRUE,control$return_full,advanced control,Advanced setting remains available with documented default and scope.
+fit_mpcurve,X,,X,retained,"Useful setting retained in a small, coherent interface."
+fit_mpcurve,S,NULL,S,retained,"Useful setting retained in a small, coherent interface."
+fit_mpcurve,num_bins,NULL,num_bins,retained,"Useful setting retained in a small, coherent interface."
+fit_mpcurve,num_orderings,1L,intrinsic_dim,renamed,"Use intrinsic-dimension terminology, with model_intrinsic_dim preserving retained model dimensionality."
+fit_mpcurve,initial_method,"""PCA""",initial_method,retained,"Useful setting retained in a small, coherent interface."
+fit_mpcurve,position_prior,"c(""adaptive"", ""fixed"")",position_prior,retained,"Useful setting retained in a small, coherent interface."
+fit_mpcurve,partition_prior,"c(""adaptive"", ""fixed"")",partition_prior,retained,"Useful setting retained in a small, coherent interface."
+fit_mpcurve,max_iter,100L,max_iter,retained,"Useful setting retained in a small, coherent interface."
+fit_mpcurve,tol,1e-06,tol,retained,"Useful setting retained in a small, coherent interface."
+fit_mpcurve,verbose,FALSE,verbose,retained,"Useful setting retained in a small, coherent interface."
+fit_mpcurve,init_control,NULL,init_control,retained,"Useful setting retained in a small, coherent interface."
+fit_mpcurve,control,NULL,control,retained,"Useful setting retained in a small, coherent interface."
+fitted_prior,x,,x,retained,"Useful setting retained in a small, coherent interface."
+fitted_prior,type,"c(""position"", ""partition"")",type,retained,"Useful setting retained in a small, coherent interface."
+fitted_prior,ordering,NULL,ordering,retained,"Useful setting retained in a small, coherent interface."
+fitted_prior,...,,...,retained,Retain the standard S3 signature; reject unused extra arguments instead of ignoring them.
+isomap_ordering,X,,X,retained,"Useful setting retained in a small, coherent interface."
+isomap_ordering,k,15,num_neighbors,renamed or made explicit,Use consistent names and expose accepted settings directly.
+isomap_ordering,ndim,1,control$embedding_dims,advanced control,Advanced setting remains available with documented default and scope.
+isomap_ordering,component,1,component,retained,"Useful setting retained in a small, coherent interface."
+isomap_ordering,landmark,NULL,control$num_landmarks,advanced control,Advanced setting remains available with documented default and scope.
+isomap_ordering,landmark_method,"c(""random"", ""kmeans"")",control$landmark_method,advanced control,Advanced setting remains available with documented default and scope.
+isomap_ordering,seed,NULL,seed,retained,"Useful setting retained in a small, coherent interface."
+isomap_ordering,keep,"c(""giant"", ""all"")",control$keep,advanced control,Advanced setting remains available with documented default and scope.
+isomap_ordering,return_full,TRUE,control$return_full,advanced control,Advanced setting remains available with documented default and scope.
+isomap_ordering,orient_by_pc1,TRUE,control$orient_by_pc1,advanced control,Advanced setting remains available with documented default and scope.
+isomap_ordering,scale01,TRUE,control$scale01,advanced control,Advanced setting remains available with documented default and scope.
+isomap_ordering,eps,1e-08,internal numerical rule,removed from public arguments,Numerical stabilization is an internal rule.
+mpcurve_control,rw_order,2L,rw_order,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,lambda_init,1,lambda_init,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,fix_lambda,FALSE,fix_lambda,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,sigma2_init,NULL,sigma2_init,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,lambda_bounds,"c(1e-10, 1e+10)",lambda_bounds,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,sigma2_bounds,"c(1e-10, 1e+10)",sigma2_bounds,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,ridge,0,ridge,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,lambda_sd_prior_rate,NULL,lambda_sd_prior_rate,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,position_prior_weights,NULL,position_prior_weights,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,partition_prior_weights,NULL,partition_prior_weights,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,anneal_steps,25L,anneal_steps,default changed to 0L,Annealing is optional; the default fit starts at temperature 1 without additional sweeps.
+mpcurve_control,anneal_start,5,anneal_start,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,anneal_sweeps,1L,anneal_sweeps,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,convergence,"c(""normalized"", ""relative"")",convergence,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,effective_weight_tol,1e-12,effective_weight_tol,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_control,hard_assign_final,FALSE,hard_assign_final,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_init_control,partition_init,"c(""similarity"", ""ordering_methods"")",partition_init,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_init_control,discretization,"c(""quantile"", ""equal"", ""kmeans"")",discretization,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_init_control,similarity_metric,NULL,similarity_metric,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_init_control,max_num_orderings,8L,max_intrinsic_dim,renamed,Use the same intrinsic-dimension terminology for search and initialization bounds.
+mpcurve_init_control,min_cluster_size,2L,min_cluster_size,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_init_control,spline_r2_df,5L,spline_r2_df,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_init_control,cluster_linkage,"""single""",cluster_linkage,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_init_control,smooth_fit_lambda_mode,"c(""optimize"", ""fixed"")",smooth_fit_lambda_mode,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_init_control,smooth_fit_lambda_value,1,smooth_fit_lambda_value,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_init_control,pca_components,NULL,pca_components,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_init_control,responsibilities_init,NULL,responsibilities_init,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_init_control,fits_init,NULL,fits_init,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+mpcurve_init_control,method_args,list(),method_args,retained,Advanced constructor settings already simplified and documented in the preceding fit-interface step.
+PCA_ordering,X,,X,retained,"Useful setting retained in a small, coherent interface."
+PCA_ordering,center,TRUE,center,retained,"Useful setting retained in a small, coherent interface."
+PCA_ordering,scale,FALSE,scale,retained,"Useful setting retained in a small, coherent interface."
+PCA_ordering,scale01,TRUE,scale01,retained,"Useful setting retained in a small, coherent interface."
+PCA_ordering,component,1L,component,retained,"Useful setting retained in a small, coherent interface."
+pcurve_ordering,X,,X,retained,"Useful setting retained in a small, coherent interface."
+pcurve_ordering,smoother,"c(""smooth_spline"", ""lowess"", ""periodic_lowess"")",smoother,retained,"Useful setting retained in a small, coherent interface."
+pcurve_ordering,thresh,0.001,tol,renamed or made explicit,Use consistent names and expose accepted settings directly.
+pcurve_ordering,maxit,10,max_iter,renamed or made explicit,Use consistent names and expose accepted settings directly.
+pcurve_ordering,stretch,2,control$stretch,advanced control,Advanced setting remains available with documented default and scope.
+pcurve_ordering,approx_points,FALSE,control$approx_points,advanced control,Advanced setting remains available with documented default and scope.
+pcurve_ordering,scale01,TRUE,control$scale01,advanced control,Advanced setting remains available with documented default and scope.
+pcurve_ordering,orient_by_pc1,TRUE,control$orient_by_pc1,advanced control,Advanced setting remains available with documented default and scope.
+select_mpcurve_dimension,X,,X,retained,"Useful setting retained in a small, coherent interface."
+select_mpcurve_dimension,max_intrinsic_dim,,max_intrinsic_dim,renamed,Use the same intrinsic-dimension terminology for search and initialization bounds.
+select_mpcurve_dimension,direction,"c(""forward"", ""backward"")",direction,retained,"Useful setting retained in a small, coherent interface."
+select_mpcurve_dimension,...,,explicit fit arguments and controls,renamed or made explicit,Use consistent names and expose accepted settings directly.
+simulate_cavi_toy,n,150,n,retained,"Useful setting retained in a small, coherent interface."
+simulate_cavi_toy,d,20,d,retained,"Useful setting retained in a small, coherent interface."
+simulate_cavi_toy,K,8,num_bins,renamed or made explicit,Use consistent names and expose accepted settings directly.
+simulate_cavi_toy,rw_q,2L,control$rw_order,advanced control,Advanced setting remains available with documented default and scope.
+simulate_cavi_toy,lambda_range,"c(0.5, 3)",control$lambda_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_cavi_toy,sigma_range,"c(0.08, 0.18)",control$noise_sd_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_cavi_toy,pi,NULL,control$position_weights,advanced control,Advanced setting remains available with documented default and scope.
+simulate_cavi_toy,ridge,0.001,control$ridge,advanced control,Advanced setting remains available with documented default and scope.
+simulate_cavi_toy,seed,NULL,seed,retained,"Useful setting retained in a small, coherent interface."
+simulate_dual_trajectory,n,200,n,retained,"Useful setting retained in a small, coherent interface."
+simulate_dual_trajectory,d1,30,d1,retained,"Useful setting retained in a small, coherent interface."
+simulate_dual_trajectory,d2,30,d2,retained,"Useful setting retained in a small, coherent interface."
+simulate_dual_trajectory,d_noise,20,d_noise,retained,"Useful setting retained in a small, coherent interface."
+simulate_dual_trajectory,sigma,0.3,noise_sd,renamed or made explicit,Use consistent names and expose accepted settings directly.
+simulate_dual_trajectory,crossing,FALSE,crossing,retained,"Useful setting retained in a small, coherent interface."
+simulate_dual_trajectory,seed,42L,seed,retained,"Useful setting retained in a small, coherent interface."
+simulate_dual_trajectory,trajectory_family,"c(""sinusoidal"", ""sinusoidal"")",trajectory_family,retained,"Useful setting retained in a small, coherent interface."
+simulate_dual_trajectory,signal_range,"c(0.5, 2)",control$signal_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_dual_trajectory,linear_slope_range,"c(0.8, 2)",control$linear_slope_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_dual_trajectory,monotone_power_range,"c(0.7, 2.5)",control$monotone_power_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_dual_trajectory,quadratic_curvature_range,"c(0.8, 2)",control$quadratic_curvature_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_dual_trajectory,quadratic_center_range,"c(0.25, 0.75)",control$quadratic_center_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_dual_trajectory,intercept_sd,0,control$intercept_sd,advanced control,Advanced setting remains available with documented default and scope.
+simulate_dual_trajectory,sinusoid_freq,1:4,control$sinusoid_freq,advanced control,Advanced setting remains available with documented default and scope.
+simulate_intrinsic_trajectories,n,200,n,retained,"Useful setting retained in a small, coherent interface."
+simulate_intrinsic_trajectories,d_signal,"c(30, 30)",d_signal,retained,"Useful setting retained in a small, coherent interface."
+simulate_intrinsic_trajectories,d_noise,20,d_noise,retained,"Useful setting retained in a small, coherent interface."
+simulate_intrinsic_trajectories,sigma,0.3,noise_sd,renamed or made explicit,Use consistent names and expose accepted settings directly.
+simulate_intrinsic_trajectories,seed,42L,seed,retained,"Useful setting retained in a small, coherent interface."
+simulate_intrinsic_trajectories,trajectory_family,"""sinusoidal""",trajectory_family,retained,"Useful setting retained in a small, coherent interface."
+simulate_intrinsic_trajectories,signal_range,"c(0.5, 2)",control$signal_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_intrinsic_trajectories,linear_slope_range,"c(0.8, 2)",control$linear_slope_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_intrinsic_trajectories,monotone_power_range,"c(0.7, 2.5)",control$monotone_power_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_intrinsic_trajectories,quadratic_curvature_range,"c(0.8, 2)",control$quadratic_curvature_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_intrinsic_trajectories,quadratic_center_range,"c(0.25, 0.75)",control$quadratic_center_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_intrinsic_trajectories,intercept_sd,0,control$intercept_sd,advanced control,Advanced setting remains available with documented default and scope.
+simulate_intrinsic_trajectories,sinusoid_freq,1:4,control$sinusoid_freq,advanced control,Advanced setting remains available with documented default and scope.
+simulate_intrinsic_trajectories,latent_positions,NULL,control$latent_positions,advanced control,Advanced setting remains available with documented default and scope.
+simulate_spiral2d,n,500,n,retained,"Useful setting retained in a small, coherent interface."
+simulate_spiral2d,turns,3,turns,retained,"Useful setting retained in a small, coherent interface."
+simulate_spiral2d,noise,0.05,noise_sd,renamed or made explicit,Use consistent names and expose accepted settings directly.
+simulate_spiral2d,r0,0.2,r0,retained,"Useful setting retained in a small, coherent interface."
+simulate_spiral2d,r1,1,r1,retained,"Useful setting retained in a small, coherent interface."
+simulate_spiral2d,seed,1,seed,retained,"Useful setting retained in a small, coherent interface."
+simulate_swiss_roll_1d_2d,n,800,n,retained,"Useful setting retained in a small, coherent interface."
+simulate_swiss_roll_1d_2d,t_range,"c(1.5 * base::pi, 6 * base::pi)",t_range,retained,"Useful setting retained in a small, coherent interface."
+simulate_swiss_roll_1d_2d,sigma,0.15,noise_sd,renamed or made explicit,Use consistent names and expose accepted settings directly.
+simulate_swiss_roll_1d_2d,seed,1,seed,retained,"Useful setting retained in a small, coherent interface."
+simulate_two_order_gp_dataset,N,1000,n,renamed or made explicit,Use consistent names and expose accepted settings directly.
+simulate_two_order_gp_dataset,D,16,d,renamed or made explicit,Use consistent names and expose accepted settings directly.
+simulate_two_order_gp_dataset,t_range,"c(0, 10)",control$t_range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_two_order_gp_dataset,range,5,control$range,advanced control,Advanced setting remains available with documented default and scope.
+simulate_two_order_gp_dataset,smoothness,2.5,control$smoothness,advanced control,Advanced setting remains available with documented default and scope.
+simulate_two_order_gp_dataset,variance,3,control$variance,advanced control,Advanced setting remains available with documented default and scope.
+simulate_two_order_gp_dataset,noise_sd,0.05,noise_sd,retained,"Useful setting retained in a small, coherent interface."
+simulate_two_order_gp_dataset,shift_positive,TRUE,control$shift_positive,advanced control,Advanced setting remains available with documented default and scope.
+simulate_two_order_gp_dataset,permute_cols,FALSE,control$permute_cols,advanced control,Advanced setting remains available with documented default and scope.
+simulate_two_order_gp_dataset,permute_rows_block2,TRUE,control$permute_rows_block2,advanced control,Advanced setting remains available with documented default and scope.
+simulate_two_order_gp_dataset,seed,NULL,seed,retained,"Useful setting retained in a small, coherent interface."
+tSNE_ordering,X,,X,retained,"Useful setting retained in a small, coherent interface."
+tSNE_ordering,tSNE_dims,1,control$embedding_dims,advanced control,Advanced setting remains available with documented default and scope.
+tSNE_ordering,component,1,component,retained,"Useful setting retained in a small, coherent interface."
+tSNE_ordering,perplexity,10,perplexity,retained,"Useful setting retained in a small, coherent interface."
+tSNE_ordering,max_iter,500,max_iter,retained,"Useful setting retained in a small, coherent interface."
+tSNE_ordering,seed,NULL,seed,retained,"Useful setting retained in a small, coherent interface."
+tSNE_ordering,scale01,TRUE,control$scale01,advanced control,Advanced setting remains available with documented default and scope.
+tSNE_ordering,orient_by_pc1,TRUE,control$orient_by_pc1,advanced control,Advanced setting remains available with documented default and scope.

@@ -299,22 +299,8 @@
 }
 
 
-#' Simulate a toy dataset from the current single-ordering CAVI model
-#'
-#' @param n Number of observations.
-#' @param d Number of features.
-#' @param K Number of latent positions/components.
-#' @param rw_q Random-walk order for the GMRF prior.
-#' @param lambda_range Length-2 positive range for feature-specific \code{lambda_j}.
-#' @param sigma_range Length-2 positive range for feature-specific \code{sigma_j}.
-#' @param pi Optional component probabilities; defaults to uniform.
-#' @param ridge Small ridge used only for simulation to make the prior proper.
-#' @param seed Optional integer seed.
-#'
-#' @return A list with \code{X}, \code{z}, \code{pi}, \code{mu}, \code{sigma2},
-#'   \code{lambda_vec}, and \code{Q_K}.
-#' @export
-simulate_cavi_toy <- function(n = 150,
+# Internal numerical implementation of simulate_mpcurve.
+.simulate_mpcurve <- function(n = 150,
                               d = 20,
                               K = 8,
                               rw_q = 2L,
@@ -388,7 +374,7 @@ simulate_cavi_toy <- function(n = 150,
 }
 
 
-#' Fit the recommended CAVI model for a single MPCurver ordering
+#' Fit a single-ordering MPCurve model by CAVI
 #'
 #' @description
 #' Recommended variational pipeline for a single-ordering MPCurver model with
@@ -455,6 +441,8 @@ cavi <- function(X,
                  K = NULL,
                  method = c("PCA", "fiedler", "pcurve", "tSNE", "random", "isomap"),
                  responsibilities_init = NULL,
+                 method_args = list(),
+                 init_on_failure = "pca",
                  position_prior = c("adaptive", "fixed"),
                  position_prior_init = NULL,
                  pi_init = NULL,
@@ -485,11 +473,7 @@ cavi <- function(X,
   if (n < 2L) stop("X must have at least two rows.")
   if (d < 1L) stop("X must have at least one column.")
 
-  if (is.null(K)) {
-    K <- max(2L, min(50L, as.integer(floor(n / 5))))
-  } else {
-    K <- as.integer(K)
-  }
+  K <- .cavi_resolve_K(X, K, rw_q)
   rw_q <- as.integer(rw_q)
   max_iter <- as.integer(max_iter)
 
@@ -526,13 +510,14 @@ cavi <- function(X,
   raw_init <- NULL
 
   if (is.null(responsibilities_init)) {
-    init <- initialize_ordering_csmooth(
+    init <- do.call(initialize_ordering_csmooth, c(list(
       X = X,
       K = K,
       method = method,
       discretization = discretization,
-      modelName = "homoskedastic"
-    )
+      modelName = "homoskedastic",
+      init_on_failure = init_on_failure
+    ), method_args))
     params0 <- init$params
     K_init <- length(params0$pi)
     if (K_init != K) {
@@ -1047,6 +1032,8 @@ cavi <- function(X,
         adaptive = if (fix_lambda) "fixed_lambda" else "variational",
         position_prior = position_prior_ctl$position_prior,
         method = method,
+        method_args = method_args,
+        init_on_failure = init_on_failure,
         discretization = discretization,
         fix_lambda = fix_lambda,
         prior_proper = prior_meta$proper,
@@ -1073,6 +1060,8 @@ cavi <- function(X,
     ),
     class = "cavi"
   )
+  out$init_info <- if (is.null(responsibilities_init)) attr(init$ordering, "init_info") else NULL
+  out$control$method <- out$init_info$method_used %||% method
   out$priors <- .mpcurve_priors_from_cavi_fit(out)
   out
 }
@@ -1143,8 +1132,8 @@ do_cavi <- function(object,
     } else {
       .normalize_lambda_sd_prior_rate(lambda_sd_prior_rate)
     }
-    lmin_use <- 1e-10
-    lmax_use <- 1e10
+    lmin_use <- lambda_min %||% object$control$lambda_min %||% 1e-10
+    lmax_use <- lambda_max %||% object$control$lambda_max %||% 1e10
   } else {
     lambda_init_use <- object$lambda_vec
     fix_lambda_use <- isTRUE(object$control$fix_lambda)
@@ -1176,6 +1165,8 @@ do_cavi <- function(object,
     X = object$data,
     K = length(object$params$pi),
     method = object$control$method %||% "PCA",
+    method_args = object$control$method_args %||% list(),
+    init_on_failure = object$control$init_on_failure %||% "pca",
     responsibilities_init = structure(
       object$gamma,
       cavi_skip_raw_preinit = TRUE
@@ -1230,7 +1221,9 @@ do_cavi <- function(object,
     updated$pi_trace <- object$pi_trace %||% list()
   }
 
-  updated$iter <- length(updated$elbo_trace) - 1L
+  updated$iteration_offset <- object$iteration_offset %||% 0L
+  updated$init_info <- object$init_info
+  updated$iter <- updated$iteration_offset + length(updated$elbo_trace) - 1L
   updated$priors <- NULL
   updated$priors <- .mpcurve_priors_from_cavi_fit(updated)
   updated
@@ -1438,14 +1431,13 @@ plot.cavi <- function(
       oldpar <- graphics::par(no.readonly = TRUE)
       on.exit(graphics::par(oldpar), add = TRUE)
       graphics::par(mfrow = c(2, 1), mar = c(4, 4, 2, 1))
-      graphics::plot(seq_along(elbo), elbo, type = "l", lwd = 2,
+      .mpcurve_plot_call(graphics::plot, list(seq_along(elbo), elbo, type = "l", lwd = 2,
                      xlab = "Iteration", ylab = "ELBO",
-                     main = sprintf("CAVI ELBO trace (K=%d)", length(x$params$pi)),
-                     ...)
+                     main = sprintf("CAVI ELBO trace (K=%d)", length(x$params$pi))), ...)
       if (length(ll) > 0L) {
-        graphics::plot(seq_along(ll), ll, type = "l", lwd = 2,
+        .mpcurve_plot_call(graphics::plot, list(seq_along(ll), ll, type = "l", lwd = 2,
                        xlab = "Iteration", ylab = "Observed log-likelihood",
-                       main = "Plug-in observed log-likelihood", ...)
+                       main = "Plug-in observed log-likelihood"), ...)
       } else {
         graphics::plot.new()
         graphics::title(main = "Plug-in observed log-likelihood (empty)")
@@ -1456,15 +1448,16 @@ plot.cavi <- function(
       yall <- yall[is.finite(yall)]
       ylim <- if (length(yall)) range(yall) else c(-1, 1)
 
-      graphics::plot.new()
-      graphics::plot.window(xlim = xlim, ylim = ylim)
-      graphics::axis(1)
-      graphics::axis(2)
-      graphics::box()
-      graphics::title(main = sprintf("CAVI traces (K=%d)", length(x$params$pi)),
-                      xlab = "Iteration", ylab = "Value")
-      if (length(elbo) > 0L) graphics::lines(seq_along(elbo), elbo, lty = 1, lwd = 2, ...)
-      if (length(ll) > 0L) graphics::lines(seq_along(ll), ll, lty = 2, lwd = 2)
+      .mpcurve_plot_call(graphics::plot, list(x = NA_real_, y = NA_real_,
+        type = "n", xlim = xlim, ylim = ylim,
+        main = sprintf("CAVI traces (K=%d)", length(x$params$pi)),
+        xlab = "Iteration", ylab = "Value"), ...)
+      line_style <- list(...)
+      line_style <- line_style[intersect(names(line_style), c("col", "lwd", "lty", "pch", "cex"))]
+      if (length(elbo) > 0L) do.call(graphics::lines, utils::modifyList(
+        list(x = seq_along(elbo), y = elbo, lty = 1, lwd = 2), line_style))
+      if (length(ll) > 0L) do.call(graphics::lines, utils::modifyList(
+        list(x = seq_along(ll), y = ll, lty = 2, lwd = 2), line_style))
       graphics::legend("bottomright",
                        legend = c(if (length(elbo) > 0L) "ELBO" else NULL,
                                   if (length(ll) > 0L) "logLik" else NULL),
@@ -1490,24 +1483,20 @@ plot.cavi <- function(
 
   if (plot_type == "mu") {
     if (length(dims) == 2L) {
-      graphics::plot(
+      .mpcurve_plot_call(graphics::plot, list(
         mu_mat[dims[1], ], mu_mat[dims[2], ],
         type = "o", pch = 16, col = "orange", lwd = 2,
-        xlab = sprintf("dim %d", dims[1]),
-        ylab = sprintf("dim %d", dims[2]),
-        main = sprintf("CAVI posterior mean path (K=%d)", K),
-        ...
-      )
+        xlab = .mpcurve_feature_label(x, dims[1]),
+        ylab = .mpcurve_feature_label(x, dims[2]),
+        main = sprintf("CAVI posterior mean path (K=%d)", K)), ...)
     } else {
       positions <- (seq_len(K) - 1L) / (K - 1L)
-      graphics::plot(
+      .mpcurve_plot_call(graphics::plot, list(
         positions, mu_mat[dims[1], ],
         type = "o", pch = 16, col = "orange", lwd = 2,
         xlab = "pseudotime",
-        ylab = sprintf("dim %d", dims[1]),
-        main = sprintf("CAVI posterior mean path (K=%d)", K),
-        ...
-      )
+        ylab = .mpcurve_feature_label(x, dims[1]),
+        main = sprintf("CAVI posterior mean path (K=%d)", K)), ...)
     }
     return(invisible(x))
   }
@@ -1517,27 +1506,24 @@ plot.cavi <- function(
 
   if (length(dims) == 2L) {
     mu_list_dims <- lapply(seq_len(K), function(k) mu_mat[dims, k])
-    plot_EM_embedding2D(
+    .mpcurve_plot_call(plot_EM_embedding2D, list(
       mu_list = mu_list_dims,
       X2 = data[, dims, drop = FALSE],
-      t_vec = t_pseudo,
+      t_vec = NULL,
+      col = .mpcurve_pseudotime_colors(t_pseudo, pal),
       pal = pal,
       add_legend = FALSE,
       main = sprintf("CAVI pseudotime (K=%d)", K),
-      xlab = sprintf("dim %d", dims[1]),
-      ylab = sprintf("dim %d", dims[2]),
-      ...
-    )
+      xlab = .mpcurve_feature_label(x, dims[1]),
+      ylab = .mpcurve_feature_label(x, dims[2])), ...)
   } else {
     idx <- pmax(1L, pmin(length(pal), 1L + floor(t_pseudo * (length(pal) - 1L))))
-    graphics::plot(
+    .mpcurve_plot_call(graphics::plot, list(
       t_pseudo, data[, dims[1]],
       pch = 19, col = pal[idx], cex = 0.7,
       xlab = "pseudotime",
-      ylab = sprintf("dim %d", dims[1]),
-      main = sprintf("CAVI pseudotime (K=%d)", K),
-      ...
-    )
+      ylab = .mpcurve_feature_label(x, dims[1]),
+      main = sprintf("CAVI pseudotime (K=%d)", K)), ...)
     graphics::lines(positions, mu_mat[dims[1], ], col = "orange", lwd = 2)
     graphics::points(positions, mu_mat[dims[1], ], pch = 8, col = "orange", cex = 1)
   }

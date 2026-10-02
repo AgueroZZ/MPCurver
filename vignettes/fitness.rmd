@@ -193,17 +193,19 @@ plot_ordered_heatmap <- function(X, order_idx, env_idx = seq_len(ncol(X)),
 
 ```
 
+Tables 1 and 2 describe the data and environment categories.
+
 ```{r data-summary}
 data.frame(
   quantity = c("mutants", "environments", "fitness columns", "error columns"),
   value = c(nrow(X), ncol(X), length(fitness_cols), length(error_cols))
 ) |>
-  knitr::kable()
+  knitr::kable(caption = "Table 1. Numbers of mutants, environments, fitness columns, and error columns.")
 
 sort(table(env_category), decreasing = TRUE) |>
   as.data.frame() |>
   stats::setNames(c("category", "n_environments")) |>
-  knitr::kable()
+  knitr::kable(caption = "Table 2. Numbers of environments by condition category.")
 ```
 
 This is a good MPCurver example because the environments span several broad
@@ -219,18 +221,18 @@ structure in the dataset?
 
 The fitting choices are:
 
-- `method = "isomap"` supplies the initialization;
-- `K = 50` uses a 50-bin latent grid;
-- `rw_q = 2` uses a second-order random-walk prior for smooth trajectories.
+- `initial_method = "isomap"` supplies the initialization;
+- `num_bins = 50` uses a 50-bin latent grid;
+- `mpcurve_control(rw_order = 2)` uses a second-order random-walk prior for smooth trajectories.
 
 ```{r uni-fit}
 fit_unidir <- fit_mpcurve(
-  X,
-  method = "isomap",
-  K = 50,
-  rw_q = 2,
-  verbose = FALSE
-)
+    X,
+    initial_method = "isomap",
+    num_bins = 50,
+    verbose = FALSE,
+    control = mpcurve_control(rw_order = 2)
+  )
 ```
 
 ### Check convergence
@@ -238,13 +240,17 @@ fit_unidir <- fit_mpcurve(
 The ELBO trace shows progress in fitting the variational model. A plateau
 indicates small improvements between successive iterations.
 
-```{r uni-convergence, out.width = "100%", fig.alt = "ELBO trace for the single-ordering CAVI fit, showing convergence over iterations."}
+Figure 1 shows the ELBO trace for the single-ordering CAVI fit, showing convergence over iterations.
+
+```{r uni-convergence, out.width = "100%", fig.alt = "ELBO trace for the single-ordering CAVI fit, showing convergence over iterations.", fig.cap="Figure 1. ELBO trace for the single-ordering CAVI fit, showing convergence over iterations."}
 plot(fit_unidir, plot_type = "elbo")
 ```
 
 ### Inspect a few fitted trajectories
 
-```{r uni-trajectories, fig.height = 8, out.width = "100%", fig.alt = "Four panels showing fitted single-ordering CAVI trajectories for the first four environment dimensions."}
+Figure 2 shows four panels showing fitted single-ordering CAVI trajectories for the first four environment dimensions.
+
+```{r uni-trajectories, fig.height = 8, out.width = "100%", fig.alt = "Four panels showing fitted single-ordering CAVI trajectories for the first four environment dimensions.", fig.cap="Figure 2. Four panels showing fitted single-ordering CAVI trajectories for the first four environment dimensions."}
 par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
 plot(fit_unidir, dims = 1)
 plot(fit_unidir, dims = 2)
@@ -265,22 +271,25 @@ trajectories.
 
 ```{r uni-fit-smooth}
 fit_unidir_smooth <- fit_mpcurve(
-  X,
-  method = "isomap",
-  K = 50,
-  iter = 500,
-  rw_q = 2,
-  lambda_sd_prior_rate = 1e4,
-  verbose = FALSE
-)
+    X,
+    initial_method = "isomap",
+    num_bins = 50,
+    max_iter = 500,
+    verbose = FALSE,
+    control = mpcurve_control(rw_order = 2, lambda_sd_prior_rate = 1e4)
+  )
 ```
 
-```{r uni-convergence-smooth, out.width = "100%", fig.alt = "ELBO trace for the smoothed single-ordering CAVI fit."}
+Figure 3 shows the ELBO trace for the smoothed single-ordering CAVI fit.
+
+```{r uni-convergence-smooth, out.width = "100%", fig.alt = "ELBO trace for the smoothed single-ordering CAVI fit.", fig.cap="Figure 3. ELBO trace for the smoothed single-ordering CAVI fit."}
 plot(fit_unidir_smooth, plot_type = "elbo")
 fit_unidir_smooth
 ```
 
-```{r uni-trajectories-smooth, fig.height = 8, out.width = "100%", fig.alt = "Four panels showing fitted trajectories under the smoothed single-ordering CAVI fit."}
+Figure 4 shows four panels showing fitted trajectories under the smoothed single-ordering CAVI fit.
+
+```{r uni-trajectories-smooth, fig.height = 8, out.width = "100%", fig.alt = "Four panels showing fitted trajectories under the smoothed single-ordering CAVI fit.", fig.cap="Figure 4. Four panels showing fitted trajectories under the smoothed single-ordering CAVI fit."}
 par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
 plot(fit_unidir_smooth, dims = 1)
 plot(fit_unidir_smooth, dims = 3)
@@ -295,7 +304,9 @@ environment trajectories are less wiggly.
 A useful comparison is whether smoothing changes the inferred mutant ordering
 itself, or mainly changes the trajectory estimates.
 
-```{r compare-single-orderings, out.width = "100%", fig.alt = "Scatter plot comparing inferred mutant pseudotime between the default and smoothed single-ordering fits."}
+Figure 5 shows scatter plot comparing inferred mutant pseudotime between the default and smoothed single-ordering fits.
+
+```{r compare-single-orderings, out.width = "100%", fig.alt = "Scatter plot comparing inferred mutant pseudotime between the default and smoothed single-ordering fits.", fig.cap="Figure 5. Scatter plot comparing inferred mutant pseudotime between the default and smoothed single-ordering fits."}
 cor(
   fit_unidir_smooth$locations$mean$pseudotime,
   fit_unidir$locations$mean$pseudotime
@@ -330,16 +341,14 @@ number of axes would require a separate model-selection assessment.
 
 ```{r partition-fit}
 fit_partition <- fit_mpcurve(
-  X,
-  method = "isomap",
-  intrinsic_dim = 2,
-  ridge = 0,
-  K = 50,
-  iter = 500,
-  rw_q = 2,
-  lambda_sd_prior_rate = 1e4,
-  verbose = FALSE
-)
+    X,
+    initial_method = "isomap",
+    intrinsic_dim = 2,
+    num_bins = 50,
+    max_iter = 500,
+    verbose = FALSE,
+    control = mpcurve_control(ridge = 0, rw_order = 2, lambda_sd_prior_rate = 1e4)
+  )
 ```
 
 ```{r partition-summary}
@@ -353,13 +362,15 @@ $E[U_j\mid Z_j=m]$: the estimated environment trajectory if it follows
 ordering $m$. The title reports the assignment probability $q(Z_j=m)$,
 indicating the support for that interpretation.
 
-```{r partition-plot, out.width = "100%", fig.alt = "Conditional posterior mean trajectory for environment dimension 1 under each of two fixed orderings."}
+Figure 6 shows conditional posterior mean trajectory for environment dimension 1 under each of two fixed orderings.
+
+```{r partition-plot, out.width = "100%", fig.alt = "Conditional posterior mean trajectory for environment dimension 1 under each of two fixed orderings.", fig.cap="Figure 6. Conditional posterior mean trajectory for environment dimension 1 under each of two fixed orderings."}
 plot(fit_partition, plot_type = "mu", dims = 1)
 ```
 
 ### Which environments were assigned to which ordering?
 
-The table lists each environment's most probable ordering. To examine
+Table 3 lists each environment's most probable ordering. To examine
 uncertain assignments, inspect the corresponding row of
 `fit_partition$partition$pi_weights`.
 
@@ -372,12 +383,12 @@ assignment_tbl <- data.frame(
 )
 
 assignment_tbl[order(assignment_tbl$ordering, assignment_tbl$category, assignment_tbl$environment), ] |>
-  knitr::kable(row.names = FALSE)
+  knitr::kable(row.names = FALSE, caption = "Table 3. Most probable ordering for each environment.")
 ```
 
 ### How similar are the inferred orderings?
 
-Compare the inferred mutant positions across orderings. A correlation near
+Table 4 compares the inferred mutant positions across orderings. A correlation near
 $1$ or $-1$ indicates similar positions after allowing for reversal of the
 axis; smaller absolute correlations indicate more distinct orderings.
 
@@ -393,7 +404,7 @@ t_df <- setNames(
 )
 
 cor(t_df) |>
-  knitr::kable(digits = 3)
+  knitr::kable(digits = 3, caption = "Table 4. Pearson correlations between inferred mutant positions along occupied orderings.")
 ```
 
 
@@ -409,22 +420,25 @@ the supplied measurement precision affects orderings and trajectories.
 
 ```{r uni-fit-known-sd}
 fit_unidir_known_sd <- fit_mpcurve(
-  X,
-  S = S,
-  method = "isomap",
-  K = 50,
-  iter = 500,
-  rw_q = 2,
-  lambda_sd_prior_rate = 1e4,
-  verbose = FALSE
-)
+    X,
+    S = S,
+    initial_method = "isomap",
+    num_bins = 50,
+    max_iter = 500,
+    verbose = FALSE,
+    control = mpcurve_control(rw_order = 2, lambda_sd_prior_rate = 1e4)
+  )
 ```
 
-```{r uni-known-sd-convergence, out.width = "100%", fig.alt = "ELBO trace for the single-ordering CAVI fit with known measurement standard deviations."}
+Figure 7 shows the ELBO trace for the single-ordering CAVI fit with known measurement standard deviations.
+
+```{r uni-known-sd-convergence, out.width = "100%", fig.alt = "ELBO trace for the single-ordering CAVI fit with known measurement standard deviations.", fig.cap="Figure 7. ELBO trace for the single-ordering CAVI fit with known measurement standard deviations."}
 plot(fit_unidir_known_sd, plot_type = "elbo")
 ```
 
-```{r uni-known-sd-trajectories, fig.height = 8, out.width = "100%", fig.alt = "Four panels showing fitted trajectories for the single-ordering CAVI fit with known measurement SDs."}
+Figure 8 shows four panels showing fitted trajectories for the single-ordering CAVI fit with known measurement SDs.
+
+```{r uni-known-sd-trajectories, fig.height = 8, out.width = "100%", fig.alt = "Four panels showing fitted trajectories for the single-ordering CAVI fit with known measurement SDs.", fig.cap="Figure 8. Four panels showing fitted trajectories for the single-ordering CAVI fit with known measurement SDs."}
 par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
 plot(fit_unidir_known_sd, dims = 1)
 plot(fit_unidir_known_sd, dims = 2)
@@ -441,22 +455,22 @@ probabilities to see how the environment groups respond to this noise model.
 
 ```{r partition-fit-known-sd}
 fit_partition_known_sd <- fit_mpcurve(
-  X,
-  S = S,
-  method = "isomap",
-  intrinsic_dim = 2,
-  ridge = 0,
-  K = 50,
-  iter = 500,
-  rw_q = 2,
-  lambda_sd_prior_rate = 1e4,
-  verbose = FALSE
-)
+    X,
+    S = S,
+    initial_method = "isomap",
+    intrinsic_dim = 2,
+    num_bins = 50,
+    max_iter = 500,
+    verbose = FALSE,
+    control = mpcurve_control(ridge = 0, rw_order = 2, lambda_sd_prior_rate = 1e4)
+  )
 
 fit_partition_known_sd
 ```
 
-```{r known-sd-partition-trajectories, fig.height = 5.5, out.width = "100%", fig.alt = "Conditional posterior mean trajectory for environment dimension 31 under each of two fixed orderings with known measurement SDs."}
+Figure 9 shows conditional posterior mean trajectory for environment dimension 31 under each of two fixed orderings with known measurement SDs.
+
+```{r known-sd-partition-trajectories, fig.height = 5.5, out.width = "100%", fig.alt = "Conditional posterior mean trajectory for environment dimension 31 under each of two fixed orderings with known measurement SDs.", fig.cap="Figure 9. Conditional posterior mean trajectory for environment dimension 31 under each of two fixed orderings with known measurement SDs."}
 plot(fit_partition_known_sd, plot_type = "mu", dims = 31)
 ```
 

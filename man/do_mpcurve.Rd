@@ -2,96 +2,45 @@
 % Please edit documentation in R/07_mpcurve.R
 \name{do_mpcurve}
 \alias{do_mpcurve}
-\title{Run additional iterations of a fitted MPCurve model}
+\title{Continue a fitted MPCurve model}
 \usage{
-do_mpcurve(
-  object,
-  iter = 1,
-  lambda = NULL,
-  S = NULL,
-  tol = NULL,
-  lambda_sd_prior_rate = NULL,
-  lambda_min = NULL,
-  lambda_max = NULL,
-  sigma_min = NULL,
-  sigma_max = NULL,
-  tol_outer = NULL,
-  freeze_unused_ordering = NULL,
-  freeze_unused_ordering_threshold = NULL,
-  freeze_feature = NULL,
-  freeze_feature_weight_threshold = NULL,
-  drop_unused_ordering = NULL,
-  assignment_prior = NULL,
-  ordering_alpha = NULL,
-  verbose = FALSE,
-  convergence = NULL
-)
+do_mpcurve(object, max_iter = 1L, tol = NULL, verbose = FALSE, control = NULL)
 }
 \arguments{
-\item{object}{An \code{mpcurve} object returned by \code{fit_mpcurve()}.
-Partition fits saved before version 0.3.0 require refitting with
-\code{fit_mpcurve()} before they can be continued.}
+\item{object}{An \code{mpcurve} object returned by \code{\link[=fit_mpcurve]{fit_mpcurve()}}. Legacy
+augmented partition fits are read-only and require refitting.}
 
-\item{iter}{Integer >= 1. Maximum number of additional CAVI sweeps (single
-ordering) or exact \code{T = 1} partition steps.}
+\item{max_iter}{Positive integer maximum number of additional CAVI sweeps.}
 
-\item{lambda}{Optional positive smoothness value(s). A single-ordering fit
-accepts a scalar or length-\code{d} vector. A structural partition fit
-accepts a scalar, a length-\code{d} vector broadcast across orderings, a
-flattened length-\code{d * M} vector, or a \code{d x M} matrix; this
-resets \code{lambda_mat} before continuation.}
+\item{tol}{Optional nonnegative stopping tolerance. \code{NULL} inherits the
+stored tolerance; zero disables early stopping. See \code{\link[=fit_mpcurve]{fit_mpcurve()}}.}
 
-\item{S}{Optional known measurement standard deviations. If \code{NULL},
-reuse the value stored on \code{object}. Supplying a new \code{S} is only
-allowed when it matches the stored specification.}
+\item{verbose}{Print fitting progress?}
 
-\item{tol}{Optional ELBO-change tolerance for single-ordering CAVI. If
-\code{NULL}, reuse the stored value.}
-
-\item{lambda_sd_prior_rate}{Optional positive rate for the induced
-exponential prior on \code{1 / sqrt(lambda_j)}. If \code{NULL}, the stored
-control value is reused. Use \code{0} to remove this penalty.}
-
-\item{lambda_min, lambda_max}{Optional positive bounds for \code{lambda_j}. If
-\code{NULL}, reuse the stored values.}
-
-\item{sigma_min, sigma_max}{Optional positive bounds for \code{sigma_j^2}. If
-\code{NULL}, reuse the stored values.}
-
-\item{tol_outer}{For partition fits only: ELBO-change tolerance used
-after annealing. If \code{NULL}, reuse the stored value.}
-
-\item{freeze_unused_ordering, freeze_unused_ordering_threshold, freeze_feature, freeze_feature_weight_threshold, drop_unused_ordering}{Deprecated; leave as \code{NULL}. Explicit values are ignored with a warning.}
-
-\item{assignment_prior, ordering_alpha}{Deprecated; leave as \code{NULL}.
-Continuation uses the fitted partition prior. Explicit values are ignored
-with a warning.}
-
-\item{verbose}{Logical. Print per-iteration progress?}
-
-\item{convergence}{Optional stopping rule: \code{"normalized"} or
-\code{"relative"}; see \code{fit_mpcurve()}. If \code{NULL}, reuse the
-stored rule. Fits saved before version 0.3.2 use \code{"relative"} unless
-explicitly overridden. Changing the rule does not rescale stored traces.}
+\item{control}{Settings from \code{\link[=mpcurve_continue_control]{mpcurve_continue_control()}} or a named list
+of its options. Omitted or \code{NULL} settings inherit the fitted values.}
 }
 \value{
-An updated \code{mpcurve} object with refined estimates and extended
-  convergence traces.
+An updated \code{mpcurve} object.
 }
 \description{
-Refines a fitted model by running additional coordinate-ascent variational
-iterations. Use this when the objective is still increasing at the
-iteration limit, or to explore a change in smoothing parameters.
+Resume coordinate-ascent variational inference from the stored data,
+posterior, and parameters. Measurement errors, trajectory priors, and
+initialization are inherited. Partition inference resumes at temperature 1.
 }
 \details{
-Fitting resumes from the stored posterior and parameter estimates. A
-single-ordering fit appends to \code{$elbo_trace}. A multi-ordering fit
-refines all \eqn{M} orderings, trajectories, and feature assignments at
-temperature \eqn{T=1}, appending to \code{$objective_history} and
-\code{$temperature_history}.
-
-With unchanged model settings, the additional objective values should be
-nondecreasing up to numerical tolerance. Changing a smoothing prior or
-parameter bounds can change the objective or feasible parameter range;
-assess convergence within the new run in that case.
+Objective and parameter traces are extended. Changing precision, its prior,
+or parameter bounds can change the objective or feasible parameter range;
+assess convergence within the new run. Use \code{\link[=fit_mpcurve]{fit_mpcurve()}} to change the
+random-walk order, ridge, data, known measurement errors, or prior modes.
+Model selection records are retained and marked as continued. Automatic
+dimension estimates retain their estimation records and remove any new
+empty orderings after continuation without additional fitting sweeps.
+}
+\examples{
+sim <- simulate_spiral2d(n = 40, seed = 1)
+fit <- fit_mpcurve(sim$obs, num_bins = 5, max_iter = 2)
+fit <- do_mpcurve(fit, max_iter = 3)
+fixed <- do_mpcurve(fit, max_iter = 3,
+  control = mpcurve_continue_control(lambda_init = 5, fix_lambda = TRUE))
 }

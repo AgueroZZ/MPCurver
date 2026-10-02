@@ -1,10 +1,10 @@
-test_that("simulate_cavi_toy returns a coherent model-matched dataset", {
-  sim <- simulate_cavi_toy(
+test_that("simulate_mpcurve returns a coherent model-matched dataset", {
+  sim <- simulate_mpcurve(
     n = 60,
     d = 10,
-    K = 6,
-    rw_q = 2,
-    seed = 1
+    num_bins = 6,
+    seed = 1,
+    control = list(rw_order = 2)
   )
 
   expect_equal(dim(sim$X), c(60, 10))
@@ -18,12 +18,12 @@ test_that("simulate_cavi_toy returns a coherent model-matched dataset", {
 })
 
 test_that("cavi returns valid responsibilities and nondecreasing ELBO on a toy example", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 120,
     d = 12,
-    K = 6,
-    rw_q = 2,
-    seed = 2
+    num_bins = 6,
+    seed = 2,
+    control = list(rw_order = 2)
   )
 
   fit <- cavi(
@@ -50,12 +50,12 @@ test_that("cavi returns valid responsibilities and nondecreasing ELBO on a toy e
 })
 
 test_that("lambda induced-prior penalty is opt-in and keeps a monotone penalized ELBO", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 100,
     d = 10,
-    K = 6,
-    rw_q = 2,
-    seed = 21
+    num_bins = 6,
+    seed = 21,
+    control = list(rw_order = 2)
   )
 
   fit_base <- cavi(
@@ -112,12 +112,12 @@ test_that("lambda induced-prior penalty is opt-in and keeps a monotone penalized
 })
 
 test_that("cavi supports zero-iteration initialization and continuation", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 80,
     d = 8,
-    K = 5,
-    rw_q = 2,
-    seed = 3
+    num_bins = 5,
+    seed = 3,
+    control = list(rw_order = 2)
   )
 
   fit0 <- cavi(
@@ -144,12 +144,12 @@ test_that("cavi supports zero-iteration initialization and continuation", {
 })
 
 test_that("fixed position_prior keeps pi constant and do_cavi inherits it", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 80,
     d = 8,
-    K = 5,
-    rw_q = 2,
-    seed = 103
+    num_bins = 5,
+    seed = 103,
+    control = list(rw_order = 2)
   )
   pi_fixed <- c(0.5, 0.2, 0.15, 0.1, 0.05)
 
@@ -180,12 +180,12 @@ test_that("fixed position_prior keeps pi constant and do_cavi inherits it", {
 })
 
 test_that("fixed position_prior defaults to uniform when no init is supplied", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 60,
     d = 6,
-    K = 4,
-    rw_q = 2,
-    seed = 104
+    num_bins = 4,
+    seed = 104,
+    control = list(rw_order = 2)
   )
 
   fit <- cavi(
@@ -245,12 +245,12 @@ test_that("raw gamma pre-init moments match responsibility-weighted formulas", {
 })
 
 test_that("gamma-based cavi starts from raw moments and first records a penalized state", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 70,
     d = 7,
-    K = 5,
-    rw_q = 2,
-    seed = 31
+    num_bins = 5,
+    seed = 31,
+    control = list(rw_order = 2)
   )
   gamma_init <- matrix(0, nrow = nrow(sim$X), ncol = 5)
   gamma_init[cbind(seq_len(nrow(sim$X)), sim$z)] <- 1
@@ -285,12 +285,12 @@ test_that("gamma-based cavi starts from raw moments and first records a penalize
 })
 
 test_that("explicit sigma2_init and lambda_init are honored with responsibilities_init", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 70,
     d = 5,
-    K = 5,
-    rw_q = 2,
-    seed = 34
+    num_bins = 5,
+    seed = 34,
+    control = list(rw_order = 2)
   )
   gamma_init <- matrix(0, nrow = nrow(sim$X), ncol = 5)
   gamma_init[cbind(seq_len(nrow(sim$X)), sim$z)] <- 1
@@ -315,12 +315,12 @@ test_that("explicit sigma2_init and lambda_init are honored with responsibilitie
 })
 
 test_that("adaptive lambda initialization is derived from raw unpenalized trajectories", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 60,
     d = 6,
-    K = 5,
-    rw_q = 2,
-    seed = 32
+    num_bins = 5,
+    seed = 32,
+    control = list(rw_order = 2)
   )
   gamma_init <- matrix(0, nrow = nrow(sim$X), ncol = 5)
   gamma_init[cbind(seq_len(nrow(sim$X)), sim$z)] <- 1
@@ -362,12 +362,12 @@ test_that("adaptive lambda initialization is derived from raw unpenalized trajec
 })
 
 test_that("adaptive lambda initialization respects the induced prior when requested", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 60,
     d = 6,
-    K = 5,
-    rw_q = 2,
-    seed = 33
+    num_bins = 5,
+    seed = 33,
+    control = list(rw_order = 2)
   )
   gamma_init <- matrix(0, nrow = nrow(sim$X), ncol = 5)
   gamma_init[cbind(seq_len(nrow(sim$X)), sim$z)] <- 1
@@ -408,12 +408,12 @@ test_that("adaptive lambda initialization respects the induced prior when reques
 })
 
 test_that("cavi supports known feature-wise measurement sd", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 90,
     d = 7,
-    K = 5,
-    rw_q = 2,
-    seed = 41
+    num_bins = 5,
+    seed = 41,
+    control = list(rw_order = 2)
   )
   S <- seq(0.09, 0.15, length.out = ncol(sim$X))
 
@@ -438,12 +438,12 @@ test_that("cavi supports known feature-wise measurement sd", {
 })
 
 test_that("known feature-sd vector and repeated matrix inputs are equivalent", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 60,
     d = 6,
-    K = 5,
-    rw_q = 2,
-    seed = 42
+    num_bins = 5,
+    seed = 42,
+    control = list(rw_order = 2)
   )
   gamma_init <- matrix(0, nrow = nrow(sim$X), ncol = 5)
   gamma_init[cbind(seq_len(nrow(sim$X)), sim$z)] <- 1
@@ -483,12 +483,12 @@ test_that("known feature-sd vector and repeated matrix inputs are equivalent", {
 })
 
 test_that("pi_init remains as a deprecated alias for position_prior_init", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 40,
     d = 4,
-    K = 4,
-    rw_q = 2,
-    seed = 142
+    num_bins = 4,
+    seed = 142,
+    control = list(rw_order = 2)
   )
   gamma_init <- matrix(0, nrow = nrow(sim$X), ncol = 4)
   gamma_init[cbind(seq_len(nrow(sim$X)), sim$z)] <- 1
@@ -508,12 +508,12 @@ test_that("pi_init remains as a deprecated alias for position_prior_init", {
 })
 
 test_that("do_cavi reuses known observation-level measurement sd", {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 50,
     d = 5,
-    K = 4,
-    rw_q = 2,
-    seed = 43
+    num_bins = 4,
+    seed = 43,
+    control = list(rw_order = 2)
   )
   base_sd <- seq(0.07, 0.11, length.out = ncol(sim$X))
   row_scale <- seq(1, 1.15, length.out = nrow(sim$X))

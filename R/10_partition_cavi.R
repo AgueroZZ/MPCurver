@@ -2,17 +2,24 @@
 
 
 # ============================================================
-# Dual-trajectory / feature-partition helpers for the recommended CAVI path.
-# The exported user-facing routines are:
-#   * soft_two_trajectory_cavi()
+# Internal feature-partition helpers shared by structural inference and
+# legacy compatibility code.
 # ============================================================
 
 .cavi_partition_weight_floor <- function() sqrt(.Machine$double.eps)
 .cavi_partition_feature_freeze_threshold_default <- function() 0.1
 
-.cavi_resolve_K <- function(X, K) {
-  if (!is.null(K)) return(as.integer(K))
-  max(2L, min(50L, as.integer(floor(nrow(X) / 5))))
+.cavi_resolve_K <- function(X, K, rw_q = 2L) {
+  rw_q <- .mpcurve_integer_setting(rw_q, "rw_order")
+  if (is.null(K)) {
+    if (nrow(X) <= rw_q) {
+      stop("Automatic num_bins requires at least rw_order + 1 samples.", call. = FALSE)
+    }
+    return(max(rw_q + 1L, min(50L, as.integer(floor(nrow(X) / 5)))))
+  }
+  K <- .mpcurve_integer_setting(K, "num_bins", 2L)
+  if (K <= rw_q) stop("num_bins must be at least rw_order + 1.", call. = FALSE)
+  K
 }
 
 .cavi_resolve_feature_weights <- function(feature_weights, d,
@@ -33,16 +40,6 @@
 
 .cavi_partition_order_labels <- function(M) {
   if (M <= 26L) LETTERS[seq_len(M)] else paste0("ord", seq_len(M))
-}
-
-.cavi_default_pca_components <- function(methods) {
-  methods <- as.character(methods)
-  out <- rep(NA_integer_, length(methods))
-  pca_idx <- which(methods == "PCA")
-  if (length(pca_idx) > 0L) {
-    out[pca_idx] <- seq_along(pca_idx)
-  }
-  out
 }
 
 .cavi_default_subset_pca_components <- function(methods) {
@@ -652,6 +649,31 @@
   )
 }
 
+# Center and standardize only the copy used to compute dimensionless similarity.
+# Rescale centered columns before squaring so tiny/large finite units do not
+# underflow/overflow the variance calculation. Constant columns remain zero.
+.cavi_standardize_similarity_features <- function(X) {
+  centered <- sweep(X, 2L, colMeans(X), FUN = "-")
+  column_scale <- apply(abs(centered), 2L, max)
+  varying <- is.finite(column_scale) & column_scale > 0
+  standardized <- matrix(0, nrow = nrow(X), ncol = ncol(X), dimnames = dimnames(X))
+  rescaled_sd <- rep(0, ncol(X))
+  if (any(varying)) {
+    standardized[, varying] <- sweep(centered[, varying, drop = FALSE],
+                                     2L, column_scale[varying], FUN = "/")
+    rescaled_sd[varying] <- apply(standardized[, varying, drop = FALSE], 2L, stats::sd)
+  }
+  usable <- varying & is.finite(rescaled_sd) & rescaled_sd > 0
+  if (any(usable)) {
+    standardized[, usable] <- sweep(standardized[, usable, drop = FALSE],
+                                    2L, rescaled_sd[usable], FUN = "/")
+  }
+  standardized[, !usable] <- 0
+  feature_sd <- column_scale * rescaled_sd
+  list(X = standardized, sd = feature_sd,
+       standardized_sd = apply(standardized, 2L, stats::sd), usable = usable)
+}
+
 .compute_same_ordering_similarity_spline_r2 <- function(X,
                                                         spline_r2_df = 5L,
                                                         min_feature_sd = 1e-8) {
@@ -673,8 +695,10 @@
   }
 
   feature_names <- colnames(X) %||% paste0("V", seq_len(d))
-  feature_sd <- apply(X, 2L, stats::sd)
-  low_variance <- !is.finite(feature_sd) | feature_sd < min_feature_sd
+  normalized <- .cavi_standardize_similarity_features(X)
+  # The numerical SD guard is now applied in standardized units, so changing
+  # the original feature units cannot discard a nonconstant column.
+  low_variance <- !normalized$usable | normalized$standardized_sd < min_feature_sd
   rank_position <- (seq_len(n) - 0.5) / n
   spline_basis <- cbind(
     "(Intercept)" = 1,
@@ -685,10 +709,9 @@
     stop("The fixed-df spline basis is rank deficient.", call. = FALSE)
   }
   Q <- qr.Q(basis_qr)
-  centered_X <- sweep(X, 2L, colMeans(X), FUN = "-")
-  total_sum_squares <- colSums(centered_X^2)
-  valid_response <- !low_variance &
-    total_sum_squares > sqrt(.Machine$double.eps)
+  total_sum_squares <- colSums(normalized$X^2)
+  # Each usable column has SST = n - 1; constant columns are excluded above.
+  valid_response <- !low_variance
   directional_r2 <- matrix(
     0, nrow = d, ncol = d,
     dimnames = list(feature_names, feature_names)
@@ -696,11 +719,10 @@
 
   for (predictor in seq_len(d)) {
     if (low_variance[predictor]) next
-    ordered_X <- X[order(X[, predictor], method = "radix"), , drop = FALSE]
+    ordered_X <- normalized$X[order(X[, predictor], method = "radix"), , drop = FALSE]
     projected_coordinates <- crossprod(Q, ordered_X)
-    residual_sum_squares <- pmax(
-      colSums(ordered_X^2) - colSums(projected_coordinates^2), 0
-    )
+    residuals <- ordered_X - Q %*% projected_coordinates
+    residual_sum_squares <- colSums(residuals^2)
     directional_r2[predictor, valid_response] <-
       1 - residual_sum_squares[valid_response] /
         total_sum_squares[valid_response]
@@ -720,9 +742,11 @@
     S = similarity,
     distance = distance,
     metric = "spline_r2",
+    normalization = "centered_unit_variance",
     feature_info = data.frame(
       feature = feature_names,
-      sd = as.numeric(feature_sd),
+      sd = as.numeric(normalized$sd),
+      standardized_sd = as.numeric(normalized$standardized_sd),
       low_variance = low_variance,
       stringsAsFactors = FALSE
     ),
@@ -999,7 +1023,11 @@
     # rather than successive PCs across otherwise unrelated feature blocks.
     pca_components <- .cavi_default_subset_pca_components(methods)
   } else {
-    pca_components <- as.integer(pca_components)
+    if (!is.numeric(pca_components) || !length(pca_components)) {
+      stop("pca_components must contain positive integers.", call. = FALSE)
+    }
+    pca_components <- vapply(pca_components, .mpcurve_integer_setting,
+      integer(1), name = "pca_components")
     if (length(pca_components) == 1L) {
       pca_components <- rep(pca_components, M)
     } else if (length(pca_components) != M) {
@@ -1034,153 +1062,33 @@
                                         tol = 1e-6,
                                         discretization = c("quantile", "equal", "kmeans"),
                                         cluster_label = NULL,
+                                        method_args = list(),
+                                        init_on_failure = "pca",
                                         verbose = FALSE) {
   X_sub <- as.matrix(X_sub)
   method <- match.arg(method, c("PCA", "fiedler", "pcurve", "tSNE", "random", "isomap"))
-  pca_component <- as.integer(pca_component)[1]
-
-  method_requested <- method
-  method_used <- method
-  pca_requested <- if (method == "PCA") pca_component else NA_integer_
-  pca_used <- pca_requested
-  fallback <- FALSE
-  fallback_reason <- NULL
-
-  if (ncol(X_sub) == 1L) {
-    ordering_vec <- rank(X_sub[, 1], ties.method = "first")
-    fit <- .cavi_build_from_ordering(
-      X = X_sub,
-      ordering_vec = ordering_vec,
-      S = S,
-      K = K,
-      rw_q = rw_q,
-      ridge = ridge,
-      lambda_sd_prior_rate = lambda_sd_prior_rate,
-      lambda_min = lambda_min,
-      lambda_max = lambda_max,
-      sigma_min = sigma_min,
-      sigma_max = sigma_max,
-      max_iter = max_iter,
-      tol = tol,
-      discretization = discretization,
-      strict_K = TRUE,
-      ordering_label = cluster_label %||% "single-feature cluster",
-      verbose = verbose
-    )
-    method_used <- "single_feature_rank"
-    pca_used <- NA_integer_
-    fallback <- !identical(method_requested, method_used)
-    fallback_reason <- if (fallback) {
-      "Cluster contained a single feature; initialized by ranking that feature directly."
-    } else {
-      NULL
-    }
-
-    return(list(
-      fit = fit,
-      method_requested = method_requested,
-      method_used = method_used,
-      pca_component_requested = pca_requested,
-      pca_component_used = pca_used,
-      fallback = fallback,
-      fallback_reason = fallback_reason
-    ))
-  }
-
-  fit_try <- tryCatch(
-    .cavi_fit_from_method(
-      X = X_sub,
-      S = S,
-      method = method,
-      pca_component = pca_component,
-      K = K,
-      rw_q = rw_q,
-      ridge = ridge,
-      lambda_sd_prior_rate = lambda_sd_prior_rate,
-      lambda_min = lambda_min,
-      lambda_max = lambda_max,
-      sigma_min = sigma_min,
-      sigma_max = sigma_max,
-      max_iter = max_iter,
-      tol = tol,
-      discretization = discretization,
-      strict_K = TRUE,
-      verbose = verbose
-    ),
-    error = identity
+  fit <- .cavi_fit_from_method(
+    X = X_sub, S = S, K = K, method = method,
+    pca_component = pca_component, method_args = method_args,
+    init_on_failure = init_on_failure, ordering_label = cluster_label,
+    rw_q = rw_q, ridge = ridge, lambda_sd_prior_rate = lambda_sd_prior_rate,
+    lambda_min = lambda_min, lambda_max = lambda_max,
+    sigma_min = sigma_min, sigma_max = sigma_max,
+    max_iter = max_iter, tol = tol, discretization = discretization,
+    strict_K = TRUE, verbose = verbose
   )
-
-  if (inherits(fit_try, "error")) {
-    fallback <- TRUE
-    fallback_reason <- conditionMessage(fit_try)
-    fit_try <- tryCatch(
-      .cavi_fit_from_method(
-        X = X_sub,
-        S = S,
-        method = "PCA",
-        pca_component = 1L,
-        K = K,
-        rw_q = rw_q,
-        ridge = ridge,
-        lambda_sd_prior_rate = lambda_sd_prior_rate,
-        lambda_min = lambda_min,
-        lambda_max = lambda_max,
-        sigma_min = sigma_min,
-        sigma_max = sigma_max,
-        max_iter = max_iter,
-        tol = tol,
-        discretization = discretization,
-        strict_K = TRUE,
-        verbose = verbose
-      ),
-      error = identity
-    )
-    if (inherits(fit_try, "error")) {
-      ordering_vec <- rank(X_sub[, 1], ties.method = "first")
-      fit_try <- .cavi_build_from_ordering(
-        X = X_sub,
-        ordering_vec = ordering_vec,
-        S = S,
-        K = K,
-        rw_q = rw_q,
-        ridge = ridge,
-        lambda_sd_prior_rate = lambda_sd_prior_rate,
-        lambda_min = lambda_min,
-        lambda_max = lambda_max,
-        max_iter = max_iter,
-        tol = tol,
-        discretization = discretization,
-        strict_K = TRUE,
-        ordering_label = cluster_label %||% "fallback single-feature rank",
-        verbose = verbose
-      )
-      method_used <- "single_feature_rank"
-      pca_used <- NA_integer_
-      fallback_reason <- paste(
-        fallback_reason,
-        "Fallback PCA also failed; used the first feature rank as a final fallback."
-      )
-    } else {
-      method_used <- "PCA"
-      pca_used <- 1L
-    }
-  }
-
-  list(
-    fit = fit_try,
-    method_requested = method_requested,
-    method_used = method_used,
-    pca_component_requested = pca_requested,
-    pca_component_used = pca_used,
-    fallback = fallback,
-    fallback_reason = fallback_reason
-  )
+  info <- fit$init_info %||% list(method_requested = method, method_used = method,
+    pca_component_requested = NA_integer_, pca_component_used = NA_integer_,
+    fallback = FALSE, fallback_reason = NULL)
+  c(list(fit = fit), info)
 }
 
 .cavi_init_m_trajectories_similarity <- function(X,
                                                  S = NULL,
                                                  M = 2L,
                                                  methods = NULL,
+                                                 method_args = list(),
+                                                 init_on_failure = "pca",
                                                  pca_components = NULL,
                                                  K = NULL,
                                                  rw_q = 2L,
@@ -1211,7 +1119,7 @@
   similarity_metric <- match.arg(similarity_metric)
   smooth_fit_lambda_mode <- match.arg(smooth_fit_lambda_mode)
   cluster_linkage <- .cavi_validate_cluster_linkage(cluster_linkage)
-  K_use <- .cavi_resolve_K(X, K)
+  K_use <- .cavi_resolve_K(X, K, rw_q)
   if (identical(similarity_metric, "smooth_fit") && isTRUE(M > 1L) &&
       is.finite(ridge) && ridge <= 0) {
     warning(
@@ -1285,6 +1193,8 @@
       S = .cavi_subset_measurement_sd(S, cols_m),
       K = K_use,
       method = method_info$methods[m],
+      method_args = method_args,
+      init_on_failure = init_on_failure,
       pca_component = method_info$pca_components[m],
       rw_q = rw_q,
       ridge = ridge,
@@ -1348,6 +1258,7 @@
   similarity_init <- list(
     partition_init = "similarity",
     similarity_metric = similarity_metric,
+    similarity_normalization = similarity$normalization %||% NULL,
     cluster_linkage = cluster_linkage,
     similarity_min_feature_sd = as.numeric(similarity_min_feature_sd)[1],
     spline_r2_df = if (identical(similarity_metric, "spline_r2")) {
@@ -1435,47 +1346,8 @@
   legacy_assignment_prior <- NULL
   ordering_alpha_use <- NA_real_
 
-  if (!is.null(assignment_prior)) {
-    assignment_prior <- as.character(assignment_prior)[1]
-    if (!assignment_prior %in% c("uniform", "dirichlet")) {
-      stop("assignment_prior must be one of \"uniform\" or \"dirichlet\".", call. = FALSE)
-    }
-    .warn_assignment_prior_deprecated(caller = caller)
-    if (identical(assignment_prior, "uniform")) {
-      if (!isTRUE(partition_prior_missing) && !identical(partition_prior, "fixed")) {
-        stop(
-          caller,
-          ": deprecated `assignment_prior = \"uniform\"` conflicts with ",
-          "`partition_prior = \"", partition_prior, "\"`.",
-          call. = FALSE
-        )
-      }
-      partition_prior <- "fixed"
-      assignment_mode <- "fixed"
-      legacy_assignment_prior <- "uniform"
-      if (!is.null(ordering_alpha)) {
-        .warn_ordering_alpha_deprecated(caller = caller)
-      }
-    } else {
-      if (!isTRUE(partition_prior_missing) && identical(partition_prior, "fixed")) {
-        stop(
-          caller,
-          ": deprecated `assignment_prior = \"dirichlet\"` conflicts with ",
-          "`partition_prior = \"fixed\"`.",
-          call. = FALSE
-        )
-      }
-      partition_prior <- "adaptive"
-      assignment_mode <- "legacy_dirichlet"
-      legacy_assignment_prior <- "dirichlet"
-      if (!is.null(ordering_alpha)) {
-        .warn_ordering_alpha_deprecated(caller = caller)
-      }
-      ordering_alpha_use <- if (is.null(ordering_alpha)) 0.5 else as.numeric(ordering_alpha)[1]
-      if (!is.finite(ordering_alpha_use) || ordering_alpha_use <= 0) {
-        stop("ordering_alpha must be a single finite positive number.", call. = FALSE)
-      }
-    }
+  if (!is.null(assignment_prior) || !is.null(ordering_alpha)) {
+    stop("assignment_prior and ordering_alpha have been removed. Use partition_prior and partition_prior_init; the exploratory Dirichlet model is retired.", call. = FALSE)
   }
 
   if (!is.null(partition_prior_init)) {
@@ -1488,14 +1360,6 @@
       )
     }
     partition_prior_init <- init / sum(init)
-  }
-
-  if (identical(assignment_mode, "legacy_dirichlet") && !is.null(partition_prior_init)) {
-    warning(
-      "`partition_prior_init` is ignored by the deprecated ",
-      "`assignment_prior = \"dirichlet\"` compatibility path.",
-      call. = FALSE
-    )
   }
 
   list(
@@ -1746,32 +1610,6 @@
     ))
   }
 
-  prior_alpha <- rep(ctl$ordering_alpha, length(active_idx))
-  posterior_alpha <- prior_alpha + colSums(weights_use)
-  e_log_omega_use <- digamma(posterior_alpha) - digamma(sum(posterior_alpha))
-  expected_log_assign <- sum(weights_use * rep(e_log_omega_use, each = d))
-  kl_q_p <- .cavi_dirichlet_kl(posterior_alpha, prior_alpha)
-  omega_use <- posterior_alpha / sum(posterior_alpha)
-  e_log_omega_full[active_idx] <- e_log_omega_use
-  posterior_alpha_full[active_idx] <- posterior_alpha
-  omega_full[active_idx] <- omega_use
-
-  list(
-    assignment_prior = assignment_prior_label,
-    partition_prior = ctl$partition_prior,
-    assignment_mode = ctl$assignment_mode,
-    legacy_assignment_prior = ctl$legacy_assignment_prior,
-    ordering_alpha = ctl$ordering_alpha,
-    omega = omega_full,
-    e_log_omega = e_log_omega_full,
-    posterior_alpha = posterior_alpha_full,
-    expected_log_assign = as.numeric(expected_log_assign),
-    kl_q_p = as.numeric(kl_q_p),
-    z_entropy = as.numeric(z_entropy),
-    objective = as.numeric(expected_log_assign + T_now * z_entropy - kl_q_p),
-    active_idx = active_idx,
-    assignment_M = as.numeric(assignment_M)
-  )
 }
 
 .cavi_partition_assignment_state <- function(assignment_info) {
@@ -1783,34 +1621,6 @@
     assignment_M = assignment_info$assignment_M,
     active_idx = assignment_info$active_idx
   )
-}
-
-.cavi_validate_partition_methods <- function(methods, pca_components) {
-  pca_idx <- which(methods == "PCA")
-  if (length(pca_idx) > 1L && anyDuplicated(pca_components[pca_idx])) {
-    stop("For intrinsic_dim > 1, PCA-based partition initializations must use distinct PCA components.")
-  }
-
-  repeated_det <- unique(methods[methods %in% c("fiedler", "pcurve", "isomap") &
-                                   duplicated(methods)])
-  if (length(repeated_det) > 0L) {
-    warning(
-      "Repeated deterministic partition initialization methods can produce nearly identical orderings: ",
-      paste(repeated_det, collapse = ", "),
-      ". Consider mixing methods, using distinct PCA components, or supplying fits_init explicitly.",
-      call. = FALSE
-    )
-  }
-
-  if (sum(methods == "tSNE") > 1L) {
-    warning(
-      "Repeated tSNE-based partition initializations rely on stochastic variation rather than guaranteed orthogonal orderings. ",
-      "If you want clearly distinct starts, prefer distinct PCA components or mixed methods.",
-      call. = FALSE
-    )
-  }
-
-  invisible(NULL)
 }
 
 .cavi_warn_if_similar_orderings <- function(ordering_mat, labels,
@@ -1903,18 +1713,46 @@
   )
 }
 
-.cavi_get_ordering_result <- function(X, method, pca_component = 1L) {
+.cavi_get_ordering_result <- function(X, method, pca_component = 1L,
+                                      method_args = list(), init_on_failure = "pca",
+                                      ordering_label = NULL) {
   method <- match.arg(method, c("PCA", "fiedler", "pcurve", "tSNE", "random", "isomap"))
+  init_on_failure <- match.arg(init_on_failure, c("pca", "error"))
+  if (method == "PCA" && !"component" %in% names(method_args)) {
+    method_args$component <- pca_component
+  }
+  .mpcurve_validate_ordering_args(X, method, method_args)
   if (method == "random") return(NULL)
-
-  switch(
-    method,
-    PCA = PCA_ordering(X, component = pca_component),
-    fiedler = fiedler_ordering(X),
-    pcurve = pcurve_ordering(X),
-    tSNE = tSNE_ordering(X),
-    isomap = isomap_ordering(X)
-  )
+  helper <- switch(method, PCA = PCA_ordering, fiedler = fiedler_ordering,
+    pcurve = pcurve_ordering, tSNE = tSNE_ordering, isomap = isomap_ordering)
+  # Catch only ordering computation failures; invalid settings and downstream
+  # model-fitting errors must not change the requested initializer.
+  result <- tryCatch(do.call(helper, c(list(X = X), method_args)), error = identity)
+  info <- list(method_requested = method, method_used = method,
+    pca_component_requested = if (method == "PCA") method_args$component else NA_integer_,
+    pca_component_used = if (method == "PCA") method_args$component else NA_integer_,
+    fallback = FALSE, fallback_reason = NULL)
+  if (inherits(result, "error")) {
+    reason <- conditionMessage(result)
+    prefix <- if (is.null(ordering_label)) "" else paste0(ordering_label, ": ")
+    if (init_on_failure == "error" || method == "PCA") {
+      stop(prefix, method, " initialization failed: ", reason, call. = FALSE)
+    }
+    warning(prefix, method, " initialization failed: ", reason,
+      ". Falling back to PCA component 1. Set init_control = ",
+      "mpcurve_init_control(on_failure = 'error') to stop instead.", call. = FALSE)
+    result <- tryCatch(PCA_ordering(X, component = 1L), error = identity)
+    if (inherits(result, "error")) {
+      stop(prefix, "PCA fallback failed: ", conditionMessage(result),
+        ". Original ", method, " initialization failure: ", reason, call. = FALSE)
+    }
+    info$method_used <- "PCA"
+    info$pca_component_used <- 1L
+    info$fallback <- TRUE
+    info$fallback_reason <- reason
+  }
+  attr(result, "init_info") <- info
+  result
 }
 
 .cavi_build_from_ordering <- function(X,
@@ -3266,6 +3104,9 @@ partition_features_twofits_cavi <- function(fitA, fitB, X = NULL, delta = 0,
                                   discretization = c("quantile", "equal", "kmeans"),
                                   pca_component = 1L,
                                   strict_K = FALSE,
+                                  method_args = list(),
+                                  init_on_failure = "pca",
+                                  ordering_label = NULL,
                                   verbose = FALSE) {
   method <- match.arg(method, c("PCA", "fiedler", "pcurve", "tSNE", "random", "isomap"))
   discretization <- match.arg(discretization)
@@ -3290,8 +3131,9 @@ partition_features_twofits_cavi <- function(fitA, fitB, X = NULL, delta = 0,
     ))
   }
 
-  ordering_result <- .cavi_get_ordering_result(X, method = method, pca_component = pca_component)
-  .cavi_build_from_ordering(
+  ordering_result <- .cavi_get_ordering_result(X, method = method, pca_component = pca_component, method_args = method_args,
+    init_on_failure = init_on_failure, ordering_label = ordering_label)
+  fit <- .cavi_build_from_ordering(
     X = X,
     ordering_vec = ordering_result$t,
     S = S,
@@ -3308,13 +3150,15 @@ partition_features_twofits_cavi <- function(fitA, fitB, X = NULL, delta = 0,
     tol = tol,
     discretization = discretization,
     strict_K = strict_K,
-    ordering_label = if (method == "PCA") {
+    ordering_label = ordering_label %||% if (method == "PCA") {
       sprintf("%s(PC%d)", method, pca_component)
     } else {
       method
     },
     verbose = verbose
   )
+  fit$init_info <- attr(ordering_result, "init_info")
+  fit
 }
 
 #' Initialize two CAVI trajectories for dual-ordering partitioning
@@ -3366,7 +3210,7 @@ init_two_trajectories_cavi <- function(X,
   discretization <- match.arg(discretization)
   X <- as.matrix(X)
   d <- ncol(X)
-  K_use <- .cavi_resolve_K(X, K)
+  K_use <- .cavi_resolve_K(X, K, rw_q)
 
   fit1 <- .cavi_fit_from_method(
     X = X,
@@ -3513,80 +3357,14 @@ init_two_trajectories_cavi <- function(X,
 # Generalized M-ordering soft partition
 # ============================================================
 
-#' Initialize M CAVI trajectories for multi-ordering partitioning
-#'
-#' @param X Numeric matrix (\code{n x d}).
-#' @param M Integer >= 2. Number of orderings.
-#' @param methods Character vector of length M. Each element is an ordering
-#'   method (e.g., \code{"PCA"}, \code{"fiedler"}, \code{"random"}). With
-#'   similarity initialization, a length-one method is applied independently
-#'   to every selected feature block.
-#' @param pca_components Integer vector of length M. For PCA-based methods,
-#'   which PC component to use. Similarity initialization defaults to PC1
-#'   within every feature block. Method-based initialization on the full data
-#'   instead uses successive PCs for repeated PCA methods. Ignored for
-#'   non-PCA methods.
-#' @param partition_init Either \code{"similarity"} for feature-similarity
-#'   clustering followed by block-specific ordering initialization or
-#'   \code{"ordering_methods"} for the existing per-ordering warm starts. The
-#'   default is \code{"similarity"}.
-#' @param similarity_metric For \code{partition_init = "similarity"} only:
-#'   feature-similarity metric used to construct the clustering. One of
-#'   \code{"spearman"}, \code{"pearson"}, \code{"smooth_fit"}, or \code{"spline_r2"}.
-#'   \code{"smooth_fit"} can be used with \code{ridge = 0}, but for
-#'   \code{M > 1} this uses an intrinsic-RW pseudo-evidence rather than a
-#'   fully proper marginal likelihood; use a small positive \code{ridge} if
-#'   you want the smoother evidence to be theoretically proper.
-#' @param smooth_fit_lambda_mode For \code{similarity_metric = "smooth_fit"}
-#'   only: whether the directional smoother optimizes \code{lambda} or keeps it
-#'   fixed at \code{smooth_fit_lambda_value}.
-#' @param smooth_fit_lambda_value For \code{similarity_metric = "smooth_fit"}
-#'   only: fixed \code{lambda} value used when
-#'   \code{smooth_fit_lambda_mode = "fixed"}, and the starting value when
-#'   \code{smooth_fit_lambda_mode = "optimize"}.
-#' @param spline_r2_df For \code{similarity_metric = "spline_r2"} only:
-#'   fixed degrees of freedom for the natural cubic spline used to calculate
-#'   directional variance explained.
-#' @param cluster_linkage For \code{partition_init = "similarity"} only:
-#'   hierarchical-clustering linkage applied to \code{1 - S(X)}.
-#' @param similarity_min_feature_sd For \code{partition_init = "similarity"}
-#'   only: features below this standard-deviation threshold are treated as
-#'   low-information and get zero off-diagonal similarity.
-#' @param K Number of pseudotime bins.
-#' @param rw_q Random-walk order.
-#' @param ridge Optional nugget added to the RW precision. Mainly useful for
-#'   internal diagnostics that compare intrinsic and properized priors.
-#' @param lambda_sd_prior_rate Optional positive rate for an exponential prior
-#'   on \code{1 / sqrt(lambda_j^{(m)})}. The default \code{NULL} means no lambda
-#'   prior penalty. For backward compatibility, an explicit \code{0} is treated
-#'   the same way; it is only an alias for "no penalty" and does not
-#'   correspond to a literal exponential prior with rate zero.
-#' @param lambda_min,lambda_max Lambda bounds.
-#' @param sigma_min,sigma_max Bounds used by the \code{"smooth_fit"}
-#'   similarity metric and the warm-start single-ordering CAVI fits.
-#' @param discretization Initial discretization scheme used when converting
-#'   ordering scores into \code{K} bins. For partition fits, MPCurver enforces a
-#'   common \code{K} across orderings and may fall back to equal-width bins if
-#'   quantile discretization collapses.
-#' @param num_iter Warm-start CAVI sweeps per fit.
-#' @param verbose Logical.
-#'
-#' @return A list with \code{$fits} (list of M cavi objects),
-#'   \code{$init_info} (per-ordering method metadata), and
-#'   \code{$ordering_similarity} (pairwise ordering correlations for
-#'   \code{partition_init = "ordering_methods"}) plus optional
-#'   \code{$similarity_init} metadata for \code{partition_init = "similarity"}.
-#'   When similarity initialization is used, \code{$similarity_init} stores the
-#'   full symmetric similarity matrix \code{S}, the corresponding
-#'   \code{distance = 1 - S}, and for \code{similarity_metric = "smooth_fit"}
-#'   the raw directional score diagnostics used to build \code{S}, including
-#'   directional \code{lambda} and \code{sigma^2} estimates.
-#' @noRd
+# Initialize feature groups and one sample ordering per group.
 init_m_trajectories_cavi <- function(X,
                                      S = NULL,
                                      M = 2L,
                                      methods = NULL,
                                      pca_components = NULL,
+                                     method_args = list(),
+                                     init_on_failure = "pca",
                                      K = NULL,
                                      rw_q = 2L,
                                      ridge = 0,
@@ -3598,7 +3376,6 @@ init_m_trajectories_cavi <- function(X,
                                      sigma_min = 1e-10,
                                      sigma_max = 1e10,
                                      discretization = c("quantile", "equal", "kmeans"),
-                                     partition_init = c("similarity", "ordering_methods"),
                                      similarity_metric = c("spearman", "pearson", "smooth_fit", "spline_r2"),
                                      cluster_linkage = "single",
                                      similarity_min_feature_sd = 1e-8,
@@ -3608,113 +3385,37 @@ init_m_trajectories_cavi <- function(X,
                                      verbose = FALSE) {
   X <- as.matrix(X)
   M <- as.integer(M)
-  K_use <- .cavi_resolve_K(X, K)
+  K_use <- .cavi_resolve_K(X, K, rw_q)
   discretization <- match.arg(discretization)
-  partition_init <- match.arg(partition_init)
   similarity_metric <- match.arg(similarity_metric)
   smooth_fit_lambda_mode <- match.arg(smooth_fit_lambda_mode)
 
-  if (identical(partition_init, "similarity")) {
-    return(.cavi_init_m_trajectories_similarity(
-      X = X,
-      S = S,
-      M = M,
-      methods = methods,
-      pca_components = pca_components,
-      K = K_use,
-      rw_q = rw_q,
-      ridge = ridge,
-      lambda_sd_prior_rate = lambda_sd_prior_rate,
-      smooth_fit_lambda_mode = smooth_fit_lambda_mode,
-      smooth_fit_lambda_value = smooth_fit_lambda_value,
-      lambda_min = lambda_min,
-      lambda_max = lambda_max,
-      sigma_min = sigma_min,
-      sigma_max = sigma_max,
-      discretization = discretization,
-      num_iter = num_iter,
-      similarity_metric = similarity_metric,
-      cluster_linkage = cluster_linkage,
-      similarity_min_feature_sd = similarity_min_feature_sd,
-      spline_r2_df = spline_r2_df,
-      similarity_precomputed = similarity_precomputed,
-      verbose = verbose
-    ))
-  }
-
-  # Default methods: first = PCA, rest = PCA (with higher components)
-  if (is.null(methods)) {
-    methods <- rep("PCA", M)
-  }
-  if (length(methods) != M)
-    stop(sprintf("methods must have length M=%d.", M))
-
-  # Default PCA components follow ordering slots, so method vectors like
-  # c("fiedler", "PCA") use PC1 for the single PCA ordering, while
-  # repeated PCA entries use PC1, PC2, ... in order of appearance.
-  if (is.null(pca_components)) {
-    pca_components <- .cavi_default_pca_components(methods)
-  }
-  if (length(pca_components) != M)
-    stop(sprintf("pca_components must have length M=%d.", M))
-
-  .cavi_validate_partition_methods(methods, pca_components)
-
-  fits <- vector("list", M)
-  ordering_mat <- matrix(NA_real_, nrow(X), M)
-  ord_labels <- .cavi_partition_order_labels(M)
-  init_info <- vector("list", M)
-
-  for (m in seq_len(M)) {
-    method_m <- methods[m]
-    fits[[m]] <- .cavi_fit_from_method(
-      X = X,
-      S = S,
-      method = method_m,
-      pca_component = pca_components[m],
-      K = K_use,
-      rw_q = rw_q,
-      ridge = ridge,
-      lambda_sd_prior_rate = lambda_sd_prior_rate,
-      lambda_min = lambda_min,
-      lambda_max = lambda_max,
-      sigma_min = sigma_min,
-      sigma_max = sigma_max,
-      max_iter = num_iter,
-      discretization = discretization,
-      strict_K = TRUE,
-      verbose = FALSE
-    )
-
-    ordering_result <- .cavi_get_ordering_result(X, method = method_m,
-                                                 pca_component = pca_components[m])
-    if (!is.null(ordering_result)) {
-      ordering_mat[, m] <- ordering_result$t
-    }
-    init_info[[m]] <- list(
-      label = ord_labels[m],
-      method = method_m,
-      pca_component = if (method_m == "PCA") pca_components[m] else NA_integer_,
-      K = K_use,
-      discretization = discretization
-    )
-  }
-
-  names(init_info) <- ord_labels
-  colnames(ordering_mat) <- ord_labels
-  .cavi_warn_if_similar_orderings(ordering_mat, ord_labels)
-  ordering_similarity <- suppressWarnings(stats::cor(ordering_mat, use = "pairwise.complete.obs"))
-
-  if (isTRUE(verbose)) {
-    cat(sprintf("[init_m_cavi] M=%d methods=%s\n",
-                M, paste(methods, collapse = ",")))
-  }
-
-  list(
-    fits = fits,
-    init_info = init_info,
-    ordering_similarity = ordering_similarity,
-    similarity_init = NULL
+  .cavi_init_m_trajectories_similarity(
+    X = X,
+    S = S,
+    M = M,
+    methods = methods,
+    method_args = method_args,
+    init_on_failure = init_on_failure,
+    pca_components = pca_components,
+    K = K_use,
+    rw_q = rw_q,
+    ridge = ridge,
+    lambda_sd_prior_rate = lambda_sd_prior_rate,
+    smooth_fit_lambda_mode = smooth_fit_lambda_mode,
+    smooth_fit_lambda_value = smooth_fit_lambda_value,
+    lambda_min = lambda_min,
+    lambda_max = lambda_max,
+    sigma_min = sigma_min,
+    sigma_max = sigma_max,
+    discretization = discretization,
+    num_iter = num_iter,
+    similarity_metric = similarity_metric,
+    cluster_linkage = cluster_linkage,
+    similarity_min_feature_sd = similarity_min_feature_sd,
+    spline_r2_df = spline_r2_df,
+    similarity_precomputed = similarity_precomputed,
+    verbose = verbose
   )
 }
 
@@ -4322,14 +4023,9 @@ init_m_trajectories_cavi <- function(X,
 #'   methods (e.g., \code{c("fiedler", "PCA", "PCA")}). If NULL, defaults to
 #'   \code{rep("PCA", M)}.
 #' @param pca_components Integer vector of length M. Which PCA component to
-#'   use for PCA-based methods. If NULL, auto-assigned sequentially.
-#' @param partition_init Partition initialisation strategy. Use
-#'   \code{"similarity"} to cluster features into \code{M} blocks via
-#'   \code{1 - S(X)} before building ordering-specific warm starts, or
-#'   \code{"ordering_methods"} for the existing per-ordering method starts.
-#'   The default is \code{"similarity"}.
-#' @param similarity_metric For \code{partition_init = "similarity"} only:
-#'   pairwise feature similarity metric used to form \code{S(X)}. One of
+#'   use within each feature group. NULL uses each group's PC1.
+#' @param similarity_metric Pairwise feature similarity metric used to form
+#'   \code{S(X)}. One of
 #'   \code{"spearman"}, \code{"pearson"}, or \code{"smooth_fit"}.
 #'   \code{"smooth_fit"} can be used with \code{ridge = 0}, but for
 #'   \code{M > 1} this uses an intrinsic-RW pseudo-evidence rather than a
@@ -4342,12 +4038,11 @@ init_m_trajectories_cavi <- function(X,
 #'   only: fixed \code{lambda} value used when
 #'   \code{smooth_fit_lambda_mode = "fixed"}, and the starting value when
 #'   \code{smooth_fit_lambda_mode = "optimize"}.
-#' @param cluster_linkage For \code{partition_init = "similarity"} only:
-#'   hierarchical-clustering linkage passed to \code{\link[stats]{hclust}}.
+#' @param cluster_linkage Hierarchical-clustering linkage passed to
+#'   \code{\link[stats]{hclust}}.
 #'   The default is \code{"single"}.
-#' @param similarity_min_feature_sd For \code{partition_init = "similarity"}
-#'   only: features with standard deviation below this threshold are treated as
-#'   low-information and assigned zero off-diagonal similarity.
+#' @param similarity_min_feature_sd Features below this standard-deviation
+#'   threshold receive zero off-diagonal similarity.
 #' @param K Number of pseudotime bins.
 #' @param discretization Initial discretization scheme used when converting
 #'   ordering scores into \code{K} bins. Partition fits require a common
@@ -4393,7 +4088,6 @@ init_m_trajectories_cavi <- function(X,
 #'   remains available only as a deprecated compatibility path.
 #' @param ordering_alpha Deprecated compatibility argument used only for the
 #'   legacy \code{assignment_prior = "dirichlet"} path.
-#' @param hard_assign_final Logical; make hard assignments at the end?
 #' @param freeze_unused_ordering,freeze_unused_ordering_threshold Deprecated
 #'   no-op compatibility arguments.
 #' @param freeze_feature,freeze_feature_weight_threshold Deprecated no-op
@@ -4414,7 +4108,6 @@ init_m_trajectories_cavi <- function(X,
                                 fits_init = NULL,
                                 init_methods = NULL,
                                 pca_components = NULL,
-                                partition_init = c("similarity", "ordering_methods"),
                                 similarity_metric = c("spearman", "pearson", "smooth_fit"),
                                 smooth_fit_lambda_mode = c("optimize", "fixed"),
                                 smooth_fit_lambda_value = 1,
@@ -4441,7 +4134,7 @@ init_m_trajectories_cavi <- function(X,
                                 partition_prior_init = NULL,
                                 assignment_prior = NULL,
                                 ordering_alpha = NULL,
-                                hard_assign_final = FALSE,
+
                                 freeze_unused_ordering = TRUE,
                                 freeze_unused_ordering_threshold = 0.5,
                                 freeze_feature = TRUE,
@@ -4451,7 +4144,6 @@ init_m_trajectories_cavi <- function(X,
   X <- as.matrix(X)
   M <- as.integer(M)
   d <- ncol(X)
-  partition_init <- match.arg(partition_init)
   discretization <- match.arg(discretization)
   similarity_metric <- match.arg(similarity_metric)
   smooth_fit_lambda_mode <- match.arg(smooth_fit_lambda_mode)
@@ -4491,7 +4183,7 @@ init_m_trajectories_cavi <- function(X,
   init_info <- NULL
   ordering_similarity <- NULL
   similarity_init <- NULL
-  applied_partition_init <- if (is.null(fits_init)) partition_init else "fits_init"
+  applied_partition_init <- if (is.null(fits_init)) "similarity" else "fits_init"
 
   # Initialize fits
   if (is.null(fits_init)) {
@@ -4499,7 +4191,6 @@ init_m_trajectories_cavi <- function(X,
       X = X, S = S, M = M,
       methods = init_methods,
       pca_components = pca_components,
-      partition_init = partition_init,
       similarity_metric = similarity_metric,
       smooth_fit_lambda_mode = smooth_fit_lambda_mode,
       smooth_fit_lambda_value = smooth_fit_lambda_value,
@@ -4745,13 +4436,7 @@ init_m_trajectories_cavi <- function(X,
   effective_weight_history <- effective_weight_history[seq_len(actual_iters)]
   objective_history <- objective_history[seq_len(actual_iters)]
 
-  # Hard assignment if requested
-  if (hard_assign_final) {
-    hard <- matrix(0, nrow = d, ncol = M)
-    hard[cbind(seq_len(d), max.col(pi_weights, ties.method = "first"))] <- 1
-    pi_weights <- hard
-    colnames(pi_weights) <- ord_labels
-  }
+
 
   assignment_info_final <- .cavi_partition_assignment_info(
     weights = pi_weights,
@@ -4874,7 +4559,6 @@ init_m_trajectories_cavi <- function(X,
 #'   partition-prior API.
 #' @param ordering_alpha Deprecated compatibility argument used only for the
 #'   legacy \code{assignment_prior = "dirichlet"} path.
-#' @param hard_assign_final Logical.
 #' @param freeze_unused_ordering,freeze_unused_ordering_threshold Deprecated
 #'   no-op compatibility arguments.
 #' @param freeze_feature,freeze_feature_weight_threshold Deprecated no-op
@@ -4899,7 +4583,7 @@ soft_two_trajectory_cavi <- function(X,
                                      discretization = c("quantile", "equal", "kmeans"),
                                      T_start = 5,
                                      T_end = 1,
-                                     n_outer = 25L,
+                                     n_outer = 0L,
                                      inner_iter = 1L,
                                      max_converge_iter = 100L,
                                      tol_outer = 1e-6,
@@ -4914,9 +4598,7 @@ soft_two_trajectory_cavi <- function(X,
                                      position_prior_init = NULL,
                                      partition_prior = c("adaptive", "fixed"),
                                      partition_prior_init = NULL,
-                                     assignment_prior = NULL,
-                                     ordering_alpha = NULL,
-                                     hard_assign_final = FALSE,
+
                                      freeze_unused_ordering = NULL,
                                      freeze_unused_ordering_threshold = NULL,
                                      freeze_feature = NULL,
@@ -4929,14 +4611,7 @@ soft_two_trajectory_cavi <- function(X,
   init_method1 <- match.arg(init_method1)
   discretization <- match.arg(discretization)
   position_prior <- match.arg(position_prior)
-  partition_prior_missing <- missing(partition_prior)
   partition_prior <- match.arg(partition_prior)
-  if (isTRUE(partition_prior_missing) && !is.null(assignment_prior)) {
-    assignment_prior_chr <- as.character(assignment_prior)[1]
-    if (assignment_prior_chr %in% c("uniform", "dirichlet")) {
-      partition_prior <- if (identical(assignment_prior_chr, "uniform")) "fixed" else "adaptive"
-    }
-  }
   X <- as.matrix(X)
 
   # Build fits_init from old-style parameters
@@ -4989,9 +4664,7 @@ soft_two_trajectory_cavi <- function(X,
     position_prior_init = position_prior_init,
     partition_prior = partition_prior,
     partition_prior_init = partition_prior_init,
-    assignment_prior = assignment_prior,
-    ordering_alpha = ordering_alpha,
-    hard_assign_final = hard_assign_final,
+
     freeze_unused_ordering = freeze_unused_ordering,
     freeze_unused_ordering_threshold = freeze_unused_ordering_threshold,
     freeze_feature = freeze_feature,

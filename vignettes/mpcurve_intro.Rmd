@@ -26,11 +26,11 @@ set.seed(42)
 ```
 
 `MPCurver` estimates an ordering of samples and smooth feature trajectories
-along that ordering. This vignette introduces the statistical model and its
-coordinate-ascent variational inference (CAVI) algorithm, then uses a simulated
-spiral to show how to fit a model, assess convergence, and interpret pseudotime.
+along that ordering. This tutorial introduces the model, then uses a simulated
+spiral to show how to fit a model, assess convergence, and extract results.
+The [algorithm details](cavi_single.html) are available separately.
 
-## 1  Statistical model
+## Statistical model
 
 We observe a data matrix
 \[
@@ -66,203 +66,27 @@ The single-ordering MPCurve model assumes:
 
 The model estimates a separate noise variance \(\sigma_j^2\) and smoothness
 parameter \(\lambda_j\) for each feature. The noise variance is shared across
-grid positions. To describe uncertainty in positions and trajectories, CAVI
-uses the variational family
+grid positions. The position prior is $\Pr(c_i=k)=\pi_k$, with $\sum_k\pi_k=1$.
+By default these probabilities are also estimated from the data.
 
-\[
-q(C,U) = \prod_{i=1}^n q_i(c_i)\prod_{j=1}^d q_j(\boldsymbol{u}_j).
-\]
+The fitting algorithm estimates position and trajectory distributions together
+with the model parameters. Its objective, coordinate updates, and stopping
+rule are described in [Single-ordering CAVI](cavi_single.html).
 
-## 2  Variational algorithm
-
-`fit_mpcurve()` alternates between updates of the posterior distributions and
-model parameters to maximize the evidence lower bound (ELBO). Write
-\[
-r_{ik} := q_i(c_i = k),
-\qquad
-N_k := \sum_{i=1}^n r_{ik},
-\]
-and for each feature \(j\),
-\[
-q_j(\boldsymbol{u}_j) = N(\boldsymbol{m}_j, S_j).
-\]
-
-Under the mean-field family
-\[
-q(C,U)=\prod_{i=1}^n q_i(c_i)\prod_{j=1}^d q_j(\boldsymbol{u}_j),
-\]
-the ELBO can be written, up to additive constants, as
-\[
-\mathcal L(q)
- =
-\sum_{i=1}^n\sum_{k=1}^K r_{ik}\log \pi_k
-- \sum_{i=1}^n\sum_{k=1}^K r_{ik}\log r_{ik}
-\]
-\[
-- \frac12 \sum_{i=1}^n\sum_{k=1}^K\sum_{j=1}^d
-r_{ik}
-\left[
-\log(2\pi \sigma_j^2)
-+
-\frac{(x_{ij}-m_{jk})^2 + S_{j,kk}}{\sigma_j^2}
-\right]
-\]
-\[
-+ \frac12 \sum_{j=1}^d
-\left[
-\operatorname{rank}(Q_K)\log \lambda_j
-- \lambda_j\Big(\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j + \operatorname{tr}(Q_K S_j)\Big)
-+ \log |S_j|
-\right].
-\]
-
-This objective, including its additive constants, is recorded in `elbo_trace`.
-For the intrinsic prior, normalization uses the rank and generalized
-determinant of \(Q_K\), with a fixed reference measure on its null space.
-It provides a within-model fitting objective. The updates below maximize it
-one block at a time, with estimated noise, adaptive position probabilities,
-and no additional smoothness-parameter prior. Parameter estimates are
-restricted to the configured bounds.
-
-### 2.1  Update for \(q(\boldsymbol{u}_j)\)
-
-Fix \(r_{ik}\), \(\sigma_j^2\), and \(\lambda_j\). The ELBO terms involving
-\(\boldsymbol{u}_j\) are quadratic, so the optimal variational factor is Gaussian:
-\[
-\log q_j^\star(\boldsymbol{u}_j)
-=
--\frac12 \boldsymbol{u}_j^\top A_j \boldsymbol{u}_j
-+ \boldsymbol{u}_j^\top \boldsymbol{b}_j + \text{const},
-\]
-where
-\[
-A_j
-=
-\lambda_j Q_K +
-\operatorname{diag}\!\left(N_1/\sigma_j^2,\dots,N_K/\sigma_j^2\right),
-\]
-and
-\[
-b_{jk}
-=
-\frac{1}{\sigma_j^2}\sum_{i=1}^n r_{ik} x_{ij}.
-\]
-Therefore,
-\[
-S_j = A_j^{-1},
-\qquad
-\boldsymbol{m}_j = S_j \boldsymbol{b}_j.
-\]
-
-The diagonal likelihood term supplies information at the grid positions,
-while the random-walk precision shares information between neighboring
-positions. Their combination determines both the fitted trajectory and its
-uncertainty.
-
-### 2.2  Update for \(q(c_i)\)
-
-Fix \(q(U)\), \(\pi\), and \(\sigma_j^2\). Collecting the ELBO terms involving
-the row \(r_{i\cdot}\) gives
-\[
-\log r_{ik}
-= a_i +
-\log \pi_k
-- \frac12 \sum_{j=1}^d
-\left[
-\log(2\pi \sigma_j^2)
-+
-\frac{(x_{ij}-m_{jk})^2 + S_{j,kk}}{\sigma_j^2}
-\right].
-\]
-So the cell-position posterior is updated by a row-wise softmax:
-\[
-r_{i\cdot} \leftarrow \operatorname{softmax}\!\big(\ell_{i1},\dots,\ell_{iK}\big),
-\]
-with \(\ell_{ik}\) equal to the position-specific terms above and \(a_i\)
-the normalizing constant.
-
-The \(S_{j,kk}\) term accounts for trajectory uncertainty when assigning a
-sample to a grid position.
-
-### 2.3  Update for \(\pi_k\)
-
-Fixing everything else, we maximize
-\[
-\sum_{k=1}^K N_k \log \pi_k
-\]
-subject to \(\sum_k \pi_k = 1\). A Lagrange multiplier gives
-\[
-\pi_k = \frac{N_k}{n}.
-\]
-
-### 2.4  Update for \(\sigma_j^2\)
-
-Fixing \(q(U)\) and \(q(C)\), differentiate the ELBO with respect to
-\(\sigma_j^2\). The stationary point is
-\[
-\sigma_j^2
-=
-\frac{1}{n}
-\sum_{i=1}^n \sum_{k=1}^K
-r_{ik}\Big[(x_{ij}-m_{jk})^2 + S_{j,kk}\Big].
-\]
-
-So each feature variance is updated from the posterior expected residual sum of
-squares.
-
-### 2.5  Update for \(\lambda_j\)
-
-Fixing \(q(U)\), only the prior part of the ELBO depends on \(\lambda_j\):
-\[
-\frac12 \operatorname{rank}(Q_K)\log \lambda_j
-- \frac12 \lambda_j
-\Big(\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j + \operatorname{tr}(Q_K S_j)\Big).
-\]
-Setting the derivative to zero yields
-\[
-\lambda_j
-=
-\frac{\operatorname{rank}(Q_K)}
-{\boldsymbol{m}_j^\top Q_K \boldsymbol{m}_j + \operatorname{tr}(Q_K S_j)}.
-\]
-
-### 2.6  Assessing convergence
-
-Each update maximizes one objective block while holding the others fixed, so
-`elbo_trace` should be nondecreasing up to numerical tolerance. A plateau
-indicates that successive iterations are making small improvements. Because
-the objective can have multiple optima, compare several initializations when
-the trajectory is complex or weakly identified.
-
-By default, fitting stops when the absolute ELBO change divided by `N * D`
-is below `1e-6`, where `N` is the number of samples and `D` the number of
-features. Use `tol` for a single ordering and `tol_outer` for multiple
-orderings; partition convergence is assessed at temperature `T = 1` after
-annealing. The objective must also satisfy the algorithm's numerical
-nondecrease check. Setting the relevant tolerance to zero disables early
-stopping.
-
-`convergence = "relative"` selects the previous ELBO-relative rule. To restore
-both pre-0.3.2 default tolerances, also set `tol = 1e-6` and `tol_outer = 1e-5`.
-`do_mpcurve()` inherits the rule and tolerance stored in the fit; saved fits
-without a rule retain relative stopping. Stored ELBO traces are unchanged.
-A small increment indicates slow improvement, not a bound on the remaining
-optimization error.
-
-## 3  Simulated spiral example
+## Simulated spiral example
 
 We simulate a two-dimensional spiral with:
 
 - `n = 1000` cells,
 - latent range `t in [1.5*pi, 4.5*pi]`,
 - measurement standard deviation `sigma = 0.12`,
-- and a fitting grid of `K = 60` positions.
+- and a fitting grid of `num_bins = 60` positions.
 
 ```{r simulate}
 sim <- simulate_swiss_roll_1d_2d(
   n = 1000,
   t_range = c(1.5 * pi, 4.5 * pi),
-  sigma = 0.12,
+  noise_sd = 0.12,
   seed = 1
 )
 
@@ -273,7 +97,9 @@ cat("Data dimensions:", nrow(X), "x", ncol(X), "\n")
 cat("t range:", round(range(t_true), 3), "\n")
 ```
 
-```{r plot-data, fig.cap="Simulated spiral observations, colored by the generating latent position."}
+Figure 1 shows simulated spiral observations, colored by the generating latent position.
+
+```{r plot-data, fig.cap="Figure 1. Simulated spiral observations, colored by the generating latent position."}
 pal <- grDevices::colorRampPalette(
   c("#1F3A5F", "#2E8A99", "#F2C14E", "#E76F51")
 )(256)
@@ -284,15 +110,22 @@ plot(X, col = col_true, pch = 19, cex = 0.55,
      main = "Observed spiral, coloured by true pseudotime")
 ```
 
-## 4  Fit the model
+## Fit the model
+
+For your own data, supply a numeric matrix or data frame with samples in rows
+and features in columns. Values must be finite: handle missing values before
+fitting. MPCurver does not impute or standardize the fitting data. Optional
+measurement standard deviations `S` use the same units and positional order
+as `X`, as a feature vector or a matrix of the same dimensions. See
+`?fit_mpcurve` for the complete input contract.
 
 ```{r fit-cavi}
 fit <- fit_mpcurve(
-  X,
-  method = "fiedler",
-  K = 60,
-  iter = 120
-)
+    X,
+    initial_method = "fiedler",
+    num_bins = 60,
+    max_iter = 120
+  )
 
 stopifnot(inherits(fit, "mpcurve"))
 stopifnot(identical(fit$algorithm, "cavi"))
@@ -304,7 +137,7 @@ fit
 summary(fit)
 ```
 
-## 5  Check convergence and recovery
+## Check convergence and recovery
 
 First, check whether the variational objective increases throughout fitting.
 
@@ -315,24 +148,23 @@ cat("ELBO range:", round(range(fit$elbo_trace), 3), "\n")
 ```
 
 We can also compare the inferred ordering to the true latent parameter using
-the posterior-mean component index
-\[
-\hat c_i = \sum_{k=1}^K k \, r_{ik}.
-\]
+the posterior-mean pseudotime on the normalized grid.
 
 ```{r ordering-recovery}
-pseudotime_hat <- as.numeric(fit$gamma %*% seq_len(ncol(fit$gamma)))
+pseudotime_hat <- fitted_positions(fit)[, 1]
 rho_t <- abs(cor(pseudotime_hat, t_true, method = "spearman"))
 
 cat("Absolute Spearman correlation with true t:", round(rho_t, 4), "\n")
 ```
 
-## 6  Visualize the fitted ordering
+## Visualize the fitted ordering
 
-```{r plot-fit, fig.cap="True pseudotime (left) and inferred CAVI pseudotime (right)."}
+Figure 2 shows true pseudotime (left) and inferred CAVI pseudotime (right).
+
+```{r plot-fit, fig.cap="Figure 2. True pseudotime (left) and inferred CAVI pseudotime (right)."}
 col_fit <- pal[cut(pseudotime_hat, breaks = 256, labels = FALSE)]
 
-op <- par(mfrow = c(1, 2), mar = c(4, 4, 2.5, 1))
+op <- par(mfrow = c(1, 2), mar = c(4, 4, 3.5, 1))
 plot(X, col = col_true, pch = 19, cex = 0.5,
      xlab = "x", ylab = "y", main = "Truth")
 plot(X, col = col_fit, pch = 19, cex = 0.5,
@@ -343,15 +175,19 @@ par(op)
 The fitted object also provides plots of the objective and posterior mean
 trajectory.
 
-```{r plot-trace, fig.cap="CAVI trace plot from the fitted mpcurve object."}
+Figure 3 shows the CAVI trace plot from the fitted mpcurve object.
+
+```{r plot-trace, fig.cap="Figure 3. CAVI trace plot from the fitted mpcurve object."}
 plot(fit, plot_type = "elbo")
 ```
 
-```{r plot-mu, fig.cap="Posterior mean trajectories across the K bins."}
+Figure 4 shows posterior mean trajectories across the K bins.
+
+```{r plot-mu, fig.cap="Figure 4. Posterior mean trajectories across the K bins."}
 plot(fit, plot_type = "mu")
 ```
 
-## 7  Using the results
+## Using the results
 
 The ordering-recovery statistic above compares estimated sample positions
 with the generating latent variable. Its absolute value accounts for the
@@ -359,11 +195,27 @@ arbitrary direction of an inferred ordering. In an application, use known
 sample annotations to help interpret that direction and assess whether
 nearby samples have similar feature profiles.
 
-Normalized positions are available in `fit$locations$mean$pseudotime`,
-trajectory means in `fit$params$mu`, and trajectory covariance matrices in
-`fit$fit$posterior$cov`. If the objective is still increasing at the iteration
-limit, continue with `fit <- do_mpcurve(fit, iter = 100)`.
+The extraction functions use the same dimensions for one or multiple orderings:
+
+```{r extract-results}
+positions <- fitted_positions(fit)                 # samples x orderings
+trajectories <- fitted_trajectories(fit)            # features x bins x orderings
+trajectory_sd <- fitted_trajectories(fit, "sd")
+assignment_probabilities <- fitted_assignments(fit) # features x orderings
+head(positions)
+```
+
+Use `fitted_positions(fit, "probability")` for the full position probabilities
+and `fitted_trajectories(fit, "covariance")` for trajectory covariance matrices.
+Input sample and feature names are preserved. Even a single ordering retains
+its matrix or array dimension. If the objective is still increasing at the
+iteration limit, continue with `fit <- do_mpcurve(fit, max_iter = 100)`.
+Continuation inherits the fitted settings. Use
+`control = mpcurve_continue_control(lambda_init = 5, fix_lambda = TRUE)`
+to reset and fix precision at 5, or `fix_lambda = FALSE` to resume its updates.
+Changing the random-walk order or measurement errors requires a new fit.
 
 When different feature groups may follow different sample orderings, see the
-[feature-partitioning tutorial](partition.html). For data with supplied
+[multiple-ordering tutorial](partition.html). To choose the dimension, see
+[Estimating intrinsic dimension](intrinsic_dimension.html). For data with supplied
 measurement uncertainty, see the [fitness analysis](fitness.html).

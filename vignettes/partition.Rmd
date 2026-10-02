@@ -1,10 +1,10 @@
 ---
-title: "Feature Partitioning with MPCurver"
+title: "Multiple Orderings with MPCurver"
 output:
   rmarkdown::html_vignette:
     toc: true
 vignette: >
-  %\VignetteIndexEntry{Feature Partitioning with MPCurver}
+  %\VignetteIndexEntry{Multiple Orderings with MPCurver}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -20,28 +20,100 @@ knitr::opts_chunk$set(
 )
 ```
 
+## Intrinsic dimension
+
+A single ordering describes one axis of variation: every feature follows a
+smooth trajectory along the same sample positions. Some datasets contain
+several such axes. For example, genes associated with cell differentiation
+and genes associated with the cell cycle can vary across the same cells in
+different ways. One ordering may describe one group well while missing the
+structure in the other.
+
+MPCurver represents these patterns using $M$ latent sample orderings. Each
+feature follows one ordering, and the model learns its assignment together
+with the sample positions and smooth trajectory. In this model, intrinsic
+dimension refers to the number of latent orderings in the returned model. With $M=1$,
+all features share one ordering; with $M=2$, two feature groups can follow
+different sample positions.
+
+We first describe the model, then fit an example with $M=2$.
+[Estimating intrinsic dimension](intrinsic_dimension.html) covers choosing $M$;
+[Multi-ordering CAVI](cavi_partition.html) describes the algorithm separately.
+
+## Statistical model
+
+The standard model fits a fixed number $M$ of latent orderings to a
+sample-by-feature matrix $X\in\mathbb{R}^{n\times P}$. Each ordering uses
+$K$ grid positions. Sample $i$ has a position $C_i^{(m)}$ along every ordering
+$m$, while feature $j$ follows one ordering, indicated by $Z_j$:
+
+$$
+\Pr(C_i^{(m)}=k)=\pi_{mk},\qquad
+\Pr(Z_j=m)=\omega_m.
+$$
+
+The position probabilities sum to one over $k$, and the feature-assignment
+prior weights sum to one over $m$. A feature's assignment is shared across
+all samples.
+
+### Observations and smooth trajectories
+
+Write $U_j=(u_{j1},\ldots,u_{jK})^T$ for feature $j$'s trajectory. Conditional
+on its ordering and the sample's position,
+
+$$
+x_{ij}\mid Z_j=m,\ C_i^{(m)}=k,\ U_j
+\sim N(u_{jk},\sigma_j^2).
+$$
+
+There is one noise variance $\sigma_j^2$ per feature, shared across orderings
+and grid positions. The trajectory has a random-walk smoothness prior:
+
+$$
+p(U_j\mid Z_j=m,\lambda_{jm})
+\propto
+\exp\!\left(-\frac{\lambda_{jm}}{2}U_j^TQ_KU_j\right).
+$$
+
+The default second-order random walk (RW2) penalizes second differences along
+the grid. A larger precision $\lambda_{jm}$ favors a smoother trajectory.
+The standard fit estimates the noise variances, smoothness precisions,
+position probabilities $\pi$, and feature-assignment prior weights $\omega$
+by empirical Bayes.
+
+With the default `ridge = 0`, $Q_K$ is an intrinsic precision matrix of rank
+$K-2$. The likelihood identifies the directions left unpenalized by the prior.
+
+The fitting algorithm learns sample positions and soft feature-assignment
+probabilities jointly, retaining a trajectory distribution conditional on each
+possible assignment. The [Multi-ordering CAVI](cavi_partition.html) page gives
+the variational family, objective contributions, and coordinate updates.
+
+## Choose a fitting approach
+
+When the dimension is unknown, start with adaptive fitting using
+`fit_mpcurve(X, intrinsic_dim = "auto")`. It is computationally simpler:
+similarity initialization chooses a starting dimension, then one adaptive
+model is fitted and orderings with numerical-zero estimated prior weights are
+removed. It does not require a sequence of full fits at different dimensions.
+
+- Use `intrinsic_dim = M` when the analysis specifies the number of orderings.
+- Use `intrinsic_dim = "auto"` with the default adaptive partition prior when
+  you want the model to estimate the number of supported orderings.
+- Use `select_mpcurve_dimension()` when you specifically want to compare
+  dimensions under a fixed uniform partition prior. It fits multiple candidate
+  models and compares their final objectives.
+
+The adaptive and fixed-uniform procedures use different priors and selection
+rules, so they may return different dimensions. See
+[Estimating intrinsic dimension](intrinsic_dimension.html) for examples.
+
+## Fit a model with M = 2
+
 ```{r load}
 library(MPCurver)
 set.seed(42)
 ```
-
-## When to use multiple orderings
-
-Different groups of features can reflect different patterns among the same
-samples. For example, one group of genes may track cell differentiation while
-another tracks a separate cell-state axis. A feature-partition model estimates
-several sample orderings and the probability that each feature follows each
-one.
-
-Set `intrinsic_dim = M` to specify the number of orderings. The fit returns
-sample positions along each ordering, smooth feature trajectories conditional
-on each assignment, and assignment probabilities that quantify support for
-the feature groups.
-
-This tutorial starts with a two-ordering example, shows how to interpret its
-results, and then explains the model and structural variational updates.
-
-## Fit a two-ordering model
 
 We simulate 500 samples with two groups of ten features. The groups vary along
 different latent orderings, with quadratic and monotone trajectory families.
@@ -52,7 +124,7 @@ sim <- simulate_dual_trajectory(
   d1 = 10,
   d2 = 10,
   d_noise = 0,
-  sigma = 0.05,
+  noise_sd = 0.05,
   trajectory_family = c("quadratic", "monotone"),
   seed = 1
 )
@@ -61,34 +133,27 @@ X <- sim$X
 truth <- sim$true_assign
 ```
 
-Fit two orderings using 50 grid positions and a second-order random-walk
-prior. The default initialization groups similar features and uses PCA to
-initialize a sample ordering within each group. Each group is treated as its
-own feature subset and uses its own PC1; the PCA component is not incremented
-across groups.
+Fit a model with $M=2$ and 50 grid positions using the default RW2 prior
+and PCA initialization.
 
 ```{r fit-soft}
 fit_partition <- fit_mpcurve(
   X,
   intrinsic_dim = 2,
-  method = "PCA",
-  K = 50,
-  rw_q = 2,
-  ridge = 0,
-  verbose = FALSE
+  num_bins = 50
 )
 ```
 
 ### Interpret feature assignments
 
-`fit_partition$partition$pi_weights` is a feature-by-ordering matrix:
+`fitted_assignments(fit_partition)` is a feature-by-ordering matrix:
 entry $(j,m)$ is the fitted probability $q(Z_j=m)$ that feature $j$ follows
 ordering $m$. Each row sums to one. A row concentrated on one ordering gives
 a clear assignment; a diffuse row indicates that several orderings describe
 the feature similarly well.
 
 ```{r assignment-probabilities}
-head(fit_partition$partition$pi_weights)
+head(fitted_assignments(fit_partition))
 table(fit_partition$partition$assign)
 ```
 
@@ -109,9 +174,16 @@ cat("Partition accuracy:", round(accuracy, 4), "\n")
 against the inferred sample positions for each ordering, together with its
 fitted trajectory. The objective plot shows progress over fitting iterations.
 
-```{r visualize-mpcurve, fig.cap="Variational objective over fitting iterations and observed feature values along each inferred ordering."}
+Figure 1 shows the variational objective over fitting iterations.
+Figure 2 shows observed feature values along each inferred ordering.
+
+```{r visualize-mpcurve, fig.cap="Figure 1. Variational objective over fitting iterations."}
 plot(fit_partition, plot_type = "elbo")
-plot(fit_partition, dims = 4)
+```
+
+```{r visualize-sample-orderings, fig.cap="Figure 2. Observed feature 4 values along each inferred ordering; colors encode pseudotime, and orange lines show fitted mean trajectories."}
+plot(fit_partition, dims = 4, add_legend = FALSE,
+     pal = hcl.colors(100, "Viridis"))
 ```
 
 To focus on trajectory shape, use `plot_type = "mu"`. Panel $m$ displays the
@@ -119,7 +191,9 @@ conditional posterior mean $E[U_j\mid Z_j=m]$ against normalized latent
 position. The assignment probability in the panel title indicates how
 strongly the data support that ordering for the selected feature.
 
-```{r structural-mu-one-dimensional, fig.cap="Conditional mean trajectory of feature 4 under each ordering; panel titles report assignment probabilities."}
+Figure 3 shows conditional mean trajectory of feature 4 under each ordering; panel titles report assignment probabilities.
+
+```{r structural-mu-one-dimensional, fig.cap="Figure 3. Conditional mean trajectory of feature 4 under each ordering; panel titles report assignment probabilities."}
 plot(fit_partition, plot_type = "mu", dims = 4)
 ```
 
@@ -132,382 +206,97 @@ one another across the latent grid. This shows the joint path implied by
 placing both features on that ordering. Check both assignment probabilities
 when interpreting the path.
 
-```{r structural-mu-two-dimensional, fig.cap="Conditional mean paths for features 4 and 14 under each ordering."}
+Figure 4 shows conditional mean paths for features 4 and 14 under each ordering.
+
+```{r structural-mu-two-dimensional, fig.cap="Figure 4. Conditional mean paths for features 4 and 14 under each ordering."}
 plot(fit_partition, plot_type = "mu", dims = c(4, 14))
 ```
 
 ### Extract results
 
-The following fields support further analysis:
+Table 1 lists the extraction functions used for further analysis. Their
+ordering dimension is retained for both single- and multiple-ordering fits.
 
-| Quantity | Field |
-|:--|:--|
-| Sample positions for ordering $m$ | `locations[[m]]$mean$pseudotime` |
-| Feature-assignment probabilities | `partition$pi_weights` |
-| Most probable feature assignments | `partition$assign` |
-| Conditional trajectory means | `conditional_posterior$mean[[m]]` |
-| Trajectory covariance for feature $j$, ordering $m$ | `conditional_posterior$cov[[m]][[j]]` |
-| Feature noise variances, shared across orderings | `params$sigma2` |
-| Feature-by-ordering smoothness parameters | `lambda_mat` |
-| Fitted number of orderings | `intrinsic_dim` |
-| Effective number of orderings | `effective_intrinsic_dim` |
+Table 1. Result extraction for sample positions, conditional trajectories, and feature assignments. Here $n$ is the number of samples, $P$ features, $K$ bins, and $M$ fitted orderings.
+
+| Quantity | Extraction | Shape |
+|:--|:--|:--|
+| Posterior-mean sample positions | `fitted_positions(fit_partition)` | $n \times M$ |
+| Position probabilities | `fitted_positions(fit_partition, "probability")` | $n \times K \times M$ |
+| Feature-assignment probabilities | `fitted_assignments(fit_partition)` | $P \times M$ |
+| Conditional trajectory means | `fitted_trajectories(fit_partition)` | $P \times K \times M$ |
+| Conditional trajectory SDs | `fitted_trajectories(fit_partition, "sd")` | $P \times K \times M$ |
+| Conditional trajectory covariances | `fitted_trajectories(fit_partition, "covariance")` | $K \times K \times P \times M$ |
+
+```{r extract-results}
+positions <- fitted_positions(fit_partition)
+assignment_probabilities <- fitted_assignments(fit_partition)
+trajectories <- fitted_trajectories(fit_partition)
+```
+
+Rows retain the input sample or feature names. Use feature names in plots,
+for example `plot(fit_partition, dims = colnames(X)[1])` when `X` has names.
+Model metadata such as `fit_partition$intrinsic_dim` and
+`fit_partition$params$sigma2` remain available directly.
 
 Sample positions are normalized to $[0,1]$. Ordering labels and directions
 are arbitrary; use sample annotations to interpret the axes and align
 orderings when comparing fits. See `?mpcurve` for the complete object
-description.
+description. Effective-dimension reporting is covered in
+[Estimating intrinsic dimension](intrinsic_dimension.html#report-the-supported-dimension).
 
 ### Assess convergence and continue fitting
 
-Fitting begins with an annealing schedule that encourages diffuse feature
-assignments, followed by coordinate updates at temperature $T=1$. Inspect
-`objective_history` together with `temperature_history`: the $T=1$ segment
-tracks improvements in a common objective. Values from different
-temperatures correspond to different objectives.
+By default, fitting runs directly at temperature $T=1$, with no annealing.
+`max_iter` limits the coordinate sweeps, and `objective_history` records
+improvements in the same objective throughout fitting.
 
 ```{r check-objective}
-t1_objective <- fit_partition$objective_history[
-  fit_partition$temperature_history == 1
-]
-cat("Recorded T=1 objective values:", length(t1_objective), "\n")
+objective <- fit_partition$objective_history
+cat("Recorded objective values:", length(objective), "\n")
 cat("Final objective increments:\n")
-tail(diff(t1_objective))
+tail(diff(objective))
 ```
 
 If the increments remain appreciable at the iteration limit, run additional
 iterations:
 
 ```{r continue, eval=FALSE}
-fit_partition <- do_mpcurve(fit_partition, iter = 10)
+fit_partition <- do_mpcurve(fit_partition, max_iter = 10)
 ```
 
 This refines the orderings, trajectories, assignments, and estimated
 parameters at $T=1$, extending the objective history.
 
-## Choose fitting settings
+### Fitting settings {#choose-fitting-settings}
 
-### Number of orderings
+#### Initialization
 
-Set `intrinsic_dim` to an integer to fit that number of orderings. Alternatively,
-`intrinsic_dim = "auto"` uses the feature-similarity tree to choose an
-initialization dimension before fitting. In either case the fitted model keeps
-that dimension fixed. The returned `effective_intrinsic_dim` records the number
-of orderings supported by the selected feature-assignment prior. With a fixed
-prior it equals the fitted `intrinsic_dim`. With the default adaptive
-empirical-Bayes prior, it counts fitted assignment-prior weights exceeding
-`effective_weight_tol` (default `1e-12`). The raw weights remain available
-through `fitted_prior(fit_partition, type = "partition")$omega`.
+For a specified $M$, the default initialization uses feature similarity and
+single-linkage clustering to form $M$ feature groups, then initializes one
+sample ordering per group. Each group uses the selected `initial_method`;
+the default `"PCA"` uses that group's first principal component.
 
-```{r effective-dimension}
-fit_partition$effective_intrinsic_dim
-fitted_prior(fit_partition, type = "partition")$omega
-```
+Similarity options are `"spearman"` (the default for specified $M$),
+`"pearson"`, `"spline_r2"`, and `"smooth_fit"`. For example, pass
+`init_control = mpcurve_init_control(similarity_metric = "spline_r2")`
+to change the metric. See
+[`mpcurve_init_control()`](../reference/mpcurve_init_control.html#feature-similarity)
+for metric definitions and alternative initialization settings.
 
-This count is a numerical occupancy estimate, not a posterior distribution
-over $M$. The fitted model still contains all `intrinsic_dim` orderings. A
-smaller effective count does not remove or refit any trajectory.
+#### Noise and smoothness
 
-Automatic initialization evaluates hierarchical-clustering cuts up to
-`max_intrinsic_dim` and selects the eligible cut with the largest mean
-silhouette. A cut is eligible only when every cluster contains at least
-`similarity_min_cluster_size` features. The default minimum of two rules out a
-singleton feature as the sole evidence for an ordering: ordering that feature
-by its own values would otherwise produce a tautologically smooth trajectory.
-
-```{r automatic-dimension, eval=FALSE}
-fit_auto <- fit_mpcurve(
-  X,
-  intrinsic_dim = "auto",
-  max_intrinsic_dim = 8,
-  similarity_metric = "spline_r2",
-  spline_r2_df = 5,
-  similarity_min_cluster_size = 2,
-  partition_prior = "adaptive",
-  K = 50,
-  verbose = FALSE
-)
-
-fit_auto$intrinsic_dim
-fit_auto$effective_intrinsic_dim
-```
-
-If no multi-ordering cut satisfies the minimum size, the automatic procedure
-fits one ordering. For an eligible cut with cluster sizes
-$d_1,\ldots,d_M$, an adaptive fit initializes the global ordering
-probabilities as $\omega_m=d_m/D$, where $D$ is the number of features. Every
-feature starts from this same probability vector; the tree cut does not impose
-hard feature assignments, and subsequent empirical-Bayes updates may reduce
-the effective number of orderings.
-
-The minimum-size requirement addresses initialization identifiability, not
-garbage-feature classification. A singleton branch can represent noise, a
-weakly measured member of a supported ordering, model mismatch, or a feature
-that does not follow any ordering. MPCurver does not currently distinguish
-these cases with a separate background component. The requirement applies to
-automatic dimension initialization; a numeric `intrinsic_dim` continues to
-request that exact fitted dimension.
-
-For a fixed **uniform** feature-assignment prior, use a separate greedy
-selector to compare final soft $T=1$ objectives across adjacent values of
-$M$. If an extra ordering receives no feature mass, its uniform assignment
-prior contributes a penalty of $D\log\{M/(M-1)\}$ relative to the smaller
-model, where $D$ is the number of features. The selector fits both similarity
-and ordering-method initializations at each candidate $M$ and records the
-scores and convergence diagnostics used in its decision.
-
-```{r greedy-dimension, eval=FALSE}
-selected <- select_mpcurve_dimension(
-  X,
-  max_intrinsic_dim = 4,
-  direction = "forward",
-  K = 20,
-  T_start = 1,
-  T_end = 1,
-  n_outer = 1,
-  max_converge_iter = 500
-)
-selected$effective_intrinsic_dim
-selected$dimension_selection$history
-```
-
-`direction = "backward"` starts at the upper bound and tests smaller
-dimensions. Greedy selection depends on fit quality and can stop at a local
-choice; inspect the saved candidate scores and convergence flags. The
-adaptive-prior effective count and the uniform-prior greedy search are
-different estimators and should be interpreted separately.
-
-### Initialization
-
-The default `partition_init = "similarity"` clusters features by similarity
-and initializes one ordering per feature group. A length-one `method` is
-applied independently to every group. The default `method = "PCA"` therefore
-uses each group's own PC1; `method = "isomap"` or `method = "fiedler"` applies
-that same method separately to every group. The fast
-`similarity_metric = "spline_r2"` option orders the samples by each predictor
-feature, fits the other features with a natural cubic spline of fixed degrees
-of freedom, and uses the proportion of response variance explained as a
-directional similarity. The two directions are combined into a symmetric
-score. `spline_r2_df` controls the spline degrees of freedom and defaults to
-5. Alternatively,
-`partition_init = "ordering_methods"` uses the specified ordering methods:
-
-```{r fit-methods, eval=FALSE}
-fit3 <- fit_mpcurve(
-  X,
-  intrinsic_dim = 3,
-  partition_init = "ordering_methods",
-  method = c("fiedler", "PCA", "PCA"),
-  K = 16
-)
-```
-
-Compare several initializations when trajectories are non-monotone or
-groups are weakly separated. Within a common model and fitting configuration,
-compare final $T=1$ objective values as well as the resulting orderings and
-feature assignments.
-
-### Noise and smoothness
-
-By default, the model estimates one noise variance per feature, shared
-across orderings. `sigma2_init` supplies a scalar or a vector of initial
-feature variances. Alternatively, supply known measurement standard
+By default, the model estimates the noise variance $\sigma_j^2$ for each
+feature $j$, shared across orderings. `control$sigma2_init` sets the initial
+values of $\sigma_j^2$ using a scalar or a feature-specific vector.
+Alternatively, supply known measurement standard
 deviations through `S`, as a feature-specific vector or a matrix matching
 `X`. In that case `params$sigma2` is `NULL`, and the supplied
 measurement errors determine the likelihood variances.
 
-`lambda` initializes the smoothness parameters. Larger values give
-stronger smoothing; `fix_lambda = TRUE` holds them fixed during fitting.
-An optional `lambda_sd_prior_rate` encourages smooth trajectories while
-allowing their smoothness parameters to be estimated.
+See [the known-error updates](cavi_partition.html#known-measurement-errors)
+for the corresponding algorithm.
 
-## Statistical model
-
-Let $C_i^{(m)}$ be the latent grid position of sample $i$ along ordering $m$,
-and let $Z_j\in\{1,\ldots,M\}$ identify the ordering followed by feature $j$.
-The position and feature-assignment probabilities are
-$\Pr(C_i^{(m)}=k)=\pi_{mk}$ and $\Pr(Z_j=m)=\omega_m$. Conditional on these
-assignments,
-
-$$
-x_{ij}\mid Z_j=m,\; C_i^{(m)}=k,\; U_j
-\sim N(u_{jk},\sigma_j^2).
-$$
-
-Each feature has a trajectory $U_j$ whose prior smoothness depends on its
-ordering:
-
-$$
-p(U_j\mid Z_j=m,\lambda_{jm})
-\propto
-\exp\!\left(-\frac{\lambda_{jm}}{2}U_j^TQ_KU_j\right).
-$$
-
-$Q_K$ is the random-walk precision matrix. Its quadratic form penalizes
-variation along the ordered grid. With known measurement standard deviations,
-replace $\sigma_j^2$ by $v_{ij}=S_{ij}^2$ (or $S_j^2$ for a feature-specific
-vector).
-
-### Structural variational inference
-
-MPCurver approximates the posterior by
-
-$$
-q(C,Z,U)
-=
-\prod_{m=1}^M\prod_{i=1}^n q(C_i^{(m)})
-\prod_{j=1}^d q(Z_j)q(U_j\mid Z_j).
-$$
-
-Write $q(C_i^{(m)}=k)=r_{imk}$, $q(Z_j=m)=w_{jm}$, and
-
-$$
-q(U_j\mid Z_j=m)=N(\mu_{jm},V_{jm}).
-$$
-
-The conditional Gaussian distributions describe the possible trajectory
-shapes under each feature assignment. Preserving this dependence allows
-assignment uncertainty and trajectory uncertainty to be represented together.
-Coordinate updates alternate between trajectories, sample positions, feature
-assignments, and model parameters.
-
-### Conditional trajectory update
-
-Let $R^{(m)}=(r_{imk})$ and $N_{mk}=\sum_i r_{imk}$. With estimated feature
-variance,
-
-$$
-A_{jm}
-=
-\lambda_{jm}Q_K
-+\operatorname{diag}\!\left(\frac{N_m}{\sigma_j^2}\right),
-\qquad
-b_{jm}
-=
-\frac{(R^{(m)})^T X_{\cdot j}}{\sigma_j^2},
-$$
-
-and
-
-$$
-V_{jm}=A_{jm}^{-1},\qquad \mu_{jm}=V_{jm}b_{jm}.
-$$
-
-These updates combine the smoothness prior with the full likelihood
-conditional on $Z_j=m$. Thus each possible assignment has its own trajectory
-estimate and covariance, including assignments with small $w_{jm}$.
-
-With known variances $v_{ij}$, the likelihood terms become
-
-$$
-A_{jm}
-=
-\lambda_{jm}Q_K
-+\operatorname{diag}_k\sum_i\frac{r_{imk}}{v_{ij}},
-\qquad
-b_{jmk}=\sum_i\frac{r_{imk}x_{ij}}{v_{ij}}.
-$$
-
-### Ordering responsibilities
-
-The sample-position update weights each feature's contribution by its
-assignment probability:
-
-$$
-\log r_{imk}
-\stackrel{+}{=}
-\log\pi_{mk}
--\frac12\sum_j w_{jm}
-\frac{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}}{\sigma_j^2},
-$$
-
-where $\stackrel{+}{=}$ denotes equality up to a normalizing constant in $k$.
-A feature with large $w_{jm}$ strongly informs ordering $m$. The term
-$V_{jm,kk}$ propagates trajectory uncertainty into the position update.
-For known measurement variances, replace $\sigma_j^2$ by $v_{ij}$.
-
-### Shared feature variance
-
-For estimated noise, define
-
-$$
-E_{jm}
-=
-\sum_{i,k}r_{imk}
-\left[(x_{ij}-\mu_{jmk})^2+V_{jm,kk}\right].
-$$
-
-The variance update averages the expected squared residuals across ordering
-assignments:
-
-$$
-\sigma_j^2
-=
-\frac1n\sum_{m=1}^M w_{jm}E_{jm}.
-$$
-
-This gives one noise scale for each feature. When measurement variances are
-supplied through `S`, those variances are used directly.
-
-### Feature assignments
-
-Assignment probabilities balance expected data fit, trajectory smoothness,
-and posterior uncertainty. Define
-
-$$
-G_{jm}=\mu_{jm}^TQ_K\mu_{jm}+\operatorname{tr}(Q_KV_{jm}).
-$$
-
-With estimated noise, precision rank $r$, and generalized determinant
-$|Q_K|_+$, the local objective for feature $j$ under ordering $m$ is
-
-$$
-\begin{aligned}
-B_{jm}
-=\;&-\frac n2\log(2\pi\sigma_j^2)
--\frac{E_{jm}}{2\sigma_j^2}\\
-&+\frac12\left[
-r\{\log\lambda_{jm}-\log(2\pi)\}
-+\log|Q_K|_+
--\lambda_{jm}G_{jm}
-\right]\\
-&+\log p(\lambda_{jm})
-+\frac12\left[K\log(2\pi e)+\log|V_{jm}|\right].
-\end{aligned}
-$$
-
-The terms are the expected likelihood, expected trajectory log prior,
-optional smoothness-parameter log prior, and Gaussian entropy. The default
-smoothness-parameter penalty is zero. At annealing temperature $T$,
-
-$$
-w_{jm}
-\propto
-\exp\left\{
-\frac{\log\omega_m+B_{jm}}{T}
-\right\}
-$$
-
-for a fixed or empirically estimated ordering prior $\omega$.
-At $T=1$, these are the feature-assignment updates for the structural
-variational objective.
-
-### Intrinsic random-walk prior
-
-The default `ridge = 0` gives an intrinsic random-walk prior. $Q_K$ is rank
-deficient, and the likelihood provides information about the unpenalized
-directions. The conditional posterior is proper when
-$\lambda_{jm}Q_K+D_{jm}$ is positive definite, equivalently when
-
-$$
-\ker(Q_K)\cap\ker(D_{jm})=\{0\},
-$$
-
-where $D_{jm}$ is the diagonal likelihood precision in the trajectory update.
-This is the same identification condition as in the single-ordering model.
-A positive `ridge` adds a diagonal term to $Q_K$ and gives a proper Gaussian
-trajectory prior.
-
-For an intrinsic prior, the objective uses the rank and generalized
-determinant of $Q_K$, with a fixed reference measure on the null space. It
-supports fitting and convergence assessment for the specified model; an
-ordinary marginal-likelihood interpretation requires a proper prior.
+For advanced fitting settings, see
+[`mpcurve_control()`](../reference/mpcurve_control.html). To estimate the
+intrinsic dimension, continue to [Estimating intrinsic dimension](intrinsic_dimension.html).

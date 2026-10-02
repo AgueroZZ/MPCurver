@@ -173,19 +173,16 @@ test_that("fixed-M structural fits use canonical shared state with intrinsic rid
   fit2 <- suppressWarnings(fit_mpcurve(
     X,
     intrinsic_dim = 2,
-    K = 5,
-    partition_init = "ordering_methods",
-    method = c("PCA", "PCA"),
-    ridge = 0,
-    T_start = 1,
-    T_end = 1,
-    n_outer = 1,
-    max_converge_iter = 3,
-    verbose = FALSE
+    num_bins = 5,
+    initial_method = "PCA",
+    max_iter = 3,
+    verbose = FALSE,
+    control = mpcurve_control(ridge = 0, anneal_start = 1, anneal_steps = 1),
+    init_control = mpcurve_init_control()
   ))
   expect_s3_class(fit2, "mpcurve")
   expect_identical(fit2$variational_family, "structured")
-  expect_equal(fit2$intrinsic_dim, 2L)
+  expect_equal(fit2$model_intrinsic_dim, 2L)
   expect_equal(length(fit2$params$sigma2), ncol(X))
   expect_equal(dim(fit2$lambda_mat), c(ncol(X), 2L))
   expect_equal(dim(fit2$partition$pi_weights), c(ncol(X), 2L))
@@ -204,17 +201,14 @@ test_that("fixed-M structural fits use canonical shared state with intrinsic rid
   fit3 <- suppressWarnings(fit_mpcurve(
     X,
     intrinsic_dim = 3,
-    K = 5,
-    partition_init = "ordering_methods",
-    method = rep("PCA", 3),
-    ridge = 0,
-    T_start = 1,
-    T_end = 1,
-    n_outer = 1,
-    max_converge_iter = 2,
-    verbose = FALSE
+    num_bins = 5,
+    initial_method = "PCA",
+    max_iter = 2,
+    verbose = FALSE,
+    control = mpcurve_control(ridge = 0, anneal_start = 1, anneal_steps = 1),
+    init_control = mpcurve_init_control()
   ))
-  expect_equal(fit3$intrinsic_dim, 3L)
+  expect_equal(fit3$model_intrinsic_dim, 3L)
   expect_equal(dim(fit3$partition$pi_weights), c(ncol(X), 3L))
   expect_equal(length(fit3$conditional_posterior$mean), 3L)
 })
@@ -227,19 +221,16 @@ test_that("known S and structural continuation preserve canonical schema", {
     X,
     S = S_vec,
     intrinsic_dim = 2,
-    K = 5,
-    partition_init = "ordering_methods",
-    method = c("PCA", "PCA"),
-    ridge = 0,
-    T_start = 1,
-    T_end = 1,
-    n_outer = 1,
-    max_converge_iter = 1,
-    verbose = FALSE
+    num_bins = 5,
+    initial_method = "PCA",
+    max_iter = 1,
+    verbose = FALSE,
+    control = mpcurve_control(ridge = 0, anneal_start = 1, anneal_steps = 1),
+    init_control = mpcurve_init_control()
   ))
   expect_null(fit$params$sigma2)
   before <- length(fit$objective_history)
-  continued <- suppressWarnings(do_mpcurve(fit, iter = 2, S = S_vec))
+  continued <- suppressWarnings(do_mpcurve(fit, max_iter = 2))
   expect_gt(length(continued$objective_history), before)
   expect_null(continued$params$sigma2)
   expect_identical(continued$variational_family, "structured")
@@ -249,39 +240,40 @@ test_that("known S and structural continuation preserve canonical schema", {
     X,
     S = S_mat,
     intrinsic_dim = 2,
-    K = 5,
-    partition_init = "ordering_methods",
-    method = c("PCA", "PCA"),
-    ridge = 0,
-    T_start = 1,
-    T_end = 1,
-    n_outer = 1,
-    max_converge_iter = 1,
-    verbose = FALSE
+    num_bins = 5,
+    initial_method = "PCA",
+    max_iter = 1,
+    verbose = FALSE,
+    control = mpcurve_control(ridge = 0, anneal_start = 1, anneal_steps = 1),
+    init_control = mpcurve_init_control()
   ))
   expect_null(fit_mat$params$sigma2)
   expect_equal(fit_mat$measurement_sd, S_mat)
 })
 
-test_that("transition controls warn and greedy is disabled", {
+test_that("removed transition controls error and greedy is disabled", {
   set.seed(106)
   X <- matrix(rnorm(80), nrow = 20, ncol = 4)
-  expect_warning(
+  expect_error(
     fit_mpcurve(
-      X,
-      intrinsic_dim = 2,
-      K = 4,
-      partition_init = "ordering_methods",
-      method = c("PCA", "PCA"),
-      n_outer = 1,
-      max_converge_iter = 0,
-      freeze_feature = TRUE,
-      verbose = FALSE
-    ),
-    "deprecated and ignored"
+    X,
+    intrinsic_dim = 2,
+    num_bins = 4,
+    initial_method = "PCA",
+    max_iter = 0,
+    freeze_feature = TRUE,
+    verbose = FALSE,
+    control = mpcurve_control(anneal_steps = 1),
+    init_control = mpcurve_init_control()
+  ),
+    "unused argument"
   )
   expect_error(
-    fit_mpcurve(X, intrinsic_dim = 3, greedy = "forward"),
-    "temporarily unavailable"
+    fit_mpcurve(
+    X,
+    intrinsic_dim = 3,
+    greedy = "forward"
+  ),
+    "unused argument"
   )
 })

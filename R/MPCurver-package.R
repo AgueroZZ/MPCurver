@@ -22,6 +22,17 @@
 #' Use \code{\link{summary.mpcurve}} for a numerical summary and
 #' \code{\link{plot.mpcurve}} to visualize trajectories and sample orderings.
 #'
+#' @section Stable result extraction:
+#' Use \code{\link{fitted_positions}} for an \code{n x M} position matrix,
+#' \code{\link{fitted_assignments}} for a \code{d x M} assignment-probability
+#' matrix, and \code{\link{fitted_trajectories}} for \code{d x K x M} trajectory
+#' means or standard deviations. These functions preserve input names and retain
+#' the ordering dimension even when \code{M = 1}. They also expose full position
+#' probabilities and trajectory covariances through their \code{type} argument.
+#' Use \code{$intrinsic_dim} for the number of fitted orderings and
+#' \code{$converged} for convergence status. The state fields below support
+#' detailed inspection and continuation.
+#'
 #' @section Sample positions:
 #' For a single ordering, \code{$locations$mean$pseudotime} contains
 #' posterior-mean positions on \eqn{[0,1]}, and
@@ -31,7 +42,7 @@
 #' along an inferred trajectory; its direction can be reversed.
 #'
 #' @section Single-ordering objects:
-#' For \code{intrinsic_dim = 1}, \code{$params$pi} is a length-\code{K}
+#' For \code{model_intrinsic_dim = 1}, \code{$params$pi} is a length-\code{K}
 #' position-prior vector, \code{$params$mu} is a \code{d x K} posterior-mean
 #' trajectory matrix, \code{$params$sigma2} is a length-\code{d} estimated
 #' variance vector (or \code{NULL} when measurement standard deviations are
@@ -42,7 +53,7 @@
 #' form or its \code{n x d} observation-level form.
 #'
 #' @section Multiple orderings and feature assignments:
-#' For \code{intrinsic_dim = M >= 2}, the variational family is
+#' For \code{model_intrinsic_dim = M >= 2}, the variational family is
 #' \deqn{q(C)\prod_{j=1}^d q(Z_j)q(U_j\mid Z_j).}
 #' Here \eqn{C} represents sample positions, \eqn{Z_j} the ordering followed
 #' by feature \eqn{j}, and \eqn{U_j} its trajectory. The object contains:
@@ -69,8 +80,9 @@
 #'     \eqn{q(Z_j=m)}, with the hard display assignment in
 #'     \code{$partition$assign};
 #'   \item \code{$objective_history} and \code{$temperature_history}: the
-#'     variational objective and its temperature schedule. Use the
-#'     \eqn{T=1} segment to assess convergence after annealing.
+#'     variational objective and its temperature schedule. Fitting uses
+#'     \eqn{T=1} throughout by default. If optional annealing is enabled, use
+#'     the final \eqn{T=1} segment to assess convergence.
 #' }
 #' Each row of \code{$partition$pi_weights} sums to one. Concentrated rows
 #' indicate strong support for an ordering; diffuse rows indicate uncertainty
@@ -81,19 +93,32 @@
 #' @section Additional fields:
 #' \code{$fit} stores the underlying variational fit. For partition models,
 #' \code{$fits} provides derived per-ordering views for inspection; continue
-#' the complete model with \code{do_mpcurve(object)}. The dimension fields
-#' \code{$intrinsic_dim}, \code{$active_intrinsic_dim}, and
-#' \code{$displayed_intrinsic_dim} all equal the specified \code{M} for
-#' structural partition fits. \code{$effective_intrinsic_dim} is the number
-#' of orderings with nontrivial fitted assignment-prior weight under an
-#' adaptive prior, using \code{effective_weight_tol}; it equals the fitted
-#' \code{M} for a fixed prior. This count does not remove fitted orderings.
+#' the complete model with \code{do_mpcurve(object)}.
+#' \code{$intrinsic_dim} is the actual number of orderings in the returned model.
+#' The compatibility field \code{$model_intrinsic_dim} has the same value for
+#' current fits. An explicitly specified dimension is retained. With
+#' \code{intrinsic_dim = "auto"} and an adaptive partition prior, orderings
+#' whose estimated prior weight \eqn{\hat{\omega}_m} is at or below
+#' \code{control$effective_count_tol / P} are removed. The tolerance defaults
+#' to \code{1e-8}, and \eqn{P} is the number of features. Adaptive EB estimates
+#' \eqn{\hat{\omega}_m = \sum_j Pr(Z_j=m) / P}.
+#' Remaining assignment probabilities and prior
+#' weights are normalized, and the objective is recomputed without further
+#' fitting. A result reduced to one ordering uses the single-ordering schema.
+#' A fixed partition prior retains the initialized dimension.
 #' Fits returned by \code{\link{select_mpcurve_dimension}} also include
 #' \code{$dimension_selection} with candidate scores and greedy decisions.
 #' Fits requested with \code{fit_mpcurve(intrinsic_dim = "auto")} also include
 #' \code{$dimension_initialization} with candidate silhouettes, cut
 #' eligibility, selected clusters, similarity diagnostics, and the ordering
 #' probabilities used to initialize the fit.
+#' \code{$dimension_estimation} records initial and returned dimensions and
+#' any pruning events. When removal occurs, each event's \code{$fitting_history}
+#' preserves the preceding dimension's objective, temperature, assignment,
+#' score, and parameter traces. The returned model's objective trace starts
+#' at its recomputed objective; \code{do_mpcurve()} extends this trace and
+#' preserves the estimation record. The feature-count rule measures occupancy,
+#' not a posterior distribution over the dimension.
 #'
 #' @name mpcurve
 #' @keywords models

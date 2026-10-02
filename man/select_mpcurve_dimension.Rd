@@ -8,7 +8,15 @@ select_mpcurve_dimension(
   X,
   max_intrinsic_dim,
   direction = c("forward", "backward"),
-  ...
+  S = NULL,
+  num_bins = NULL,
+  initial_method = "PCA",
+  position_prior = c("adaptive", "fixed"),
+  max_iter = 100L,
+  tol = 1e-06,
+  verbose = FALSE,
+  init_control = NULL,
+  control = NULL
 )
 }
 \arguments{
@@ -18,11 +26,46 @@ select_mpcurve_dimension(
 
 \item{direction}{Either \code{"forward"} or \code{"backward"}.}
 
-\item{...}{Additional fixed-model arguments passed to \code{\link[=fit_mpcurve]{fit_mpcurve()}}.
-The selector controls \code{intrinsic_dim}, \code{greedy}, \code{partition_init},
-\code{partition_prior}, \code{partition_prior_init}, and \code{hard_assign_final}.
-A scalar \code{method} may be supplied. Dimension-specific initial fits are
-not accepted through \code{...}.}
+\item{S}{Optional known measurement standard deviations, as a length-d feature
+vector or matrix matching \code{X}. Values must be finite and nonnegative, in
+the same units and positional order as \code{X}; names do not trigger reordering.
+Zero SDs are floored at \code{sqrt(.Machine$double.eps)} for computation. Otherwise
+feature noise variances are estimated.}
+
+\item{num_bins}{Requested number of latent-position bins. \code{NULL} uses
+\code{max(control$rw_order + 1, min(50, floor(nrow(X) / 5)))}.
+The sample count must be at least \code{control$rw_order + 1}. Collapsed initialization cuts can
+reduce the realized count in a single-ordering fit.}
+
+\item{initial_method}{One initialization method: \code{"PCA"}, \code{"fiedler"},
+\code{"pcurve"}, \code{"tSNE"}, \code{"random"}, or \code{"isomap"}. Under similarity
+grouping this method is applied independently within each feature
+block. The default PCA uses each block's own PC1. Method vectors are rejected.}
+
+\item{position_prior}{Estimate position probabilities (\code{"adaptive"}) or keep
+them fixed (\code{"fixed"}, uniform unless custom control weights are supplied).}
+
+\item{max_iter}{Maximum CAVI sweeps for one ordering, or maximum joint sweeps
+at temperature 1 for multiple orderings. Annealing is disabled by default;
+enabling it adds \code{anneal_steps * anneal_sweeps} sweeps before this phase,
+configured through \code{\link[=mpcurve_control]{mpcurve_control()}}. Zero skips this fitting phase.}
+
+\item{tol}{Shared ELBO-change stopping tolerance. The default rule uses
+\code{abs(delta_ELBO) / (nrow(X) * ncol(X))}; partition stopping is checked
+at temperature 1, after any optional annealing. Existing numerical decrease
+checks apply.
+Zero disables early stopping. A small increment does not bound the
+remaining optimization gap.}
+
+\item{verbose}{Print fitting progress?}
+
+\item{init_control}{Initialization settings from \code{\link[=mpcurve_init_control]{mpcurve_init_control()}}.
+Supplied fits, responsibilities, and PCA components cannot be shared across
+candidate counts.}
+
+\item{control}{Model and optimization settings from \code{\link[=mpcurve_control]{mpcurve_control()}}.
+Comparisons require a fixed uniform partition prior and soft final
+assignments. Custom partition weights and hard assignments are rejected.}
 }
 \value{
 The selected \code{\link[=fit_mpcurve]{fit_mpcurve()}} \code{mpcurve} object. Its
@@ -37,8 +80,8 @@ Fit adjacent candidate dimensions with a fixed uniform prior over feature
 orderings. Forward selection starts at one ordering; backward selection
 starts at \code{max_intrinsic_dim}. At each step, the candidate is accepted only
 if its final soft-assignment objective at \code{T = 1} is strictly larger.
-For each dimension above one, both similarity and ordering-method
-initializations are attempted and the higher finite objective is used.
+Each candidate dimension is fitted once, grouping features by similarity
+and applying the selected \code{initial_method} independently within each group.
 }
 \details{
 This is a greedy comparison of variational solutions. The selected dimension

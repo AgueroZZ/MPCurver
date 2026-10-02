@@ -4,14 +4,21 @@
 \alias{simulate_spiral2d}
 \title{Simulate a 2D Archimedean spiral (helix-like) with noise}
 \usage{
-simulate_spiral2d(n = 500, turns = 3, noise = 0.05, r0 = 0.2, r1 = 1, seed = 1)
+simulate_spiral2d(
+  n = 500,
+  turns = 3,
+  noise_sd = 0.05,
+  r0 = 0.2,
+  r1 = 1,
+  seed = 1
+)
 }
 \arguments{
 \item{n}{Integer \eqn{\ge 1}. Number of samples.}
 
 \item{turns}{Positive numeric. Number of revolutions over \eqn{t \in [0,1]}.}
 
-\item{noise}{Nonnegative numeric. Standard deviation of Gaussian noise added
+\item{noise_sd}{Nonnegative numeric. Standard deviation of Gaussian noise added
 to both coordinates.}
 
 \item{r0, r1}{Nonnegative numerics with \code{r1 >= r0}. Start/end radius.}
@@ -33,7 +40,7 @@ angle makes \code{turns} revolutions. Independent Gaussian noise is added to
 each coordinate.
 }
 \examples{
-sim <- simulate_spiral2d(n = 200, turns = 4, noise = 0.05, seed = 1)
+sim <- simulate_spiral2d(n = 200, turns = 4, noise_sd = 0.05, seed = 1)
 head(sim$obs)
 head(sim$t)
 

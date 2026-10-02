@@ -1,19 +1,29 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>https://aguerozz.github.io/MPCurver/404.html</loc></url>
+<url><loc>https://aguerozz.github.io/MPCurver/articles/cavi_partition.html</loc></url>
+<url><loc>https://aguerozz.github.io/MPCurver/articles/cavi_single.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/articles/fitness.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/articles/index.html</loc></url>
+<url><loc>https://aguerozz.github.io/MPCurver/articles/intrinsic_dimension.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/articles/mpcurve_intro.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/articles/partition.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/index.html</loc></url>
+<url><loc>https://aguerozz.github.io/MPCurver/news/index.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/MPCurver.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/PCA_ordering.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/do_mpcurve.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/fiedler_ordering.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/fit_mpcurve.html</loc></url>
+<url><loc>https://aguerozz.github.io/MPCurver/reference/fitted_assignments.html</loc></url>
+<url><loc>https://aguerozz.github.io/MPCurver/reference/fitted_positions.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/fitted_prior.html</loc></url>
+<url><loc>https://aguerozz.github.io/MPCurver/reference/fitted_trajectories.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/index.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/isomap_ordering.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/mpcurve.html</loc></url>
+<url><loc>https://aguerozz.github.io/MPCurver/reference/mpcurve_continue_control.html</loc></url>
+<url><loc>https://aguerozz.github.io/MPCurver/reference/mpcurve_control.html</loc></url>
+<url><loc>https://aguerozz.github.io/MPCurver/reference/mpcurve_init_control.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/pcurve_ordering.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/plot.mpcurve.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/print.mpcurve.html</loc></url>
@@ -21,6 +31,7 @@
 <url><loc>https://aguerozz.github.io/MPCurver/reference/simulate_cavi_toy.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/simulate_dual_trajectory.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/simulate_intrinsic_trajectories.html</loc></url>
+<url><loc>https://aguerozz.github.io/MPCurver/reference/simulate_mpcurve.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/simulate_spiral2d.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/simulate_swiss_roll_1d_2d.html</loc></url>
 <url><loc>https://aguerozz.github.io/MPCurver/reference/simulate_two_order_gp_dataset.html</loc></url>

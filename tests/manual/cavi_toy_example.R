@@ -1,19 +1,13 @@
-source("R/00_utils.R")
-source("R/01_initialization.R")
-source("R/02_prior.R")
-source("R/06_cSmoothEM.R")
-source("R/09_cavi.R")
+pkgload::load_all(".", quiet = TRUE)
 
 set.seed(1)
 
-sim <- simulate_cavi_toy(
+sim <- simulate_mpcurve(
   n = 150,
   d = 20,
-  K = 8,
-  rw_q = 2,
-  lambda_range = c(0.8, 3),
-  sigma_range = c(0.08, 0.18),
-  seed = 1
+  num_bins = 8,
+  seed = 1,
+  control = list(rw_order = 2, lambda_range = c(0.8, 3), noise_sd_range = c(0.08, 0.18))
 )
 
 fit <- cavi(
@@ -28,7 +22,7 @@ fit <- cavi(
 
 z_hat <- max.col(fit$gamma, ties.method = "first")
 
-cat("\n=== cavi toy example ===\n")
+cat("\n=== MPCurve simulation and CAVI fitting example ===\n")
 cat(sprintf("iter: %d\n", fit$iter))
 cat(sprintf("converged: %s\n", fit$converged))
 cat(sprintf("ELBO start/end: %.6f -> %.6f\n", fit$elbo_trace[1], tail(fit$elbo_trace, 1)))

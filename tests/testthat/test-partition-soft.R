@@ -21,7 +21,7 @@ test_that("soft two-trajectory output stays on the A/B interface", {
     d1 = 3,
     d2 = 3,
     d_noise = 1,
-    sigma = 0.2,
+    noise_sd = 0.2,
     seed = 1
   )
 
@@ -53,7 +53,7 @@ test_that("soft score and weight histories are synchronised to the post-update s
     d1 = 4,
     d2 = 4,
     d_noise = 0,
-    sigma = 0.15,
+    noise_sd = 0.15,
     seed = 2
   )
 
@@ -83,7 +83,7 @@ test_that("weighted collapsed ml path matches the unweighted fit when all weight
     d1 = 4,
     d2 = 4,
     d_noise = 0,
-    sigma = 0.15,
+    noise_sd = 0.15,
     seed = 11
   )
 
@@ -128,7 +128,7 @@ test_that("weighted collapsed ml trace is nondecreasing for fixed soft weights",
     d1 = 4,
     d2 = 4,
     d_noise = 0,
-    sigma = 0.15,
+    noise_sd = 0.15,
     seed = 12
   )
 
@@ -164,7 +164,7 @@ test_that("simulate_dual_trajectory supports multiple trajectory families", {
       d1 = 3,
       d2 = 2,
       d_noise = 1,
-      sigma = 0.05,
+      noise_sd = 0.05,
       seed = 10,
       trajectory_family = fam
     )
@@ -185,10 +185,10 @@ test_that("simulate_intrinsic_trajectories supports multiple intrinsic dimension
     n = 30,
     d_signal = c(2, 3, 1),
     d_noise = 2,
-    sigma = 0.05,
+    noise_sd = 0.05,
     seed = 11,
     trajectory_family = c("linear", "quadratic", "monotone"),
-    latent_positions = latent
+    control = list(latent_positions = latent)
   )
 
   expect_equal(dim(sim$X), c(30, 8))

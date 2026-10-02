@@ -7,7 +7,7 @@
 \method{plot}{mpcurve}(
   x,
   plot_type = c("scatterplot", "elbo", "mu"),
-  dims = c(1L, 2L),
+  dims = NULL,
   data = NULL,
   pal = (grDevices::colorRampPalette(c("#0000FF", "#00FFFF", "#00FF00", "#FFFF00",
     "#FF0000")))(256L),
@@ -21,9 +21,10 @@
 \item{plot_type}{One of \code{"scatterplot"} (default), \code{"elbo"},
 \code{"mu"}.}
 
-\item{dims}{Integer vector of length one or two identifying feature columns.
-It determines the scatterplot axes and the trajectory coordinates used by
-\code{plot_type = "mu"}. Defaults to \code{c(1, 2)}.}
+\item{dims}{One or two feature column indices or names. Determines the
+scatterplot axes and trajectory coordinates for \code{plot_type = "mu"}.
+\code{NULL} selects the first two features, or the only feature in a
+one-feature fit. Available feature names are used as axis labels.}
 
 \item{data}{Optional numeric \code{n x d} matrix used by scatterplots. If
 \code{NULL}, data stored on \code{x} are used. It is not required for
@@ -53,7 +54,8 @@ panel per ordering. Panel \eqn{m} uses that ordering's
 \eqn{q(C^{(m)})} responsibilities for pseudotime and overlays the
 conditional trajectory mean from \eqn{q(U_j\mid Z_j=m)}. The fitted
 feature-assignment probabilities for the selected dimensions are shown in
-each panel title.
+each panel title. Point colors use the same absolute `[0,1]` pseudotime
+scale in every panel, without stretching each panel's observed range.
 
 \describe{
   \item{\code{"scatterplot"}}{Scatter of two chosen dimensions, colored by
@@ -61,9 +63,9 @@ each panel title.
     multi-ordering fit, draws one panel per ordering. With one dimension,
     displays the observed feature values against inferred pseudotime.}
   \item{\code{"elbo"}}{Variational objective over fitting iterations.
-    For multi-ordering fits, the initial annealing phase is followed by
-    iterations at \eqn{T=1}. Assess convergence within that final segment,
-    since changing the temperature changes the objective.}
+    Fitting uses \eqn{T=1} throughout by default. If optional annealing is
+    enabled, assess convergence within the final \eqn{T=1} segment, since
+    changing the temperature changes the objective.}
   \item{\code{"mu"}}{Posterior-mean trajectory only. With one selected
     dimension, plots the feature mean against normalized latent position;
     with two dimensions, plots the posterior-mean path in that feature
@@ -78,9 +80,8 @@ sim <- simulate_dual_trajectory(n = 100, d1 = 3, d2 = 3, seed = 1)
 fit <- fit_mpcurve(
   sim$X,
   intrinsic_dim = 2,
-  K = 8,
-  n_outer = 3,
-  max_converge_iter = 3
+  num_bins = 8,
+  max_iter = 3
 )
 plot(fit, plot_type = "scatterplot", dims = c(1, 4))
 plot(fit, plot_type = "mu", dims = 1)

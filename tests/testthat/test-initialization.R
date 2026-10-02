@@ -22,7 +22,7 @@ test_that("fiedler_ordering auto-increases the default k until the graph is conn
   expect_gt(fit_default$k_used, 15)
 
   expect_warning(
-    fit_explicit <- fiedler_ordering(X, k = 15),
+    fit_explicit <- fiedler_ordering(X, num_neighbors = 15),
     "connected components"
   )
   expect_gt(fit_explicit$n_components, 1L)

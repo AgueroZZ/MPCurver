@@ -3,13 +3,13 @@
 orderings. Forward selection starts at one ordering; backward selection
 starts at max_intrinsic_dim. At each step, the candidate is accepted only
 if its final soft-assignment objective at T = 1 is strictly larger.
-For each dimension above one, both similarity and ordering-method
-initializations are attempted and the higher finite objective is used."><meta property="og:description" content="Fit adjacent candidate dimensions with a fixed uniform prior over feature
+Each candidate dimension is fitted once, grouping features by similarity
+and applying the selected initial_method independently within each group."><meta property="og:description" content="Fit adjacent candidate dimensions with a fixed uniform prior over feature
 orderings. Forward selection starts at one ordering; backward selection
 starts at max_intrinsic_dim. At each step, the candidate is accepted only
 if its final soft-assignment objective at T = 1 is strictly larger.
-For each dimension above one, both similarity and ordering-method
-initializations are attempted and the higher finite objective is used."></head><body>
+Each candidate dimension is fitted once, grouping features by similarity
+and applying the selected initial_method independently within each group."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -17,7 +17,7 @@ initializations are attempted and the higher finite objective is used."></head><
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -31,12 +31,17 @@ initializations are attempted and the higher finite objective is used."></head><
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
     <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver</a></li>
-    <li><a class="dropdown-item" href="../articles/partition.html">Feature Partitioning with MPCurver</a></li>
+    <li><a class="dropdown-item" href="../articles/partition.html">Multiple Orderings with MPCurver</a></li>
+    <li><a class="dropdown-item" href="../articles/intrinsic_dimension.html">Estimating Intrinsic Dimension with MPCurver</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Case studies</h6></li>
     <li><a class="dropdown-item" href="../articles/fitness.html">Analyzing the eLife Fitness Dataset with MPCurver</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Algorithm details</h6></li>
+    <li><a class="dropdown-item" href="../articles/cavi_single.html">Single-ordering CAVI</a></li>
+    <li><a class="dropdown-item" href="../articles/cavi_partition.html">Multi-ordering CAVI</a></li>
   </ul></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/AgueroZZ/MPCurver/blob/main/NEWS.md">Changelog</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/AgueroZZ/MPCurver/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -58,8 +63,8 @@ initializations are attempted and the higher finite objective is used."></head><
 orderings. Forward selection starts at one ordering; backward selection
 starts at <code>max_intrinsic_dim</code>. At each step, the candidate is accepted only
 if its final soft-assignment objective at <code>T = 1</code> is strictly larger.
-For each dimension above one, both similarity and ordering-method
-initializations are attempted and the higher finite objective is used.</p>
+Each candidate dimension is fitted once, grouping features by similarity
+and applying the selected <code>initial_method</code> independently within each group.</p>
     </div>
 
     <div class="section level2">
@@ -68,7 +73,15 @@ initializations are attempted and the higher finite objective is used.</p>
 <span>  <span class="va">X</span>,</span>
 <span>  <span class="va">max_intrinsic_dim</span>,</span>
 <span>  direction <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"forward"</span>, <span class="st">"backward"</span><span class="op">)</span>,</span>
-<span>  <span class="va">...</span></span>
+<span>  S <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  num_bins <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  initial_method <span class="op">=</span> <span class="st">"PCA"</span>,</span>
+<span>  position_prior <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"adaptive"</span>, <span class="st">"fixed"</span><span class="op">)</span>,</span>
+<span>  max_iter <span class="op">=</span> <span class="fl">100L</span>,</span>
+<span>  tol <span class="op">=</span> <span class="fl">1e-06</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  init_control <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  control <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -88,12 +101,63 @@ initializations are attempted and the higher finite objective is used.</p>
 <dd><p>Either <code>"forward"</code> or <code>"backward"</code>.</p></dd>
 
 
-<dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional fixed-model arguments passed to <code><a href="fit_mpcurve.html">fit_mpcurve()</a></code>.
-The selector controls <code>intrinsic_dim</code>, <code>greedy</code>, <code>partition_init</code>,
-<code>partition_prior</code>, <code>partition_prior_init</code>, and <code>hard_assign_final</code>.
-A scalar <code>method</code> may be supplied. Dimension-specific initial fits are
-not accepted through <code>...</code>.</p></dd>
+<dt id="arg-s">S<a class="anchor" aria-label="anchor" href="#arg-s"></a></dt>
+<dd><p>Optional known measurement standard deviations, as a length-d feature
+vector or matrix matching <code>X</code>. Values must be finite and nonnegative, in
+the same units and positional order as <code>X</code>; names do not trigger reordering.
+Zero SDs are floored at <code>sqrt(.Machine$double.eps)</code> for computation. Otherwise
+feature noise variances are estimated.</p></dd>
+
+
+<dt id="arg-num-bins">num_bins<a class="anchor" aria-label="anchor" href="#arg-num-bins"></a></dt>
+<dd><p>Requested number of latent-position bins. <code>NULL</code> uses
+<code>max(control$rw_order + 1, min(50, floor(nrow(X) / 5)))</code>.
+The sample count must be at least <code>control$rw_order + 1</code>. Collapsed initialization cuts can
+reduce the realized count in a single-ordering fit.</p></dd>
+
+
+<dt id="arg-initial-method">initial_method<a class="anchor" aria-label="anchor" href="#arg-initial-method"></a></dt>
+<dd><p>One initialization method: <code>"PCA"</code>, <code>"fiedler"</code>,
+<code>"pcurve"</code>, <code>"tSNE"</code>, <code>"random"</code>, or <code>"isomap"</code>. Under similarity
+grouping this method is applied independently within each feature
+block. The default PCA uses each block's own PC1. Method vectors are rejected.</p></dd>
+
+
+<dt id="arg-position-prior">position_prior<a class="anchor" aria-label="anchor" href="#arg-position-prior"></a></dt>
+<dd><p>Estimate position probabilities (<code>"adaptive"</code>) or keep
+them fixed (<code>"fixed"</code>, uniform unless custom control weights are supplied).</p></dd>
+
+
+<dt id="arg-max-iter">max_iter<a class="anchor" aria-label="anchor" href="#arg-max-iter"></a></dt>
+<dd><p>Maximum CAVI sweeps for one ordering, or maximum joint sweeps
+at temperature 1 for multiple orderings. Annealing is disabled by default;
+enabling it adds <code>anneal_steps * anneal_sweeps</code> sweeps before this phase,
+configured through <code><a href="mpcurve_control.html">mpcurve_control()</a></code>. Zero skips this fitting phase.</p></dd>
+
+
+<dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>
+<dd><p>Shared ELBO-change stopping tolerance. The default rule uses
+<code>abs(delta_ELBO) / (nrow(X) * ncol(X))</code>; partition stopping is checked
+at temperature 1, after any optional annealing. Existing numerical decrease
+checks apply.
+Zero disables early stopping. A small increment does not bound the
+remaining optimization gap.</p></dd>
+
+
+<dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
+<dd><p>Print fitting progress?</p></dd>
+
+
+<dt id="arg-init-control">init_control<a class="anchor" aria-label="anchor" href="#arg-init-control"></a></dt>
+<dd><p>Initialization settings from <code><a href="mpcurve_init_control.html">mpcurve_init_control()</a></code>.
+Supplied fits, responsibilities, and PCA components cannot be shared across
+candidate counts.</p></dd>
+
+
+<dt id="arg-control">control<a class="anchor" aria-label="anchor" href="#arg-control"></a></dt>
+<dd><p>Model and optimization settings from <code><a href="mpcurve_control.html">mpcurve_control()</a></code>.
+Comparisons require a fixed uniform partition prior and soft final
+assignments. Custom partition weights and hard assignments are rejected.</p></dd>
 
 </dl></div>
     <div class="section level2">

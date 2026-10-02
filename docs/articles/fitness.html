@@ -21,7 +21,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,13 +37,18 @@
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
     <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver</a></li>
-    <li><a class="dropdown-item" href="../articles/partition.html">Feature Partitioning with MPCurver</a></li>
+    <li><a class="dropdown-item" href="../articles/partition.html">Multiple Orderings with MPCurver</a></li>
+    <li><a class="dropdown-item" href="../articles/intrinsic_dimension.html">Estimating Intrinsic Dimension with MPCurver</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Case studies</h6></li>
     <li><a class="dropdown-item" href="../articles/fitness.html">Analyzing the eLife Fitness Dataset with MPCurver</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Algorithm details</h6></li>
+    <li><a class="dropdown-item" href="../articles/cavi_single.html">Single-ordering CAVI</a></li>
+    <li><a class="dropdown-item" href="../articles/cavi_partition.html">Multi-ordering CAVI</a></li>
   </ul>
 </li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/AgueroZZ/MPCurver/blob/main/NEWS.md">Changelog</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -98,7 +103,7 @@ trajectories?</li>
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"MPCurver"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://aguerozz.github.io/MPCurver/">MPCurver</a></span><span class="op">)</span></span>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"devtools"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu">devtools</span><span class="fu">::</span><span class="fu">load_all</span><span class="op">(</span><span class="st">"."</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span>  <span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/devtools/man/load_all.html" class="external-link">load_all</a></span><span class="op">(</span><span class="st">"."</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
 <span>  <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"Need either an installed MPCurver package or devtools::load_all()."</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
@@ -210,13 +215,16 @@ adjusted standard deviations <code>S</code>.</li>
 <div class="section level2">
 <h2 id="first-look-at-the-data">First look at the data<a class="anchor" aria-label="anchor" href="#first-look-at-the-data"></a>
 </h2>
+<p>Tables 1 and 2 describe the data and environment categories.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  quantity <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"mutants"</span>, <span class="st">"environments"</span>, <span class="st">"fitness columns"</span>, <span class="st">"error columns"</span><span class="op">)</span>,</span>
 <span>  value <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">X</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">X</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">fitness_cols</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">error_cols</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span>caption <span class="op">=</span> <span class="st">"Table 1. Numbers of mutants, environments, fitness columns, and error columns."</span><span class="op">)</span></span></code></pre></div>
 <table class="table">
+<caption>Table 1. Numbers of mutants, environments, fitness columns, and
+error columns.</caption>
 <thead><tr class="header">
 <th align="left">quantity</th>
 <th align="right">value</th>
@@ -245,8 +253,10 @@ adjusted standard deviations <code>S</code>.</li>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">env_category</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/setNames.html" class="external-link">setNames</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"category"</span>, <span class="st">"n_environments"</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span>caption <span class="op">=</span> <span class="st">"Table 2. Numbers of environments by condition category."</span><span class="op">)</span></span></code></pre></div>
 <table class="table">
+<caption>Table 2. Numbers of environments by condition
+category.</caption>
 <thead><tr class="header">
 <th align="left">category</th>
 <th align="right">n_environments</th>
@@ -292,40 +302,55 @@ the main structure in the dataset?</p>
 <p>The fitting choices are:</p>
 <ul>
 <li>
-<code>method = "isomap"</code> supplies the initialization;</li>
+<code>initial_method = "isomap"</code> supplies the
+initialization;</li>
 <li>
-<code>K = 50</code> uses a 50-bin latent grid;</li>
+<code>num_bins = 50</code> uses a 50-bin latent grid;</li>
 <li>
-<code>rw_q = 2</code> uses a second-order random-walk prior for
-smooth trajectories.</li>
+<code>mpcurve_control(rw_order = 2)</code> uses a second-order
+random-walk prior for smooth trajectories.</li>
 </ul>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_unidir</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  <span class="va">X</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">50</span>,</span>
-<span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+<span>    <span class="va">X</span>,</span>
+<span>    initial_method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
+<span>    num_bins <span class="op">=</span> <span class="fl">50</span>,</span>
+<span>    verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    control <span class="op">=</span> <span class="fu"><a href="../reference/mpcurve_control.html">mpcurve_control</a></span><span class="op">(</span>rw_order <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="check-convergence">Check convergence<a class="anchor" aria-label="anchor" href="#check-convergence"></a>
 </h3>
 <p>The ELBO trace shows progress in fitting the variational model. A
 plateau indicates small improvements between successive iterations.</p>
+<p>Figure 1 shows the ELBO trace for the single-ordering CAVI fit,
+showing convergence over iterations.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/uni-convergence-1.png" class="r-plt" alt="ELBO trace for the single-ordering CAVI fit, showing convergence over iterations." width="100%"></p>
+<div class="figure">
+<img src="fitness_files/figure-html/uni-convergence-1.png" class="r-plt" alt="ELBO trace for the single-ordering CAVI fit, showing convergence over iterations." width="100%"><p class="caption">
+Figure 1. ELBO trace for the single-ordering CAVI fit, showing
+convergence over iterations.
+</p>
+</div>
 </div>
 <div class="section level3">
 <h3 id="inspect-a-few-fitted-trajectories">Inspect a few fitted trajectories<a class="anchor" aria-label="anchor" href="#inspect-a-few-fitted-trajectories"></a>
 </h3>
+<p>Figure 2 shows four panels showing fitted single-ordering CAVI
+trajectories for the first four environment dimensions.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, dims <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, dims <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, dims <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/uni-trajectories-1.png" class="r-plt" alt="Four panels showing fitted single-ordering CAVI trajectories for the first four environment dimensions." width="100%"></p>
+<div class="figure">
+<img src="fitness_files/figure-html/uni-trajectories-1.png" class="r-plt" alt="Four panels showing fitted single-ordering CAVI trajectories for the first four environment dimensions." width="100%"><p class="caption">
+Figure 2. Four panels showing fitted single-ordering CAVI trajectories
+for the first four environment dimensions.
+</p>
+</div>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>The first fit already recovers coherent structure, but the
@@ -342,17 +367,22 @@ on <code>lambda_j</code> through <code>lambda_sd_prior_rate</code>.
 Larger values encourage smoother trajectories.</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_unidir_smooth</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  <span class="va">X</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">50</span>,</span>
-<span>  iter <span class="op">=</span> <span class="fl">500</span>,</span>
-<span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  lambda_sd_prior_rate <span class="op">=</span> <span class="fl">1e4</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+<span>    <span class="va">X</span>,</span>
+<span>    initial_method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
+<span>    num_bins <span class="op">=</span> <span class="fl">50</span>,</span>
+<span>    max_iter <span class="op">=</span> <span class="fl">500</span>,</span>
+<span>    verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    control <span class="op">=</span> <span class="fu"><a href="../reference/mpcurve_control.html">mpcurve_control</a></span><span class="op">(</span>rw_order <span class="op">=</span> <span class="fl">2</span>, lambda_sd_prior_rate <span class="op">=</span> <span class="fl">1e4</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span></code></pre></div>
+<p>Figure 3 shows the ELBO trace for the smoothed single-ordering CAVI
+fit.</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/uni-convergence-smooth-1.png" class="r-plt" alt="ELBO trace for the smoothed single-ordering CAVI fit." width="100%"></p>
+<div class="figure">
+<img src="fitness_files/figure-html/uni-convergence-smooth-1.png" class="r-plt" alt="ELBO trace for the smoothed single-ordering CAVI fit." width="100%"><p class="caption">
+Figure 3. ELBO trace for the smoothed single-ordering CAVI fit.
+</p>
+</div>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_unidir_smooth</span></span>
 <span><span class="co">#&gt; MPCurve fit</span></span>
@@ -363,19 +393,28 @@ Larger values encourage smoother trajectories.</p>
 <span><span class="co">#&gt;   Iterations     : 341</span></span>
 <span><span class="co">#&gt;   Converged      : yes</span></span>
 <span><span class="co">#&gt;   ELBO (last)    : 11842.393573</span></span></code></pre></div>
+<p>Figure 4 shows four panels showing fitted trajectories under the
+smoothed single-ordering CAVI fit.</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">7</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">9</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/uni-trajectories-smooth-1.png" class="r-plt" alt="Four panels showing fitted trajectories under the smoothed single-ordering CAVI fit." width="100%"></p>
+<div class="figure">
+<img src="fitness_files/figure-html/uni-trajectories-smooth-1.png" class="r-plt" alt="Four panels showing fitted trajectories under the smoothed single-ordering CAVI fit." width="100%"><p class="caption">
+Figure 4. Four panels showing fitted trajectories under the smoothed
+single-ordering CAVI fit.
+</p>
+</div>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>These curves are easier to read: the global ordering remains, but the
 fitted environment trajectories are less wiggly.</p>
 <p>A useful comparison is whether smoothing changes the inferred mutant
 ordering itself, or mainly changes the trajectory estimates.</p>
+<p>Figure 5 shows scatter plot comparing inferred mutant pseudotime
+between the default and smoothed single-ordering fits.</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span></span>
 <span>  <span class="va">fit_unidir_smooth</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span>,</span>
@@ -390,7 +429,12 @@ ordering itself, or mainly changes the trajectory estimates.</p>
 <span>  ylab <span class="op">=</span> <span class="st">"Latent position (less regularized fit)"</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span>, lty <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/compare-single-orderings-1.png" class="r-plt" alt="Scatter plot comparing inferred mutant pseudotime between the default and smoothed single-ordering fits." width="100%"></p>
+<div class="figure">
+<img src="fitness_files/figure-html/compare-single-orderings-1.png" class="r-plt" alt="Scatter plot comparing inferred mutant pseudotime between the default and smoothed single-ordering fits." width="100%"><p class="caption">
+Figure 5. Scatter plot comparing inferred mutant pseudotime between the
+default and smoothed single-ordering fits.
+</p>
+</div>
 <p>The correlation and scatterplot show how closely the two mutant
 orderings agree. Together with the trajectory plots, they help
 distinguish a change in curve smoothness from a change in sample
@@ -413,27 +457,24 @@ representation; choosing the number of axes would require a separate
 model-selection assessment.</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_partition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  <span class="va">X</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
-<span>  intrinsic_dim <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  ridge <span class="op">=</span> <span class="fl">0</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">50</span>,</span>
-<span>  iter <span class="op">=</span> <span class="fl">500</span>,</span>
-<span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  lambda_sd_prior_rate <span class="op">=</span> <span class="fl">1e4</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+<span>    <span class="va">X</span>,</span>
+<span>    initial_method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
+<span>    intrinsic_dim <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>    num_bins <span class="op">=</span> <span class="fl">50</span>,</span>
+<span>    max_iter <span class="op">=</span> <span class="fl">500</span>,</span>
+<span>    verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    control <span class="op">=</span> <span class="fu"><a href="../reference/mpcurve_control.html">mpcurve_control</a></span><span class="op">(</span>ridge <span class="op">=</span> <span class="fl">0</span>, rw_order <span class="op">=</span> <span class="fl">2</span>, lambda_sd_prior_rate <span class="op">=</span> <span class="fl">1e4</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span></code></pre></div>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_partition</span></span>
 <span><span class="co">#&gt; MPCurve partition fit</span></span>
 <span><span class="co">#&gt;   Backend        : cavi</span></span>
 <span><span class="co">#&gt;   Variational    : structural q(C) q(Z) q(U | Z)</span></span>
-<span><span class="co">#&gt;   Intrinsic dim  : 2 (fixed)</span></span>
-<span><span class="co">#&gt;   Effective dim  : 2</span></span>
+<span><span class="co">#&gt;   Intrinsic dim  : 2</span></span>
 <span><span class="co">#&gt;   n / d / K      : 421 / 45 / 50</span></span>
-<span><span class="co">#&gt;   Iterations     : 525</span></span>
+<span><span class="co">#&gt;   Iterations     : 500</span></span>
 <span><span class="co">#&gt;   Partition      : A=27, B=18</span></span>
-<span><span class="co">#&gt;   Objective (last): 13072.351457</span></span>
+<span><span class="co">#&gt;   Objective (last): 13064.825013</span></span>
 <span><span class="co">#&gt;   Converged      : FALSE</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="inspect-trajectories-under-each-ordering">Inspect trajectories under each ordering<a class="anchor" aria-label="anchor" href="#inspect-trajectories-under-each-ordering"></a>
@@ -443,14 +484,21 @@ posterior mean <span class="math inline">E[U_j\mid Z_j=m]</span>: the
 estimated environment trajectory if it follows ordering <span class="math inline">m</span>. The title reports the assignment
 probability <span class="math inline">q(Z_j=m)</span>, indicating the
 support for that interpretation.</p>
+<p>Figure 6 shows conditional posterior mean trajectory for environment
+dimension 1 under each of two fixed orderings.</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/partition-plot-1.png" class="r-plt" alt="Conditional posterior mean trajectory for environment dimension 1 under each of two fixed orderings." width="100%"></p>
+<div class="figure">
+<img src="fitness_files/figure-html/partition-plot-1.png" class="r-plt" alt="Conditional posterior mean trajectory for environment dimension 1 under each of two fixed orderings." width="100%"><p class="caption">
+Figure 6. Conditional posterior mean trajectory for environment
+dimension 1 under each of two fixed orderings.
+</p>
+</div>
 </div>
 <div class="section level3">
 <h3 id="which-environments-were-assigned-to-which-ordering">Which environments were assigned to which ordering?<a class="anchor" aria-label="anchor" href="#which-environments-were-assigned-to-which-ordering"></a>
 </h3>
-<p>The table lists each environment’s most probable ordering. To examine
+<p>Table 3 lists each environment’s most probable ordering. To examine
 uncertain assignments, inspect the corresponding row of
 <code>fit_partition$partition$pi_weights</code>.</p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
@@ -462,8 +510,9 @@ uncertain assignments, inspect the corresponding row of
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">assignment_tbl</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/order.html" class="external-link">order</a></span><span class="op">(</span><span class="va">assignment_tbl</span><span class="op">$</span><span class="va">ordering</span>, <span class="va">assignment_tbl</span><span class="op">$</span><span class="va">category</span>, <span class="va">assignment_tbl</span><span class="op">$</span><span class="va">environment</span><span class="op">)</span>, <span class="op">]</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span>row.names <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span>row.names <span class="op">=</span> <span class="cn">FALSE</span>, caption <span class="op">=</span> <span class="st">"Table 3. Most probable ordering for each environment."</span><span class="op">)</span></span></code></pre></div>
 <table class="table">
+<caption>Table 3. Most probable ordering for each environment.</caption>
 <thead><tr class="header">
 <th align="left">environment</th>
 <th align="left">category</th>
@@ -701,8 +750,8 @@ uncertain assignments, inspect the corresponding row of
 <div class="section level3">
 <h3 id="how-similar-are-the-inferred-orderings">How similar are the inferred orderings?<a class="anchor" aria-label="anchor" href="#how-similar-are-the-inferred-orderings"></a>
 </h3>
-<p>Compare the inferred mutant positions across orderings. A correlation
-near <span class="math inline">1</span> or <span class="math inline">-1</span> indicates similar positions after allowing
+<p>Table 4 compares the inferred mutant positions across orderings. A
+correlation near <span class="math inline">1</span> or <span class="math inline">-1</span> indicates similar positions after allowing
 for reversal of the axis; smaller absolute correlations indicate more
 distinct orderings.</p>
 <div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
@@ -717,8 +766,10 @@ distinct orderings.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span><span class="va">t_df</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span>digits <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span>digits <span class="op">=</span> <span class="fl">3</span>, caption <span class="op">=</span> <span class="st">"Table 4. Pearson correlations between inferred mutant positions along occupied orderings."</span><span class="op">)</span></span></code></pre></div>
 <table class="table">
+<caption>Table 4. Pearson correlations between inferred mutant positions
+along occupied orderings.</caption>
 <thead><tr class="header">
 <th align="left"></th>
 <th align="right">A</th>
@@ -728,11 +779,11 @@ distinct orderings.</p>
 <tr class="odd">
 <td align="left">A</td>
 <td align="right">1.000</td>
-<td align="right">0.857</td>
+<td align="right">0.858</td>
 </tr>
 <tr class="even">
 <td align="left">B</td>
-<td align="right">0.857</td>
+<td align="right">0.858</td>
 <td align="right">1.000</td>
 </tr>
 </tbody>
@@ -752,25 +803,38 @@ affects orderings and trajectories.</p>
 </h3>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_unidir_known_sd</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  <span class="va">X</span>,</span>
-<span>  S <span class="op">=</span> <span class="va">S</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">50</span>,</span>
-<span>  iter <span class="op">=</span> <span class="fl">500</span>,</span>
-<span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  lambda_sd_prior_rate <span class="op">=</span> <span class="fl">1e4</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+<span>    <span class="va">X</span>,</span>
+<span>    S <span class="op">=</span> <span class="va">S</span>,</span>
+<span>    initial_method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
+<span>    num_bins <span class="op">=</span> <span class="fl">50</span>,</span>
+<span>    max_iter <span class="op">=</span> <span class="fl">500</span>,</span>
+<span>    verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    control <span class="op">=</span> <span class="fu"><a href="../reference/mpcurve_control.html">mpcurve_control</a></span><span class="op">(</span>rw_order <span class="op">=</span> <span class="fl">2</span>, lambda_sd_prior_rate <span class="op">=</span> <span class="fl">1e4</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span></code></pre></div>
+<p>Figure 7 shows the ELBO trace for the single-ordering CAVI fit with
+known measurement standard deviations.</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/uni-known-sd-convergence-1.png" class="r-plt" alt="ELBO trace for the single-ordering CAVI fit with known measurement standard deviations." width="100%"></p>
+<div class="figure">
+<img src="fitness_files/figure-html/uni-known-sd-convergence-1.png" class="r-plt" alt="ELBO trace for the single-ordering CAVI fit with known measurement standard deviations." width="100%"><p class="caption">
+Figure 7. ELBO trace for the single-ordering CAVI fit with known
+measurement standard deviations.
+</p>
+</div>
+<p>Figure 8 shows four panels showing fitted trajectories for the
+single-ordering CAVI fit with known measurement SDs.</p>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">31</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">45</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/uni-known-sd-trajectories-1.png" class="r-plt" alt="Four panels showing fitted trajectories for the single-ordering CAVI fit with known measurement SDs." width="100%"></p>
+<div class="figure">
+<img src="fitness_files/figure-html/uni-known-sd-trajectories-1.png" class="r-plt" alt="Four panels showing fitted trajectories for the single-ordering CAVI fit with known measurement SDs." width="100%"><p class="caption">
+Figure 8. Four panels showing fitted trajectories for the
+single-ordering CAVI fit with known measurement SDs.
+</p>
+</div>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -783,32 +847,38 @@ assignment probabilities to see how the environment groups respond to
 this noise model.</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_partition_known_sd</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  <span class="va">X</span>,</span>
-<span>  S <span class="op">=</span> <span class="va">S</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
-<span>  intrinsic_dim <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  ridge <span class="op">=</span> <span class="fl">0</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">50</span>,</span>
-<span>  iter <span class="op">=</span> <span class="fl">500</span>,</span>
-<span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  lambda_sd_prior_rate <span class="op">=</span> <span class="fl">1e4</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span>
+<span>    <span class="va">X</span>,</span>
+<span>    S <span class="op">=</span> <span class="va">S</span>,</span>
+<span>    initial_method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
+<span>    intrinsic_dim <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>    num_bins <span class="op">=</span> <span class="fl">50</span>,</span>
+<span>    max_iter <span class="op">=</span> <span class="fl">500</span>,</span>
+<span>    verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    control <span class="op">=</span> <span class="fu"><a href="../reference/mpcurve_control.html">mpcurve_control</a></span><span class="op">(</span>ridge <span class="op">=</span> <span class="fl">0</span>, rw_order <span class="op">=</span> <span class="fl">2</span>, lambda_sd_prior_rate <span class="op">=</span> <span class="fl">1e4</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
 <span></span>
 <span><span class="va">fit_partition_known_sd</span></span>
 <span><span class="co">#&gt; MPCurve partition fit</span></span>
 <span><span class="co">#&gt;   Backend        : cavi</span></span>
 <span><span class="co">#&gt;   Variational    : structural q(C) q(Z) q(U | Z)</span></span>
-<span><span class="co">#&gt;   Intrinsic dim  : 2 (fixed)</span></span>
-<span><span class="co">#&gt;   Effective dim  : 2</span></span>
+<span><span class="co">#&gt;   Intrinsic dim  : 2</span></span>
 <span><span class="co">#&gt;   n / d / K      : 421 / 45 / 50</span></span>
-<span><span class="co">#&gt;   Iterations     : 525</span></span>
+<span><span class="co">#&gt;   Iterations     : 500</span></span>
 <span><span class="co">#&gt;   Partition      : A=13, B=32</span></span>
-<span><span class="co">#&gt;   Objective (last): 13939.840025</span></span>
+<span><span class="co">#&gt;   Objective (last): 13936.146602</span></span>
 <span><span class="co">#&gt;   Converged      : FALSE</span></span></code></pre></div>
+<p>Figure 9 shows conditional posterior mean trajectory for environment
+dimension 31 under each of two fixed orderings with known measurement
+SDs.</p>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_partition_known_sd</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">31</span><span class="op">)</span></span></code></pre></div>
-<p><img src="fitness_files/figure-html/known-sd-partition-trajectories-1.png" class="r-plt" alt="Conditional posterior mean trajectory for environment dimension 31 under each of two fixed orderings with known measurement SDs." width="100%"></p>
+<div class="figure">
+<img src="fitness_files/figure-html/known-sd-partition-trajectories-1.png" class="r-plt" alt="Conditional posterior mean trajectory for environment dimension 31 under each of two fixed orderings with known measurement SDs." width="100%"><p class="caption">
+Figure 9. Conditional posterior mean trajectory for environment
+dimension 31 under each of two fixed orderings with known measurement
+SDs.
+</p>
+</div>
 </div>
 </div>
 <div class="section level2">

@@ -6,11 +6,17 @@ test_that("public namespace exports the curated mpcurve-first API", {
       "do_mpcurve",
       "fiedler_ordering",
       "fit_mpcurve",
+      "mpcurve_control",
+      "mpcurve_continue_control",
+      "mpcurve_init_control",
       "select_mpcurve_dimension",
       "fitted_prior",
+      "fitted_positions",
+      "fitted_trajectories",
+      "fitted_assignments",
       "isomap_ordering",
       "pcurve_ordering",
-      "simulate_cavi_toy",
+      "simulate_mpcurve",
       "simulate_dual_trajectory",
       "simulate_intrinsic_trajectories",
       "simulate_spiral2d",
@@ -34,75 +40,51 @@ test_that("public namespace exports the curated mpcurve-first API", {
   expect_true(is.function(utils::getS3method("plot", "mpcurve")))
 })
 
-test_that("fit_mpcurve keeps algorithm formal but only accepts cavi", {
-  fit_formals <- names(formals(fit_mpcurve))
-  do_formals <- names(formals(do_mpcurve))
-
-  expect_true("algorithm" %in% fit_formals)
-  expect_true("greedy" %in% fit_formals)
-  expect_true("S" %in% fit_formals)
-  expect_true("position_prior" %in% fit_formals)
-  expect_true("position_prior_init" %in% fit_formals)
-  expect_true("partition_prior" %in% fit_formals)
-  expect_true("partition_prior_init" %in% fit_formals)
-  expect_false("relative_lambda" %in% fit_formals)
-  expect_false("adaptive" %in% fit_formals)
-  expect_false("sigma_update" %in% fit_formals)
-  expect_false("check_decrease" %in% fit_formals)
-  expect_false("tol_decrease" %in% fit_formals)
-
-  expect_false("adaptive" %in% do_formals)
-  expect_true("S" %in% do_formals)
-  expect_false("sigma_update" %in% do_formals)
-  expect_false("check_decrease" %in% do_formals)
-  expect_false("tol_decrease" %in% do_formals)
+test_that("fit_mpcurve has one initialization method and twelve public arguments", {
+  expect_identical(names(formals(fit_mpcurve)), c(
+    "X", "S", "num_bins", "intrinsic_dim", "initial_method", "position_prior",
+    "partition_prior", "max_iter", "tol", "verbose", "init_control", "control"
+  ))
+  X <- matrix(0, 10, 4)
+  for (M in list(1L, 2L, "auto")) {
+    expect_error(fit_mpcurve(X, intrinsic_dim = M,
+                            initial_method = c("PCA", "isomap")), "exactly one")
+    for (argument in c("algorithm", "greedy", "num_cores", "tol_outer",
+                       "assignment_prior", "ordering_alpha", "freeze_feature",
+                       "freeze_unused_ordering", "drop_unused_ordering")) {
+      expect_error(do.call(fit_mpcurve, c(list(X = X, intrinsic_dim = M),
+                                         setNames(list(NULL), argument))), "unused argument")
+    }
+  }
 })
 
-test_that("fit_mpcurve rejects legacy backend requests explicitly", {
-  sim <- simulate_cavi_toy(
-    n = 60,
-    d = 6,
-    K = 4,
-    rw_q = 2,
-    seed = 13
-  )
-
-  expect_error(
-    fit_mpcurve(
-      sim$X,
-      algorithm = "csmooth_em",
-      method = "PCA",
-      K = 4,
-      iter = 2
-    ),
-    "CAVI-only public wrapper"
-  )
-
-  expect_error(
-    fit_mpcurve(
-      sim$X,
-      algorithm = "smooth_em",
-      method = "PCA",
-      K = 4,
-      iter = 2
-    ),
-    "CAVI-only public wrapper"
-  )
+test_that("feature grouping is the only automatic partition initialization path", {
+  expect_false("partition_init" %in% names(formals(mpcurve_init_control)))
+  expect_false("partition_init" %in% names(mpcurve_init_control()))
+  expect_error(mpcurve_init_control(partition_init = "similarity"), "unused argument")
+  expect_error(mpcurve_init_control(partition_init = "ordering_methods"), "unused argument")
+  X <- matrix(0, 10, 4)
+  for (M in list(1L, 2L, "auto")) {
+    expect_error(fit_mpcurve(X, intrinsic_dim = M,
+      init_control = list(partition_init = "ordering_methods")), "Unknown init_control")
+  }
+  expect_error(select_mpcurve_dimension(X, max_intrinsic_dim = 2,
+    init_control = list(partition_init = "ordering_methods")), "Unknown init_control")
 })
 
 test_that("print.mpcurve is shorter than summary for single and partition fits", {
-  sim_single <- simulate_cavi_toy(
+  sim_single <- simulate_mpcurve(
     n = 60,
     d = 8,
-    K = 5,
-    rw_q = 2,
-    seed = 101
+    num_bins = 5,
+    seed = 101,
+    control = list(rw_order = 2)
   )
   fit_single <- fit_mpcurve(
     sim_single$X,
-    method = "PCA",
-    K = 5,
-    iter = 4,
+    initial_method = "PCA",
+    num_bins = 5,
+    max_iter = 4,
     tol = 0,
     verbose = FALSE
   )
@@ -120,18 +102,17 @@ test_that("print.mpcurve is shorter than summary for single and partition fits",
     d1 = 4,
     d2 = 4,
     d_noise = 0,
-    sigma = 0.15,
+    noise_sd = 0.15,
     seed = 102
   )
   fit_partition <- suppressWarnings(fit_mpcurve(
     sim_partition$X,
     intrinsic_dim = 2,
-    method = "PCA",
-    K = 6,
-    n_outer = 2L,
-    inner_iter = 1L,
-    max_converge_iter = 2L,
-    verbose = FALSE
+    initial_method = "PCA",
+    num_bins = 6,
+    max_iter = 2L,
+    verbose = FALSE,
+    control = mpcurve_control(anneal_steps = 2L, anneal_sweeps = 1L)
   ))
 
   partition_print <- paste(capture.output(print(fit_partition)), collapse = "\n")
@@ -153,9 +134,9 @@ test_that("print.mpcurve is shorter than summary for single and partition fits",
   expect_identical(partition_summary_obj$variational_family, "structured")
   expect_equal(partition_summary_obj$sigma2, fit_partition$params$sigma2)
   expect_equal(partition_summary_obj$active_intrinsic_dim,
-               fit_partition$intrinsic_dim)
+               fit_partition$model_intrinsic_dim)
   expect_equal(partition_summary_obj$displayed_intrinsic_dim,
-               fit_partition$intrinsic_dim)
+               fit_partition$model_intrinsic_dim)
   expect_match(partition_summary, "structural VI", fixed = TRUE)
   expect_match(partition_summary, "Shared sigma2 range", fixed = TRUE)
   expect_match(partition_summary, "fixed-M structural ELBO", fixed = TRUE)

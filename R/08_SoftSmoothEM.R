@@ -978,7 +978,6 @@ init_two_trajectories <- function(X,
 #'   \code{adaptive = "ml"}: \code{"ml"} (collapsed marginal, default) or
 #'   legacy \code{"mstep"} (weighted SSE). Use \code{"ml"} to jointly optimize
 #'   \eqn{\sigma^2} and \eqn{\lambda}; \code{"mstep"} is retained only for backward compatibility.
-#' @param hard_assign_final  Snap final soft weights to hard 0/1 (default FALSE).
 #' @param verbose         Print iteration log (default TRUE).
 #'
 #' @return A list with:
@@ -1016,7 +1015,7 @@ soft_two_trajectory_EM <- function(
     lambda_max          = 1e10,
     adaptive            = "ml",
     sigma_update        = c("ml", "mstep"),
-    hard_assign_final   = FALSE,
+
     verbose             = TRUE
 ) {
   score_mode   <- match.arg(score_mode)
@@ -1235,12 +1234,7 @@ soft_two_trajectory_EM <- function(
   weight_history <- weight_history[seq_len(actual_iters)]
   ll_history     <- ll_history[seq_len(actual_iters)]
 
-  # ---- (5) Optional hard final assignment -----------------------------------
-  if (hard_assign_final) {
-    hard <- matrix(0, d, ncol(pi_weights))
-    for (i in seq_len(d)) hard[i, which.max(pi_weights[i, ])] <- 1
-    pi_weights <- hard; colnames(pi_weights) <- col_names
-  }
+
 
   list(pi_weights     = pi_weights,
        assign         = col_names[apply(pi_weights, 1, which.max)],
@@ -1369,7 +1363,7 @@ plot_soft_weights <- function(result, feature_names = NULL,
     base <- switch(
       family,
       sinusoidal = {
-        freq_j <- sample(sinusoid_freq, 1L)
+        freq_j <- sinusoid_freq[sample.int(length(sinusoid_freq), 1L)]
         phase_j <- stats::runif(1L, 0, 2 * pi)
         sin(freq_j * pi * t + phase_j)
       },
@@ -1425,54 +1419,8 @@ plot_soft_weights <- function(result, feature_names = NULL,
   out
 }
 
-#' Simulate a multi-ordering intrinsic-trajectory dataset
-#'
-#' @description
-#' Simulates a feature-partition dataset with an arbitrary number of intrinsic
-#' orderings. Each ordering contributes its own signal block, and optional
-#' noise features are pure Gaussian noise.
-#'
-#' @param n Integer number of samples.
-#' @param d_signal Integer vector giving the number of signal features assigned
-#'   to each intrinsic ordering.
-#' @param d_noise Integer number of pure-noise features.
-#' @param sigma Observation noise standard deviation added independently to each
-#'   simulated feature trajectory.
-#' @param seed Optional integer seed.
-#' @param trajectory_family Character scalar or length-\code{M} vector
-#'   specifying the feature family for each ordering block. Each entry must be
-#'   one of \code{"sinusoidal"}, \code{"linear"}, \code{"monotone"}, or
-#'   \code{"quadratic"}.
-#' @param signal_range Length-2 positive range controlling the per-feature
-#'   signal amplitude.
-#' @param linear_slope_range Length-2 positive range for linear slopes.
-#' @param monotone_power_range Length-2 positive range controlling the power-like
-#'   basis shapes used in the monotone family. The monotone generator mixes
-#'   several increasing bases to create varied monotone curves.
-#' @param quadratic_curvature_range Length-2 positive range for quadratic
-#'   curvature magnitudes.
-#' @param quadratic_center_range Length-2 range inside \code{[0, 1]} for the
-#'   quadratic vertex.
-#' @param intercept_sd Standard deviation of feature-specific intercept shifts.
-#'   Defaults to \code{0}, giving no intercept shifts.
-#' @param sinusoid_freq Integer vector of admissible sinusoid frequencies.
-#' @param latent_positions Optional \code{n x M} matrix of true latent sample
-#'   positions. If \code{NULL}, each intrinsic ordering is generated
-#'   independently from \code{Uniform(0, 1)}.
-#'
-#' @return A list with components:
-#' \itemize{
-#'   \item \code{X}: shuffled simulated data matrix
-#'   \item \code{true_assign}: feature labels such as \code{"A"}, \code{"B"},
-#'     ..., or \code{"noise"}
-#'   \item \code{latent_positions}: \code{n x M} matrix of true latent sample
-#'     locations
-#'   \item \code{ordering_labels}: ordering labels used in \code{true_assign}
-#'   \item \code{original_order}: column permutation applied to the feature blocks
-#'   \item \code{trajectory_family}: the realized family labels for each ordering
-#' }
-#' @export
-simulate_intrinsic_trajectories <- function(n = 200,
+# Internal numerical implementation of simulate_intrinsic_trajectories.
+.simulate_intrinsic_trajectories <- function(n = 200,
                                             d_signal = c(30, 30),
                                             d_noise = 20,
                                             sigma = 0.3,
@@ -1589,27 +1537,8 @@ simulate_intrinsic_trajectories <- function(n = 200,
   )
 }
 
-#' Simulate a dual-trajectory dataset with configurable trajectory families
-#'
-#' @description
-#' Generates two groups of features that vary along distinct latent sample
-#' orderings, with optional Gaussian noise features. Choose a trajectory
-#' family for each group and use \code{crossing} to control the relationship
-#' between the two orderings. For more groups, use
-#' \code{\link{simulate_intrinsic_trajectories}}.
-#'
-#' @inheritParams simulate_intrinsic_trajectories
-#' @param d1,d2 Integer numbers of signal features assigned to trajectories A
-#'   and B.
-#' @param crossing Logical; if \code{TRUE}, the second latent ordering is
-#'   generated as a noisy reversed version of the first, making the two
-#'   orderings harder to disentangle.
-#'
-#' @return A list with the same fields as
-#'   \code{\link{simulate_intrinsic_trajectories}}, plus \code{t1} and
-#'   \code{t2} containing the true positions along each ordering.
-#' @export
-simulate_dual_trajectory <- function(n = 200,
+# Internal numerical implementation of simulate_dual_trajectory.
+.simulate_dual_trajectory <- function(n = 200,
                                      d1 = 30,
                                      d2 = 30,
                                      d_noise = 20,
@@ -1645,7 +1574,7 @@ simulate_dual_trajectory <- function(n = 200,
     t2 <- stats::runif(n)
   }
 
-  sim <- simulate_intrinsic_trajectories(
+  sim <- .simulate_intrinsic_trajectories(
     n = n,
     d_signal = c(d1, d2),
     d_noise = d_noise,

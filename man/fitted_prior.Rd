@@ -25,7 +25,7 @@ fitted_prior(x, type = c("position", "partition"), ordering = NULL, ...)
 single-ordering position prior it may identify the sole ordering; for a
 partition fit use the labels in \code{names(x$locations)}.}
 
-\item{...}{Unused.}
+\item{...}{No additional arguments are accepted.}
 }
 \value{
 If \code{type = "position"}, a numeric vector for a

@@ -15,7 +15,7 @@ plot.mpcurve to visualize trajectories and sample orderings."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -29,12 +29,17 @@ plot.mpcurve to visualize trajectories and sample orderings."></head><body>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
     <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver</a></li>
-    <li><a class="dropdown-item" href="../articles/partition.html">Feature Partitioning with MPCurver</a></li>
+    <li><a class="dropdown-item" href="../articles/partition.html">Multiple Orderings with MPCurver</a></li>
+    <li><a class="dropdown-item" href="../articles/intrinsic_dimension.html">Estimating Intrinsic Dimension with MPCurver</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Case studies</h6></li>
     <li><a class="dropdown-item" href="../articles/fitness.html">Analyzing the eLife Fitness Dataset with MPCurver</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Algorithm details</h6></li>
+    <li><a class="dropdown-item" href="../articles/cavi_single.html">Single-ordering CAVI</a></li>
+    <li><a class="dropdown-item" href="../articles/cavi_partition.html">Multi-ordering CAVI</a></li>
   </ul></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/AgueroZZ/MPCurver/blob/main/NEWS.md">Changelog</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/AgueroZZ/MPCurver/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -61,6 +66,20 @@ Use <code><a href="summary.mpcurve.html">summary.mpcurve</a></code> for a numeri
 
 
     <div class="section level2">
+    <h2 id="stable-result-extraction">Stable result extraction<a class="anchor" aria-label="anchor" href="#stable-result-extraction"></a></h2>
+
+
+<p>Use <code><a href="fitted_positions.html">fitted_positions</a></code> for an <code>n x M</code> position matrix,
+<code><a href="fitted_assignments.html">fitted_assignments</a></code> for a <code>d x M</code> assignment-probability
+matrix, and <code><a href="fitted_trajectories.html">fitted_trajectories</a></code> for <code>d x K x M</code> trajectory
+means or standard deviations. These functions preserve input names and retain
+the ordering dimension even when <code>M = 1</code>. They also expose full position
+probabilities and trajectory covariances through their <code>type</code> argument.
+Use <code>$intrinsic_dim</code> for the number of fitted orderings and
+<code>$converged</code> for convergence status. The state fields below support
+detailed inspection and continuation.</p>
+    </div>
+    <div class="section level2">
     <h2 id="sample-positions">Sample positions<a class="anchor" aria-label="anchor" href="#sample-positions"></a></h2>
 
 
@@ -75,7 +94,7 @@ along an inferred trajectory; its direction can be reversed.</p>
     <h2 id="single-ordering-objects">Single-ordering objects<a class="anchor" aria-label="anchor" href="#single-ordering-objects"></a></h2>
 
 
-<p>For <code>intrinsic_dim = 1</code>, <code>$params$pi</code> is a length-<code>K</code>
+<p>For <code>model_intrinsic_dim = 1</code>, <code>$params$pi</code> is a length-<code>K</code>
 position-prior vector, <code>$params$mu</code> is a <code>d x K</code> posterior-mean
 trajectory matrix, <code>$params$sigma2</code> is a length-<code>d</code> estimated
 variance vector (or <code>NULL</code> when measurement standard deviations are
@@ -89,7 +108,7 @@ form or its <code>n x d</code> observation-level form.</p>
     <h2 id="multiple-orderings-and-feature-assignments">Multiple orderings and feature assignments<a class="anchor" aria-label="anchor" href="#multiple-orderings-and-feature-assignments"></a></h2>
 
 
-<p>For <code>intrinsic_dim = M &gt;= 2</code>, the variational family is
+<p>For <code>model_intrinsic_dim = M &gt;= 2</code>, the variational family is
 $$q(C)\prod_{j=1}^d q(Z_j)q(U_j\mid Z_j).$$
 Here \(C\) represents sample positions, \(Z_j\) the ordering followed
 by feature \(j\), and \(U_j\) its trajectory. The object contains:</p><ul><li><p><code>$params$pi</code>: named list of <code>M</code> length-<code>K</code>
@@ -114,8 +133,9 @@ by feature \(j\), and \(U_j\) its trajectory. The object contains:</p><ul><li><p
     \(q(Z_j=m)\), with the hard display assignment in
     <code>$partition$assign</code>;</p></li>
 <li><p><code>$objective_history</code> and <code>$temperature_history</code>: the
-    variational objective and its temperature schedule. Use the
-    \(T=1\) segment to assess convergence after annealing.</p></li>
+    variational objective and its temperature schedule. Fitting uses
+    \(T=1\) throughout by default. If optional annealing is enabled, use
+    the final \(T=1\) segment to assess convergence.</p></li>
 </ul><p>Each row of <code>$partition$pi_weights</code> sums to one. Concentrated rows
 indicate strong support for an ordering; diffuse rows indicate uncertainty
 about the feature assignment. Conditional trajectory means describe the
@@ -128,19 +148,32 @@ these probabilities.</p>
 
 <p><code>$fit</code> stores the underlying variational fit. For partition models,
 <code>$fits</code> provides derived per-ordering views for inspection; continue
-the complete model with <code>do_mpcurve(object)</code>. The dimension fields
-<code>$intrinsic_dim</code>, <code>$active_intrinsic_dim</code>, and
-<code>$displayed_intrinsic_dim</code> all equal the specified <code>M</code> for
-structural partition fits. <code>$effective_intrinsic_dim</code> is the number
-of orderings with nontrivial fitted assignment-prior weight under an
-adaptive prior, using <code>effective_weight_tol</code>; it equals the fitted
-<code>M</code> for a fixed prior. This count does not remove fitted orderings.
+the complete model with <code>do_mpcurve(object)</code>.
+<code>$intrinsic_dim</code> is the actual number of orderings in the returned model.
+The compatibility field <code>$model_intrinsic_dim</code> has the same value for
+current fits. An explicitly specified dimension is retained. With
+<code>intrinsic_dim = "auto"</code> and an adaptive partition prior, orderings
+whose estimated prior weight \(\hat{\omega}_m\) is at or below
+<code>control$effective_count_tol / P</code> are removed. The tolerance defaults
+to <code>1e-8</code>, and \(P\) is the number of features. Adaptive EB estimates
+\(\hat{\omega}_m = \sum_j Pr(Z_j=m) / P\).
+Remaining assignment probabilities and prior
+weights are normalized, and the objective is recomputed without further
+fitting. A result reduced to one ordering uses the single-ordering schema.
+A fixed partition prior retains the initialized dimension.
 Fits returned by <code><a href="select_mpcurve_dimension.html">select_mpcurve_dimension</a></code> also include
 <code>$dimension_selection</code> with candidate scores and greedy decisions.
 Fits requested with <code>fit_mpcurve(intrinsic_dim = "auto")</code> also include
 <code>$dimension_initialization</code> with candidate silhouettes, cut
 eligibility, selected clusters, similarity diagnostics, and the ordering
-probabilities used to initialize the fit.</p>
+probabilities used to initialize the fit.
+<code>$dimension_estimation</code> records initial and returned dimensions and
+any pruning events. When removal occurs, each event's <code>$fitting_history</code>
+preserves the preceding dimension's objective, temperature, assignment,
+score, and parameter traces. The returned model's objective trace starts
+at its recomputed objective; <code><a href="do_mpcurve.html">do_mpcurve()</a></code> extends this trace and
+preserves the estimation record. The feature-count rule measures occupancy,
+not a posterior distribution over the dimension.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
@@ -162,4 +195,3 @@ probabilities used to initialize the fit.</p>
 
 
   </body></html>
-

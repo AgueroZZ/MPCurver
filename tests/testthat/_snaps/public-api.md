@@ -14,8 +14,7 @@
     MPCurve partition fit
       Backend        : cavi
       Variational    : structural q(C) q(Z) q(U | Z)
-      Intrinsic dim  : 2 (fixed)
-      Effective dim  : 2
+      Intrinsic dim  : 2
       n / d / K      : 60 / 8 / 6
       Iterations     : 4
       Partition      : A=3, B=5

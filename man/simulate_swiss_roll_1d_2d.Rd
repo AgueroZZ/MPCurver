@@ -7,7 +7,7 @@
 simulate_swiss_roll_1d_2d(
   n = 800,
   t_range = c(1.5 * base::pi, 6 * base::pi),
-  sigma = 0.15,
+  noise_sd = 0.15,
   seed = 1
 )
 }
@@ -16,7 +16,7 @@ simulate_swiss_roll_1d_2d(
 
 \item{t_range}{Numeric vector of length 2 specifying \eqn{[t_{\min}, t_{\max}]}.}
 
-\item{sigma}{Nonnegative numeric. Standard deviation of Gaussian noise. May be
+\item{noise_sd}{Nonnegative numeric. Standard deviation of Gaussian noise. May be
 a scalar (applied to both coordinates) or a length-2 vector for coordinate-specific
 noise.}
 
@@ -37,7 +37,7 @@ by \eqn{t \in [t_{\min}, t_{\max}]}. The noiseless curve is
 each coordinate.
 }
 \examples{
-sim <- simulate_swiss_roll_1d_2d(n = 300, sigma = 0.1, seed = 1)
+sim <- simulate_swiss_roll_1d_2d(n = 300, noise_sd = 0.1, seed = 1)
 head(sim$obs)
 
 }

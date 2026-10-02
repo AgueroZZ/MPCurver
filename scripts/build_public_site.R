@@ -10,9 +10,15 @@ public_reference_topics <- c(
   "MPCurver",
   "mpcurve",
   "fit_mpcurve",
+  "mpcurve_control",
+  "mpcurve_init_control",
+  "mpcurve_continue_control",
   "select_mpcurve_dimension",
   "do_mpcurve",
   "fitted_prior",
+  "fitted_positions",
+  "fitted_trajectories",
+  "fitted_assignments",
   "print.mpcurve",
   "summary.mpcurve",
   "plot.mpcurve",
@@ -21,7 +27,7 @@ public_reference_topics <- c(
   "isomap_ordering",
   "pcurve_ordering",
   "tSNE_ordering",
-  "simulate_cavi_toy",
+  "simulate_mpcurve",
   "simulate_dual_trajectory",
   "simulate_intrinsic_trajectories",
   "simulate_spiral2d",
@@ -32,7 +38,10 @@ public_reference_topics <- c(
 public_articles <- c(
   "mpcurve_intro",
   "partition",
-  "fitness"
+  "intrinsic_dimension",
+  "fitness",
+  "cavi_single",
+  "cavi_partition"
 )
 
 # Execute vignette code against the current checkout rather than a potentially
@@ -137,6 +146,42 @@ if (any(grepl("<ce>|<bc>", fitness_html, fixed = FALSE))) {
   stop("The fitness article contains malformed UTF-8 markup.")
 }
 
+pkgdown::build_news(pkg_home, preview = FALSE)
 pkgdown:::build_search(pkg_home)
 pkgdown:::build_sitemap(pkg_home)
 rewrite_pkgdown_metadata("docs/pkgdown.yml", public_articles)
+
+# Preserve bookmarked reference URLs after the public simulation helper rename.
+write_public_reference_redirects <- function() {
+  writeLines(c(
+    '<!doctype html>',
+    '<html lang="en">',
+    '<head>',
+    '  <meta charset="utf-8">',
+    '  <title>simulate_mpcurve — MPCurver</title>',
+    '  <meta http-equiv="refresh" content="0; url=simulate_mpcurve.html">',
+    '  <link rel="canonical" href="simulate_mpcurve.html">',
+    '</head>',
+    '<body>',
+    '  <p>This reference has moved to <a href="simulate_mpcurve.html">simulate_mpcurve()</a>.</p>',
+    '</body>',
+    '</html>'
+  ), "docs/reference/simulate_cavi_toy.html")
+}
+write_public_reference_redirects()
+
+# Keep generated HTML free of trailing blank lines across pkgdown builds.
+normalize_public_html <- function() {
+  paths <- list.files("docs", pattern = "\\.html$", recursive = TRUE,
+                      full.names = TRUE)
+  for (path in paths) {
+    lines <- readLines(path, warn = FALSE)
+    if (length(lines) && !nzchar(tail(lines, 1L))) {
+      while (length(lines) && !nzchar(tail(lines, 1L))) {
+        lines <- head(lines, -1L)
+      }
+      writeLines(lines, path)
+    }
+  }
+}
+normalize_public_html()

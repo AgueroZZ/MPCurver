@@ -23,7 +23,7 @@
 
     <a class="navbar-brand me-2" href="index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,13 +39,18 @@
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
     <li><a class="dropdown-item" href="articles/mpcurve_intro.html">Getting Started with MPCurver</a></li>
-    <li><a class="dropdown-item" href="articles/partition.html">Feature Partitioning with MPCurver</a></li>
+    <li><a class="dropdown-item" href="articles/partition.html">Multiple Orderings with MPCurver</a></li>
+    <li><a class="dropdown-item" href="articles/intrinsic_dimension.html">Estimating Intrinsic Dimension with MPCurver</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Case studies</h6></li>
     <li><a class="dropdown-item" href="articles/fitness.html">Analyzing the eLife Fitness Dataset with MPCurver</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Algorithm details</h6></li>
+    <li><a class="dropdown-item" href="articles/cavi_single.html">Single-ordering CAVI</a></li>
+    <li><a class="dropdown-item" href="articles/cavi_partition.html">Multi-ordering CAVI</a></li>
   </ul>
 </li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/AgueroZZ/MPCurver/blob/main/NEWS.md">Changelog</a></li>
+<li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -71,12 +76,11 @@
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
 </h2>
 <ul>
-<li>
-<a href="https://aguerozz.github.io/MPCurver/articles/mpcurve_intro.html">Getting started</a>: the model, variational inference, and a simulated trajectory example.</li>
-<li>
-<a href="https://aguerozz.github.io/MPCurver/articles/partition.html">Feature partitioning</a>: fitting multiple orderings and interpreting feature assignments.</li>
-<li>
-<a href="https://aguerozz.github.io/MPCurver/articles/fitness.html">Fitness data analysis</a>: a worked example with smoothing and measurement uncertainty.</li>
+<li><p><a href="https://aguerozz.github.io/MPCurver/articles/mpcurve_intro.html">Getting started</a>: the single-ordering model and a simulated trajectory example.</p></li>
+<li><p><a href="https://aguerozz.github.io/MPCurver/articles/partition.html">Multiple orderings</a>: the multi-ordering model and an example fit.</p></li>
+<li><p><a href="https://aguerozz.github.io/MPCurver/articles/intrinsic_dimension.html">Estimating intrinsic dimension</a>: automatic initialization, adaptive feature support, and dimension selection.</p></li>
+<li><p><a href="https://aguerozz.github.io/MPCurver/articles/fitness.html">Fitness data analysis</a>: a worked example with smoothing and measurement uncertainty.</p></li>
+<li><p>Optional algorithm details: <a href="https://aguerozz.github.io/MPCurver/articles/cavi_single.html">Single-ordering CAVI</a> and <a href="https://aguerozz.github.io/MPCurver/articles/cavi_partition.html">Multi-ordering CAVI</a>.</p></li>
 </ul>
 </div>
 <div class="section level2">
@@ -84,52 +88,112 @@
 </h2>
 <p>Install <code>MPCurver</code> from GitHub:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu">pak</span><span class="op">(</span><span class="st">"AgueroZZ/MPCurver"</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/pak/man/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"AgueroZZ/MPCurver"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="example">Example<a class="anchor" aria-label="anchor" href="#example"></a>
+<h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
+</h2>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://aguerozz.github.io/MPCurver/">MPCurver</a></span><span class="op">)</span></span>
+<span><span class="va">sim_small</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/simulate_mpcurve.html">simulate_mpcurve</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">60</span>, d <span class="op">=</span> <span class="fl">6</span>, num_bins <span class="op">=</span> <span class="fl">8</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="va">fit_small</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span><span class="va">sim_small</span><span class="op">$</span><span class="va">X</span>, num_bins <span class="op">=</span> <span class="fl">8</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_small</span><span class="op">)</span></span>
+<span><span class="co">#&gt; MPCurve Model Summary</span></span>
+<span><span class="co">#&gt; Algorithm : cavi  |  Model : homoskedastic  |  n=60  d=6  K=8</span></span>
+<span><span class="co">#&gt; Position prior : adaptive</span></span>
+<span><span class="co">#&gt; Current pi range : [2.805e-12, 0.2167]</span></span>
+<span><span class="co">#&gt; Converged : yes</span></span>
+<span><span class="co">#&gt; Underlying fit summary</span></span>
+<span><span class="co">#&gt; &lt;summary.cavi&gt;</span></span>
+<span><span class="co">#&gt;   n = 60, d = 6, K = 8</span></span>
+<span><span class="co">#&gt;   model = homoskedastic, RW(q) = 2</span></span>
+<span><span class="co">#&gt;   noise model = estimated_feature_variance</span></span>
+<span><span class="co">#&gt;   init = PCA, discretization = quantile, adaptive = variational</span></span>
+<span><span class="co">#&gt;   position prior = adaptive</span></span>
+<span><span class="co">#&gt;   iter = 7, converged = yes</span></span>
+<span><span class="co">#&gt;   last ELBO = -345.99997 (delta last = 0.0003201)</span></span>
+<span><span class="co">#&gt;   last logLik = -274.93912 (delta last = 0.007702)</span></span>
+<span><span class="co">#&gt;   pi range = [2.805e-12, 0.2167]</span></span>
+<span><span class="co">#&gt;   sigma2 range = [0.02148, 2.748]</span></span>
+<span><span class="co">#&gt;   lambda range = [0.2428, 3.099]</span></span>
+<span><span class="co">#&gt;   relative change (last step):</span></span>
+<span><span class="co">#&gt;     ELBO: 9.25e-07</span></span>
+<span><span class="co">#&gt;     logLik: 2.8e-05</span></span>
+<span><span class="co">#&gt;     lambda_vec (L2 rel): 0.00396</span></span>
+<span><span class="va">positions</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fitted_positions.html">fitted_positions</a></span><span class="op">(</span><span class="va">fit_small</span><span class="op">)</span>                 <span class="co"># samples x orderings</span></span>
+<span><span class="va">trajectories</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fitted_trajectories.html">fitted_trajectories</a></span><span class="op">(</span><span class="va">fit_small</span><span class="op">)</span>            <span class="co"># features x bins x orderings</span></span>
+<span><span class="va">assignment_probabilities</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fitted_assignments.html">fitted_assignments</a></span><span class="op">(</span><span class="va">fit_small</span><span class="op">)</span> <span class="co"># features x orderings</span></span></code></pre></div>
+<p>Figure 1 shows the inferred ordering and trajectory. Inspect <code>summary(fit_small)</code> and the objective trace when assessing convergence; use <code>do_mpcurve(fit_small, max_iter = 100)</code> to continue a fit.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_small</span><span class="op">)</span></span></code></pre></div>
+<div class="figure">
+<img src="reference/figures/README-quick-plot-1.png" alt="Figure 1. Sample observations colored by posterior-mean pseudotime, with the fitted mean trajectory in orange." width="100%"><p class="caption">
+Figure 1. Sample observations colored by posterior-mean pseudotime, with the fitted mean trajectory in orange.
+</p>
+</div>
+<p>The extraction functions retain the ordering dimension even for one ordering. Use <code>fitted_positions(fit_small, "sd")</code> or <code>fitted_trajectories(fit_small, "sd")</code> for posterior standard deviations.</p>
+<div class="section level3">
+<h3 id="your-data">Your data<a class="anchor" aria-label="anchor" href="#your-data"></a>
+</h3>
+<p>Supply a numeric matrix or all-numeric data frame, with samples in rows and features in columns. Sample and feature names are retained; <code>plot(fit, dims = "gene_name")</code> selects a named feature. Values must be finite: handle missing values before fitting. MPCurver does not impute or standardize the fitting data. Optional measurement SDs <code>S</code> must be finite and nonnegative, in the same units and positional order as <code>X</code>, as a feature vector or a matrix matching <code>X</code>. Names do not trigger reordering. See <code><a href="reference/fit_mpcurve.html">?fit_mpcurve</a></code> for details.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="worked-spiral-example">Worked spiral example<a class="anchor" aria-label="anchor" href="#worked-spiral-example"></a>
 </h2>
 <p>The example below recovers a latent ordering from a noisy two-dimensional spiral.</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://aguerozz.github.io/MPCurver/">MPCurver</a></span><span class="op">)</span></span></code></pre></div>
-<p>First, generate the observations:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/simulate_spiral2d.html">simulate_spiral2d</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">1500</span>, turns <span class="op">=</span> <span class="fl">1</span>, noise <span class="op">=</span> <span class="fl">0.08</span>, seed <span class="op">=</span> <span class="fl">123</span><span class="op">)</span></span>
+<p>Generate the observations shown in Figure 2:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/simulate_spiral2d.html">simulate_spiral2d</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">1500</span>, turns <span class="op">=</span> <span class="fl">1</span>, noise_sd <span class="op">=</span> <span class="fl">0.08</span>, seed <span class="op">=</span> <span class="fl">123</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">obs</span>, pch <span class="op">=</span> <span class="fl">16</span>, cex <span class="op">=</span> <span class="fl">0.35</span>, col <span class="op">=</span> <span class="st">"grey80"</span>,</span>
 <span>     xlab <span class="op">=</span> <span class="st">"x1"</span>, ylab <span class="op">=</span> <span class="st">"x2"</span>, main <span class="op">=</span> <span class="st">"Noisy 2D spiral"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-unnamed-chunk-2-1.png" alt="" width="100%"></p>
-<p>Fit a model with 40 grid positions and a second-order random-walk prior. The first plot shows the inferred ordering and trajectory; the second shows the variational objective over fitting iterations.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="figure">
+<img src="reference/figures/README-spiral-data-1.png" alt="Figure 2. Noisy two-dimensional spiral observations." width="100%"><p class="caption">
+Figure 2. Noisy two-dimensional spiral observations.
+</p>
+</div>
+<p>Fit a model with 40 grid positions and a second-order random-walk prior. The inferred ordering and trajectory appear in Figure 3; Figure 4 shows the variational objective over fitting iterations.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
 <span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  X <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">obs</span><span class="op">)</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">40</span>,</span>
-<span>  rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  iter <span class="op">=</span> <span class="fl">150</span>,</span>
-<span>  discretization <span class="op">=</span> <span class="st">"equal"</span>,</span>
-<span>  tol <span class="op">=</span> <span class="fl">1e-8</span></span>
-<span><span class="op">)</span></span>
+<span>    X <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">obs</span><span class="op">)</span>,</span>
+<span>    initial_method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
+<span>    num_bins <span class="op">=</span> <span class="fl">40</span>,</span>
+<span>    max_iter <span class="op">=</span> <span class="fl">150</span>,</span>
+<span>    tol <span class="op">=</span> <span class="fl">1e-8</span>,</span>
+<span>    control <span class="op">=</span> <span class="fu"><a href="reference/mpcurve_control.html">mpcurve_control</a></span><span class="op">(</span>rw_order <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span>
+<span>    init_control <span class="op">=</span> <span class="fu"><a href="reference/mpcurve_init_control.html">mpcurve_init_control</a></span><span class="op">(</span>discretization <span class="op">=</span> <span class="st">"equal"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-unnamed-chunk-3-1.png" alt="" width="100%"></p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="figure">
+<img src="reference/figures/README-spiral-fit-1.png" alt="Figure 3. Inferred sample ordering and smooth trajectory for the noisy spiral." width="100%"><p class="caption">
+Figure 3. Inferred sample ordering and smooth trajectory for the noisy spiral.
+</p>
+</div>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-unnamed-chunk-3-2.png" alt="" width="100%"></p>
+<div class="figure">
+<img src="reference/figures/README-spiral-fit-2.png" alt="Figure 4. Variational objective over fitting iterations for the spiral model." width="100%"><p class="caption">
+Figure 4. Variational objective over fitting iterations for the spiral model.
+</p>
+</div>
 <p>Initialization can affect the fitted ordering, especially for curved or weakly separated patterns. Here we compare three starting orderings under the same model and fitting settings:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">init_methods</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PCA"</span>, <span class="st">"fiedler"</span>, <span class="st">"isomap"</span><span class="op">)</span></span>
 <span><span class="va">fits</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/setNames.html" class="external-link">setNames</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">init_methods</span>, <span class="kw">function</span><span class="op">(</span><span class="va">init_method</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>      X <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">obs</span><span class="op">)</span>,</span>
-<span>      method <span class="op">=</span> <span class="va">init_method</span>,</span>
-<span>      K <span class="op">=</span> <span class="fl">40</span>,</span>
-<span>      rw_q <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>      iter <span class="op">=</span> <span class="fl">150</span>,</span>
-<span>      discretization <span class="op">=</span> <span class="st">"equal"</span>,</span>
-<span>      tol <span class="op">=</span> <span class="fl">1e-8</span></span>
-<span>    <span class="op">)</span></span>
+<span>    X <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">obs</span><span class="op">)</span>,</span>
+<span>    initial_method <span class="op">=</span> <span class="va">init_method</span>,</span>
+<span>    num_bins <span class="op">=</span> <span class="fl">40</span>,</span>
+<span>    max_iter <span class="op">=</span> <span class="fl">150</span>,</span>
+<span>    tol <span class="op">=</span> <span class="fl">1e-8</span>,</span>
+<span>    control <span class="op">=</span> <span class="fu"><a href="reference/mpcurve_control.html">mpcurve_control</a></span><span class="op">(</span>rw_order <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span>
+<span>    init_control <span class="op">=</span> <span class="fu"><a href="reference/mpcurve_init_control.html">mpcurve_init_control</a></span><span class="op">(</span>discretization <span class="op">=</span> <span class="st">"equal"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
 <span>  <span class="op">}</span><span class="op">)</span>,</span>
 <span>  <span class="va">init_methods</span></span>
 <span><span class="op">)</span></span>
@@ -142,35 +206,50 @@
 <span><span class="co">#&gt; 1     PCA -424.1734</span></span>
 <span><span class="co">#&gt; 2 fiedler -375.5500</span></span>
 <span><span class="co">#&gt; 3  isomap -376.9430</span></span></code></pre></div>
-<p>For these fits with the same model and data, a larger final ELBO indicates a better variational objective. Inspect the fitted trajectories as well as this numerical comparison. Sample positions are available in <code>fit$locations$mean$pseudotime</code>, and <code>fit$params$mu</code> contains the estimated feature trajectories.</p>
+<p>For these fits with the same model and data, a larger final ELBO indicates a better variational objective. Inspect the fitted trajectories as well as this numerical comparison. Sample positions are available in <code>fitted_positions(fit)</code>, and <code>fitted_trajectories(fit)</code> contains the estimated feature trajectories.</p>
+<p>Model settings are collected in <code><a href="reference/mpcurve_control.html">mpcurve_control()</a></code>. The default RW2 prior uses empirical-Bayes smoothness updates. For RW3 with precision fixed at 5:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fit_rw3_fixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
+<span>  X <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">obs</span><span class="op">)</span>,</span>
+<span>  initial_method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
+<span>  control <span class="op">=</span> <span class="fu"><a href="reference/mpcurve_control.html">mpcurve_control</a></span><span class="op">(</span>rw_order <span class="op">=</span> <span class="fl">3</span>, lambda_init <span class="op">=</span> <span class="fl">5</span>, fix_lambda <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Use <code>lambda_bounds</code> and <code>sigma2_bounds</code> in the same constructor to set parameter limits. <code><a href="reference/mpcurve_init_control.html">mpcurve_init_control()</a></code> configures feature grouping and ordering-helper arguments. For example, <code>method_args = list(num_neighbors = 10)</code> controls the neighborhood size when <code>initial_method = "isomap"</code>.</p>
+<p>Invalid initialization settings raise an error. If the requested ordering computation fails, fitting warns with the cause and retries using PCA component 1. Use <code>init_control = mpcurve_init_control(on_failure = "error")</code> to stop instead. If PCA fails, fitting stops; the initialization metadata records any successful fallback and its original cause.</p>
+<p>Continue a fit with <code>do_mpcurve(fit, max_iter = 100)</code>. It inherits the stored model and measurement errors. To change precision while continuing, use <code>control = mpcurve_continue_control(lambda_init = 5, fix_lambda = TRUE)</code>; <code>fix_lambda = FALSE</code> enables empirical-Bayes updates again. Omitted continuation settings inherit their fitted values.</p>
+<p>Ordering helpers keep method-specific advanced settings in a named <code>control</code> list. When fitting, nest this list inside <code>method_args</code>, for example <code>mpcurve_init_control(method_args = list(num_neighbors = 10, control = list(num_landmarks = 100)))</code> for Isomap. Reference pages list all accepted settings and defaults. Simulation helpers consistently use <code>n</code> for samples, <code>d</code> or block-specific counts for features, and <code>noise_sd</code> for Gaussian noise standard deviations; trajectory-shape settings use their own <code>control</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="multiple-orderings-and-feature-groups">Multiple orderings and feature groups<a class="anchor" aria-label="anchor" href="#multiple-orderings-and-feature-groups"></a>
 </h2>
+<p>When the number of orderings is unknown, start with <code>fit_mpcurve(X, intrinsic_dim = "auto")</code> using the default adaptive partition prior. It is computationally simpler than candidate model comparison: it fits one adaptively weighted model after similarity initialization, then removes orderings with numerical-zero estimated prior weights.</p>
 <p>A single ordering may describe some features well while missing the patterns in others. Set <code>intrinsic_dim = M</code> to fit <span class="math inline">M</span> orderings of the same samples. MPCurver jointly estimates those orderings, smooth trajectories, and a probability distribution over orderings for each feature. For example, two groups of genes may vary along different cell-state axes.</p>
 <p>Inference uses structural variational inference: a feature’s trajectory distribution is conditional on its ordering assignment. This preserves the dependence between which ordering a feature follows and the shape of its trajectory. Each feature has one noise variance shared across the candidate orderings, while smoothness can vary with the feature and ordering.</p>
-<p>The default similarity initialization clusters the features, then applies one ordering method independently within every feature group. PCA is the default, using each group’s own PC1. Setting <code>method = "isomap"</code> or <code>method = "fiedler"</code> applies that method separately to all groups.</p>
+<p>The default similarity initialization clusters the features, then applies one ordering method independently within every feature group. PCA is the default, using each group’s own PC1. Setting <code>initial_method = "isomap"</code> or <code>initial_method = "fiedler"</code> applies that method separately to all groups.</p>
 <p>For a two-ordering analysis of your sample-by-feature data matrix <code>X</code>:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">fit_multi</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span><span class="va">X</span>, intrinsic_dim <span class="op">=</span> <span class="fl">2</span>, K <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fit_multi</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
+<span>    <span class="va">X</span>,</span>
+<span>    intrinsic_dim <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>    num_bins <span class="op">=</span> <span class="fl">40</span></span>
+<span>  <span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_multi</span><span class="op">)</span></span>
-<span><span class="va">fit_multi</span><span class="op">$</span><span class="va">partition</span><span class="op">$</span><span class="va">pi_weights</span></span>
-<span><span class="va">fit_multi</span><span class="op">$</span><span class="va">effective_intrinsic_dim</span></span>
+<span><span class="fu"><a href="reference/fitted_assignments.html">fitted_assignments</a></span><span class="op">(</span><span class="va">fit_multi</span><span class="op">)</span></span>
+<span><span class="va">fit_multi</span><span class="op">$</span><span class="va">intrinsic_dim</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_multi</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
 <p>When the number of orderings is unknown, <code>intrinsic_dim = "auto"</code> can choose an initialization dimension from the feature-similarity tree before fitting the adaptive model:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_auto</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
-<span>  <span class="va">X</span>,</span>
-<span>  intrinsic_dim <span class="op">=</span> <span class="st">"auto"</span>,</span>
-<span>  max_intrinsic_dim <span class="op">=</span> <span class="fl">8</span>,</span>
-<span>  similarity_min_cluster_size <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  K <span class="op">=</span> <span class="fl">40</span></span>
-<span><span class="op">)</span></span>
+<span>    <span class="va">X</span>,</span>
+<span>    intrinsic_dim <span class="op">=</span> <span class="st">"auto"</span>,</span>
+<span>    num_bins <span class="op">=</span> <span class="fl">40</span>,</span>
+<span>    init_control <span class="op">=</span> <span class="fu"><a href="reference/mpcurve_init_control.html">mpcurve_init_control</a></span><span class="op">(</span>max_intrinsic_dim <span class="op">=</span> <span class="fl">8</span>, min_cluster_size <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
 <span></span>
 <span><span class="va">fit_auto</span><span class="op">$</span><span class="va">dimension_initialization</span><span class="op">$</span><span class="va">diagnostics</span></span>
-<span><span class="va">fit_auto</span><span class="op">$</span><span class="va">effective_intrinsic_dim</span></span></code></pre></div>
-<p>Automatic initialization uses the fast spline-R-squared metric (<code>similarity_metric = "spline_r2"</code>) by default, with five spline degrees of freedom. It selects the eligible cut with the largest mean silhouette, where every cluster must contain at least <code>similarity_min_cluster_size</code> features (default 2). For adaptive fitting, the selected cluster-size proportions initialize the global ordering probabilities; subsequent empirical-Bayes updates can reduce the effective number of orderings.</p>
-<p>The assignment probabilities describe how strongly each feature supports each ordering. The trajectory plot shows the feature’s fitted mean under each ordering, with the corresponding assignment probability in the panel title. With the default adaptive feature-assignment prior, <code>effective_intrinsic_dim</code> counts prior weights above the configurable <code>effective_weight_tol</code> (default <code>1e-12</code>); <code>intrinsic_dim</code> remains the fitted number of orderings. For a fixed uniform assignment prior, use <code>select_mpcurve_dimension(X, max_intrinsic_dim = 4, direction = "forward")</code> to compare final objectives across adjacent dimensions. Inspect its saved scores and convergence diagnostics alongside the feature groups. The <a href="https://aguerozz.github.io/MPCurver/articles/partition.html">feature-partitioning tutorial</a> provides background on the statistical model.</p>
+<span><span class="va">fit_auto</span><span class="op">$</span><span class="va">intrinsic_dim</span></span></code></pre></div>
+<p>Automatic initialization uses the fast spline-R-squared metric (<code>similarity_metric = "spline_r2"</code>) by default, with five spline degrees of freedom. It selects the eligible cut with the largest mean silhouette, where every cluster must contain at least <code>init_control$min_cluster_size</code> features (default 2). For adaptive fitting, the selected cluster-size proportions initialize the global ordering probabilities; subsequent empirical-Bayes updates can leave some orderings with estimated prior weights numerically close to zero. Automatic fitting removes those orderings without additional fitting and returns a model with the estimated dimension. Initial and final dimensions and any removed orderings are recorded in <code>fit_auto$dimension_estimation</code>.</p>
+<p>The assignment probabilities describe how strongly each feature supports each ordering. The trajectory plot shows the feature’s fitted mean under each ordering, with the corresponding assignment probability in the panel title. <code>intrinsic_dim</code> is the actual number of orderings in the returned model. An integer supplied by the user retains that dimension. Automatic adaptive fitting removes orderings whose estimated prior weights are at or below <code>control$effective_count_tol / P</code>, where <span class="math inline">P</span> is the number of feature columns and the tolerance defaults to <code>1e-8</code>. This tolerance identifies numerical zeros; values above <code>1e-6</code> trigger a warning during automatic adaptive pruning because they may remove supported orderings. For a fixed uniform assignment prior, use <code>select_mpcurve_dimension(   X,   max_intrinsic_dim = 4,     direction = "forward"   )</code> to compare final objectives across adjacent dimensions. This fits multiple candidate models under a different prior and may choose a different dimension from adaptive fitting. Inspect its saved scores and convergence diagnostics alongside the feature groups. The <a href="https://aguerozz.github.io/MPCurver/articles/partition.html">multiple-ordering tutorial</a> introduces the statistical model. The <a href="https://aguerozz.github.io/MPCurver/articles/intrinsic_dimension.html">intrinsic-dimension tutorial</a> explains estimation and dimension selection.</p>
 </div>
 <div class="section level2">
 <h2 id="measurement-uncertainty">Measurement uncertainty<a class="anchor" aria-label="anchor" href="#measurement-uncertainty"></a>

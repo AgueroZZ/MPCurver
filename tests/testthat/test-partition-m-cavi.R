@@ -15,8 +15,6 @@ test_that("soft_partition_cavi returns canonical structural state for M=2", {
     X,
     M = 2,
     init_methods = c("PCA", "PCA"),
-    pca_components = 1:2,
-    partition_init = "ordering_methods",
     K = 5,
     T_start = 1,
     T_end = 1,
@@ -45,38 +43,34 @@ test_that("fit_mpcurve supports fixed structural M=2 and M=3", {
   fit2 <- suppressWarnings(fit_mpcurve(
     X,
     intrinsic_dim = 2,
-    method = c("PCA", "PCA"),
-    partition_init = "ordering_methods",
-    K = 5,
-    T_start = 1,
-    T_end = 1,
-    n_outer = 1,
-    max_converge_iter = 1,
-    verbose = FALSE
+    initial_method = "PCA",
+    num_bins = 5,
+    max_iter = 1,
+    verbose = FALSE,
+    control = mpcurve_control(anneal_start = 1, anneal_steps = 1),
+    init_control = mpcurve_init_control()
   ))
   fit3 <- suppressWarnings(fit_mpcurve(
     X,
     intrinsic_dim = 3,
-    method = rep("PCA", 3),
-    partition_init = "ordering_methods",
-    K = 5,
-    T_start = 1,
-    T_end = 1,
-    n_outer = 1,
-    max_converge_iter = 1,
-    verbose = FALSE
+    initial_method = "PCA",
+    num_bins = 5,
+    max_iter = 1,
+    verbose = FALSE,
+    control = mpcurve_control(anneal_start = 1, anneal_steps = 1),
+    init_control = mpcurve_init_control()
   ))
   expect_s3_class(fit2, "mpcurve")
   expect_s3_class(fit3, "mpcurve")
-  expect_equal(fit2$intrinsic_dim, 2L)
-  expect_equal(fit3$intrinsic_dim, 3L)
+  expect_equal(fit2$model_intrinsic_dim, 2L)
+  expect_equal(fit3$model_intrinsic_dim, 3L)
   expect_equal(fit2$params$sigma2, fit2$fit$params$sigma2)
   expect_equal(fit3$params$sigma2, fit3$fit$params$sigma2)
   expect_equal(length(fit2$fits), 2L)
   expect_equal(length(fit3$fits), 3L)
   expect_equal(
-    unname(vapply(fit3$fit$init_info, `[[`, integer(1), "pca_component")),
-    1:3
+    unname(vapply(fit3$fit$init_info, `[[`, integer(1), "pca_component_requested")),
+    rep(1L, 3L)
   )
 })
 
@@ -87,17 +81,12 @@ test_that("partition lambda and sigma initialization are shared and explicit", {
   fit <- suppressWarnings(fit_mpcurve(
     X,
     intrinsic_dim = 2,
-    method = c("PCA", "PCA"),
-    partition_init = "ordering_methods",
-    K = 5,
-    lambda = 2,
-    fix_lambda = TRUE,
-    sigma2_init = sigma_init,
-    T_start = 1,
-    T_end = 1,
-    n_outer = 1,
-    max_converge_iter = 0,
-    verbose = FALSE
+    initial_method = "PCA",
+    num_bins = 5,
+    max_iter = 0,
+    verbose = FALSE,
+    control = mpcurve_control(lambda_init = 2, fix_lambda = TRUE, sigma2_init = sigma_init, anneal_start = 1, anneal_steps = 1),
+    init_control = mpcurve_init_control()
   ))
   expect_equal(unname(fit$lambda_mat), matrix(2, ncol(X), 2), tolerance = 0)
   expect_equal(fit$sigma2_trace[[1]], sigma_init, tolerance = 0)
@@ -112,24 +101,22 @@ test_that("do_mpcurve continues only from canonical structural state", {
   fit <- suppressWarnings(fit_mpcurve(
     X,
     intrinsic_dim = 2,
-    method = c("PCA", "PCA"),
-    partition_init = "ordering_methods",
-    K = 5,
-    T_start = 1,
-    T_end = 1,
-    n_outer = 1,
-    max_converge_iter = 1,
-    verbose = FALSE
+    initial_method = "PCA",
+    num_bins = 5,
+    max_iter = 1,
+    verbose = FALSE,
+    control = mpcurve_control(anneal_start = 1, anneal_steps = 1),
+    init_control = mpcurve_init_control()
   ))
   before <- length(fit$objective_history)
-  continued <- suppressWarnings(do_mpcurve(fit, iter = 2))
+  continued <- suppressWarnings(do_mpcurve(fit, max_iter = 2))
   expect_gt(length(continued$objective_history), before)
   expect_identical(continued$variational_family, "structured")
 
   legacy <- fit
   legacy$fit$variational_family <- NULL
   legacy$fit$control$variational_family <- NULL
-  expect_error(do_mpcurve(legacy, iter = 1), "read-only")
+  expect_error(do_mpcurve(legacy, max_iter = 1), "read-only")
 })
 
 test_that("partition initialization retains a common K", {
@@ -143,13 +130,12 @@ test_that("partition initialization retains a common K", {
   fit <- suppressWarnings(fit_mpcurve(
     X,
     intrinsic_dim = 2,
-    method = c("PCA", "PCA"),
-    partition_init = "ordering_methods",
-    K = 6,
-    discretization = "quantile",
-    n_outer = 1,
-    max_converge_iter = 0,
-    verbose = FALSE
+    initial_method = "PCA",
+    num_bins = 6,
+    max_iter = 0,
+    verbose = FALSE,
+    control = mpcurve_control(anneal_steps = 1),
+    init_control = mpcurve_init_control(discretization = "quantile")
   ))
   expect_equal(fit$K, 6L)
   expect_true(all(vapply(fit$gamma, ncol, integer(1)) == 6L))
@@ -176,12 +162,12 @@ test_that("plot.mpcurve uses canonical structural means for trajectory plots", {
   fit <- suppressWarnings(fit_mpcurve(
     X,
     intrinsic_dim = 2,
-    method = c("PCA", "PCA"),
-    partition_init = "ordering_methods",
-    K = 5,
-    n_outer = 1,
-    max_converge_iter = 0,
-    verbose = FALSE
+    initial_method = "PCA",
+    num_bins = 5,
+    max_iter = 0,
+    verbose = FALSE,
+    control = mpcurve_control(anneal_steps = 1),
+    init_control = mpcurve_init_control()
   ))
 
   expect_identical(
@@ -226,7 +212,13 @@ test_that("plot.mpcurve uses canonical structural means for trajectory plots", {
 test_that("single-ordering trajectory plots honor the public dims argument", {
   set.seed(81)
   X <- matrix(rnorm(80), 20, 4)
-  fit <- fit_mpcurve(X, intrinsic_dim = 1, K = 5, iter = 2, verbose = FALSE)
+  fit <- fit_mpcurve(
+    X,
+    intrinsic_dim = 1,
+    num_bins = 5,
+    max_iter = 2,
+    verbose = FALSE
+  )
 
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
@@ -240,16 +232,26 @@ test_that("single-ordering trajectory plots honor the public dims argument", {
 test_that("intrinsic_dim=1 remains the ordinary cavi path", {
   set.seed(9)
   X <- matrix(rnorm(80), 20, 4)
-  fit <- fit_mpcurve(X, intrinsic_dim = 1, K = 5, iter = 2, verbose = FALSE)
+  fit <- fit_mpcurve(
+    X,
+    intrinsic_dim = 1,
+    num_bins = 5,
+    max_iter = 2,
+    verbose = FALSE
+  )
   expect_s3_class(fit$fit, "cavi")
   expect_null(fit$partition)
-  expect_equal(fit$intrinsic_dim, 1L)
+  expect_equal(fit$model_intrinsic_dim, 1L)
 })
 
-test_that("non-cavi public partition requests still fail", {
+test_that("partition fits reject the removed algorithm argument", {
   X <- matrix(rnorm(60), 15, 4)
   expect_error(
-    fit_mpcurve(X, algorithm = "csmooth_em", intrinsic_dim = 2),
-    "CAVI-only"
+    fit_mpcurve(
+    X,
+    algorithm = "csmooth_em",
+    intrinsic_dim = 2
+  ),
+    "unused argument"
   )
 })

@@ -1,0 +1,218 @@
+---
+title: "Estimating Intrinsic Dimension with MPCurver"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Estimating Intrinsic Dimension with MPCurver}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", message = FALSE,
+                      warning = FALSE, fig.width = 7, fig.height = 5)
+```
+
+When the intrinsic dimension is unknown, start with
+`fit_mpcurve(X, intrinsic_dim = "auto")` and its default adaptive partition
+prior. This is computationally simpler than fitting a sequence of candidate
+dimensions: feature similarity chooses an initial dimension, then one adaptive
+fit estimates ordering weights and removes numerical-zero orderings.
+
+Use `select_mpcurve_dimension()` when your analysis calls for explicit model
+comparison under a fixed uniform feature-assignment prior. The two approaches
+use different priors and selection rules and can produce different dimensions.
+Supplying an integer `intrinsic_dim = M` instead fits that specified dimension.
+This tutorial shows both estimation approaches;
+[Multiple orderings](partition.html) introduces the model and software use.
+The [algorithm details](cavi_partition.html) are available separately.
+
+## Example data
+
+We simulate 200 samples and twelve features, with two groups following
+different latent orderings. The generating dimension is two; it is not
+supplied to either fitting procedure below.
+
+```{r data}
+library(MPCurver)
+sim <- simulate_dual_trajectory(
+  n = 200,
+  d1 = 6,
+  d2 = 6,
+  d_noise = 0,
+  noise_sd = 0.05,
+  trajectory_family = c("quadratic", "monotone"),
+  seed = 1
+)
+X <- sim$X
+```
+
+## Automatic initialization and adaptive fitting
+
+Use `intrinsic_dim = "auto"` to choose the starting model dimension from the
+feature-similarity tree. `max_intrinsic_dim` bounds the candidate dimensions;
+here we consider at most four orderings and use twenty position bins.
+The default adaptive feature-assignment prior is used during fitting.
+
+```{r automatic-fit}
+fit_auto <- fit_mpcurve(
+  X,
+  intrinsic_dim = "auto",
+  num_bins = 20,
+  max_iter = 200,
+  init_control = mpcurve_init_control(max_intrinsic_dim = 4)
+)
+```
+
+Automatic initialization uses spline-R-squared feature similarity by default.
+It evaluates hierarchical-clustering cuts and selects the eligible cut with
+the largest mean silhouette. Every cluster must contain at least
+`init_control$min_cluster_size` features (default 2). If no multi-ordering cut
+satisfies this rule, it fits one ordering.
+
+For cluster sizes $P_1,\ldots,P_M$, the adaptive fit initializes the ordering
+prior weights as $\omega_m=P_m/P$, where $P$ is the total number of features.
+Every feature starts from this same probability vector. After fitting,
+orderings with numerical-zero estimated prior weights are removed. The returned
+model contains the estimated number of orderings.
+
+The minimum cluster size prevents a singleton feature from serving as the
+sole evidence for a latent ordering: sorting that feature by its own values
+would produce a smooth trajectory by construction. A singleton can reflect
+noise, weak measurement, or model mismatch; MPCurver has no separate
+background-feature component.
+
+## Inspect the estimated model {#report-the-supported-dimension}
+
+`fit_auto$intrinsic_dim` is the number of orderings in the returned model.
+Table 1 reports this estimated dimension.
+
+```{r dimensions, echo=FALSE}
+knitr::kable(
+  data.frame(
+    Quantity = "Estimated intrinsic dimension",
+    Field = "intrinsic_dim",
+    Value = fit_auto$intrinsic_dim
+  ),
+  caption = "Table 1. Estimated intrinsic dimension of the returned model."
+)
+```
+
+For ordering $m$, empirical Bayes estimates its prior weight as
+
+$$
+\widehat\omega_m=\frac{1}{P}\sum_{j=1}^{P} q(Z_j=m),
+$$
+
+where $P$ is the number of features. Automatic adaptive fitting removes an
+ordering when $\widehat\omega_m$ is at or below
+`control$effective_count_tol / P`. The tolerance defaults to `1e-8` and
+identifies estimated prior weights that are numerically close to zero.
+Automatic adaptive pruning warns when the tolerance exceeds `1e-6`, before
+division by $P$, because large values may remove supported orderings.
+
+Empty orderings are removed without further fitting. The remaining assignment
+probabilities and prior weights are normalized, and the final objective is
+recomputed. Initial dimensions and any removed orderings are recorded in
+`fit_auto$dimension_estimation`.
+
+Table 2 shows the estimated prior weights and their corresponding expected
+feature counts, $P\widehat\omega_m$.
+
+```{r ordering-support}
+feature_counts <- colSums(fitted_assignments(fit_auto))
+# At the adaptive update, the estimated prior weight equals the mean
+# posterior assignment probability; this also covers a single retained ordering.
+prior_weights <- colMeans(fitted_assignments(fit_auto))
+```
+
+```{r support-table, echo=FALSE}
+knitr::kable(
+  data.frame(Ordering = names(feature_counts),
+             Prior_weight = as.numeric(prior_weights),
+             Expected_feature_count = as.numeric(feature_counts)),
+  digits = 6,
+  caption = "Table 2. Estimated ordering prior weights and corresponding expected feature counts."
+)
+```
+
+Use `fitted_positions()`, `fitted_trajectories()`, and `fitted_assignments()`
+to extract results with consistent dimensions even when the estimated dimension
+is one.
+Supplying an integer `intrinsic_dim` retains that specified dimension.
+With a fixed feature-assignment prior, automatic fitting retains the
+dimension chosen at initialization.
+
+## Compare dimensions under a uniform prior
+
+`select_mpcurve_dimension()` fits adjacent model dimensions with a fixed
+uniform feature-assignment prior and compares final soft-assignment objectives
+at $T=1$. Forward selection starts at $M=1$ and accepts the next dimension
+only when its objective is strictly larger. Backward selection starts at
+`max_intrinsic_dim` and tests smaller dimensions by the same rule.
+
+```{r select-dimension}
+selected <- select_mpcurve_dimension(
+  X,
+  max_intrinsic_dim = 4,
+  direction = "forward",
+  num_bins = 20,
+  max_iter = 200
+)
+selected$intrinsic_dim
+```
+
+Each candidate $M$ is fitted once. For $M > 1$, features are grouped by
+similarity, and the selected `initial_method` initializes each group.
+All candidates use a common grid size and the supplied model and fitting
+settings. With uniform prior weights,
+an ordering receiving no feature mass still changes the assignment-prior
+term by $P\log\{M/(M-1)\}$ relative to the smaller model.
+
+Table 3 records the objective comparisons, including the rejected stopping
+step when present. Table 4 reports each attempted fit and its convergence
+status.
+
+```{r inspect-history, eval=FALSE}
+selected$dimension_selection$history
+```
+
+<div class="table-responsive">
+
+```{r selection-history, echo=FALSE}
+knitr::kable(
+  selected$dimension_selection$history[, c("current_M", "candidate_M",
+    "current_score", "candidate_score", "delta", "accepted")],
+  col.names = c("From M", "To M", "Current objective", "Candidate objective",
+                "Change", "Accepted"),
+  digits = 3,
+  caption = "Table 3. Adjacent-dimension objective comparisons in forward selection."
+)
+```
+
+</div>
+
+```{r inspect-candidates, eval=FALSE}
+selected$dimension_selection$candidates
+```
+
+<div class="table-responsive">
+
+```{r selection-candidates, echo=FALSE}
+candidates <- selected$dimension_selection$candidates
+knitr::kable(
+  candidates[, c("M", "initialization", "status", "score", "converged")],
+  col.names = c("M", "Initialization", "Status", "Objective", "Converged"),
+  digits = 3,
+  caption = "Table 4. Initialization, fitting objective, and convergence status for each candidate dimension."
+)
+```
+
+</div>
+
+The complete candidate record also contains warnings and errors. Greedy
+selection depends on initialization and convergence and can stop at a local
+choice. Inspect these records and, for candidates that reach their iteration
+limit, increase `max_iter` before relying on the comparison. The adaptive
+occupancy count and uniform-prior search use different criteria.

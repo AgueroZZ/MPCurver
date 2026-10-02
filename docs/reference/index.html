@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -21,12 +21,17 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
     <li><a class="dropdown-item" href="../articles/mpcurve_intro.html">Getting Started with MPCurver</a></li>
-    <li><a class="dropdown-item" href="../articles/partition.html">Feature Partitioning with MPCurver</a></li>
+    <li><a class="dropdown-item" href="../articles/partition.html">Multiple Orderings with MPCurver</a></li>
+    <li><a class="dropdown-item" href="../articles/intrinsic_dimension.html">Estimating Intrinsic Dimension with MPCurver</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Case studies</h6></li>
     <li><a class="dropdown-item" href="../articles/fitness.html">Analyzing the eLife Fitness Dataset with MPCurver</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Algorithm details</h6></li>
+    <li><a class="dropdown-item" href="../articles/cavi_single.html">Single-ordering CAVI</a></li>
+    <li><a class="dropdown-item" href="../articles/cavi_partition.html">Multi-ordering CAVI</a></li>
   </ul></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/AgueroZZ/MPCurver/blob/main/NEWS.md">Changelog</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/AgueroZZ/MPCurver/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -60,6 +65,27 @@
 
         <dt>
 
+          <code><a href="mpcurve_control.html">mpcurve_control()</a></code>
+
+        </dt>
+        <dd>Advanced model and fitting settings</dd>
+
+        <dt>
+
+          <code><a href="mpcurve_init_control.html">mpcurve_init_control()</a></code>
+
+        </dt>
+        <dd>Advanced initialization settings</dd>
+
+        <dt>
+
+          <code><a href="mpcurve_continue_control.html">mpcurve_continue_control()</a></code>
+
+        </dt>
+        <dd>Advanced continuation settings</dd>
+
+        <dt>
+
           <code><a href="select_mpcurve_dimension.html">select_mpcurve_dimension()</a></code>
 
         </dt>
@@ -70,7 +96,7 @@
           <code><a href="do_mpcurve.html">do_mpcurve()</a></code>
 
         </dt>
-        <dd>Run additional iterations of a fitted MPCurve model</dd>
+        <dd>Continue a fitted MPCurve model</dd>
 
         <dt>
 
@@ -96,6 +122,27 @@
 
 
       <dl><dt>
+
+          <code><a href="fitted_positions.html">fitted_positions()</a></code>
+
+        </dt>
+        <dd>Extract fitted sample positions</dd>
+
+        <dt>
+
+          <code><a href="fitted_trajectories.html">fitted_trajectories()</a></code>
+
+        </dt>
+        <dd>Extract fitted feature trajectories</dd>
+
+        <dt>
+
+          <code><a href="fitted_assignments.html">fitted_assignments()</a></code>
+
+        </dt>
+        <dd>Extract feature-assignment probabilities</dd>
+
+        <dt>
 
           <code><a href="print.mpcurve.html">print(<i>&lt;mpcurve&gt;</i>)</a></code>
 
@@ -130,28 +177,28 @@
           <code><a href="PCA_ordering.html">PCA_ordering()</a></code>
 
         </dt>
-        <dd>PCA ordering (PC1)</dd>
+        <dd>Principal-component ordering</dd>
 
         <dt>
 
           <code><a href="fiedler_ordering.html">fiedler_ordering()</a></code>
 
         </dt>
-        <dd>Fiedler ordering from a kNN graph</dd>
+        <dd>Fiedler ordering from a nearest-neighbor graph</dd>
 
         <dt>
 
           <code><a href="isomap_ordering.html">isomap_ordering()</a></code>
 
         </dt>
-        <dd>Landmark Isomap ordering (no vegan; avoids O(n^2) dist matrix)</dd>
+        <dd>Landmark Isomap ordering</dd>
 
         <dt>
 
           <code><a href="pcurve_ordering.html">pcurve_ordering()</a></code>
 
         </dt>
-        <dd>Principal curve ordering</dd>
+        <dd>Principal-curve ordering</dd>
 
         <dt>
 
@@ -171,24 +218,24 @@
 
       <dl><dt>
 
-          <code><a href="simulate_cavi_toy.html">simulate_cavi_toy()</a></code>
+          <code><a href="simulate_mpcurve.html">simulate_mpcurve()</a></code>
 
         </dt>
-        <dd>Simulate a toy dataset from the current single-ordering CAVI model</dd>
+        <dd>Simulate data from a single-ordering MPCurve model</dd>
 
         <dt>
 
           <code><a href="simulate_dual_trajectory.html">simulate_dual_trajectory()</a></code>
 
         </dt>
-        <dd>Simulate a dual-trajectory dataset with configurable trajectory families</dd>
+        <dd>Simulate two latent trajectories</dd>
 
         <dt>
 
           <code><a href="simulate_intrinsic_trajectories.html">simulate_intrinsic_trajectories()</a></code>
 
         </dt>
-        <dd>Simulate a multi-ordering intrinsic-trajectory dataset</dd>
+        <dd>Simulate multiple latent trajectories</dd>
 
         <dt>
 
@@ -209,7 +256,7 @@
           <code><a href="simulate_two_order_gp_dataset.html">simulate_two_order_gp_dataset()</a></code>
 
         </dt>
-        <dd>Simulate a two-ordering GP dataset (Matern) for feature partitioning</dd>
+        <dd>Simulate two Gaussian-process feature blocks</dd>
       </dl></div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
@@ -230,4 +277,3 @@
 
 
   </body></html>
-

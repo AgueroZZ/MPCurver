@@ -1,9 +1,5 @@
-source("R/00_utils.R")
-source("R/01_initialization.R")
-source("R/02_prior.R")
-source("R/06_cSmoothEM.R")
-source("R/09_cavi.R")
-source("R/benchmarking_curves.R")
+# Run from the MPCurver package root.
+pkgload::load_all(".", quiet = TRUE)
 
 args <- commandArgs(trailingOnly = TRUE)
 plot_out <- if (length(args) >= 1L) args[[1L]] else NULL
@@ -44,15 +40,14 @@ score_spiral_fit <- function(fit, sim, K) {
 }
 
 run_method <- function(method, sim, K = 10L, max_iter = 250L, tol = 1e-7) {
-  fit <- cavi(
+  fit <- fit_mpcurve(
     as.matrix(sim$obs),
-    K = K,
-    method = method,
-    rw_q = 2,
+    num_bins = K,
+    initial_method = method,
     max_iter = max_iter,
     tol = tol,
     verbose = FALSE
-  )
+  )$fit
 
   score <- score_spiral_fit(fit, sim, K)
   list(
@@ -79,15 +74,14 @@ run_oracle <- function(sim, K = 10L, max_iter = 250L, tol = 1e-7) {
   R0 <- matrix(0, nrow = nrow(sim$obs), ncol = K)
   R0[cbind(seq_len(nrow(sim$obs)), bin_id)] <- 1
 
-  fit <- cavi(
+  fit <- fit_mpcurve(
     as.matrix(sim$obs),
-    K = K,
-    responsibilities_init = R0,
-    rw_q = 2,
+    num_bins = K,
+    init_control = mpcurve_init_control(responsibilities_init = R0),
     max_iter = max_iter,
     tol = tol,
     verbose = FALSE
-  )
+  )$fit
 
   score <- score_spiral_fit(fit, sim, K)
   data.frame(
@@ -104,7 +98,7 @@ run_oracle <- function(sim, K = 10L, max_iter = 250L, tol = 1e-7) {
   )
 }
 
-sim <- simulate_swiss_roll_1d_2d(n = 300, sigma = 0.2, seed = 123)
+sim <- simulate_swiss_roll_1d_2d(n = 300, noise_sd = 0.2, seed = 123)
 methods <- c("PCA", "fiedler", "pcurve")
 runs <- lapply(methods, run_method, sim = sim, K = 10L, max_iter = 250L, tol = 1e-7)
 results <- do.call(rbind, lapply(runs, `[[`, "row"))

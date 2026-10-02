@@ -151,6 +151,49 @@ test_that("spline-r2 similarity is symmetric, bounded, and uses fixed-df fits", 
   )
 })
 
+test_that("spline-r2 scores retain small-scale proportional relationships", {
+  compute <- ns_fn(".compute_same_ordering_similarity_spline_r2")
+  t <- seq(0, 1, length.out = 20)
+  X <- cbind(first = t, second = 2 * t)
+  for (multiplier in c(1, 1e-5, 1e-12, 1e-200, 1e200)) {
+    similarity <- compute(multiplier * X)
+    expect_equal(unname(similarity$S[1, 2]), 1, tolerance = 1e-12)
+    expect_false(any(similarity$feature_info$low_variance))
+    expect_equal(similarity$feature_info$standardized_sd, c(1, 1), tolerance = 1e-12)
+    expect_identical(similarity$normalization, "centered_unit_variance")
+  }
+})
+
+test_that("spline-r2 scores are invariant to independent units and large offsets", {
+  compute <- ns_fn(".compute_same_ordering_similarity_spline_r2")
+  set.seed(902)
+  t <- seq(0, 1, length.out = 40)
+  X <- cbind(anchor = t, curve = t^2 + rnorm(40, sd = 0.1),
+             unrelated = rnorm(40), constant = rep(3, 40))
+  original <- X
+  reference <- compute(X)
+  rescaled <- compute(sweep(X, 2, c(1e-200, 1e200, 1e-12, 1e-20), "*"))
+  expect_equal(rescaled$S, reference$S, tolerance = 1e-12)
+  expect_equal(rescaled$directional_r2, reference$directional_r2, tolerance = 1e-12)
+  expect_equal(rescaled$feature_info$low_variance, reference$feature_info$low_variance)
+  expect_true(all(is.finite(rescaled$feature_info$sd)))
+  shifted <- compute(sweep(X, 2, c(1e8, -1e8, 1e8, 1e8), "+"))
+  expect_equal(shifted$S, reference$S, tolerance = 1e-7)
+  expect_identical(X, original)
+
+  constant <- compute(matrix(7, nrow = 20, ncol = 2), min_feature_sd = 0)
+  expect_identical(constant$feature_info$low_variance, c(TRUE, TRUE))
+  expect_equal(unname(constant$S), diag(2))
+  expect_true(all(is.finite(constant$directional_r2)))
+
+  standardize <- ns_fn(".cavi_standardize_similarity_features")
+  normalized <- standardize(X)
+  expect_equal(colMeans(normalized$X), rep(0, ncol(X)), tolerance = 1e-12,
+               ignore_attr = TRUE)
+  expect_equal(unname(apply(normalized$X[, 1:3], 2, var)), rep(1, 3), tolerance = 1e-12)
+  expect_equal(unname(colSums(normalized$X[, 1:3]^2)), rep(nrow(X) - 1, 3), tolerance = 1e-12)
+})
+
 test_that("minimum cluster size does not change an explicit numeric M", {
   set.seed(92)
   X <- cbind(
@@ -162,20 +205,14 @@ test_that("minimum cluster size does not change an explicit numeric M", {
   fit <- suppressWarnings(fit_mpcurve(
     X,
     intrinsic_dim = 3L,
-    similarity_min_cluster_size = 2L,
-    partition_init = "similarity",
-    similarity_metric = "spline_r2",
-    spline_r2_df = 3L,
-    K = 3L,
-    T_start = 1,
-    T_end = 1,
-    n_outer = 1L,
-    inner_iter = 1L,
-    max_converge_iter = 0L,
-    verbose = FALSE
+    num_bins = 3L,
+    max_iter = 0L,
+    verbose = FALSE,
+    control = mpcurve_control(anneal_start = 1, anneal_steps = 1L, anneal_sweeps = 1L),
+    init_control = mpcurve_init_control(min_cluster_size = 2L, similarity_metric = "spline_r2", spline_r2_df = 3L)
   ))
 
-  expect_identical(fit$intrinsic_dim, 3L)
+  expect_identical(fit$model_intrinsic_dim, 3L)
   expect_null(fit$dimension_initialization)
   expect_equal(
     sort(unname(fit$similarity_init$cluster_sizes)),
@@ -188,7 +225,7 @@ test_that("fit_mpcurve auto dimension uses cluster-size adaptive initialization"
     n = 40,
     d_signal = c(4, 2),
     d_noise = 0,
-    sigma = 0.01,
+    noise_sd = 0.01,
     seed = 404,
     trajectory_family = c("monotone", "monotone")
   )
@@ -196,23 +233,16 @@ test_that("fit_mpcurve auto dimension uses cluster-size adaptive initialization"
   fit <- suppressWarnings(fit_mpcurve(
     sim$X,
     intrinsic_dim = "auto",
-    max_intrinsic_dim = 3L,
-    similarity_min_cluster_size = 2L,
     partition_prior = "adaptive",
-    partition_init = "similarity",
-    spline_r2_df = 5L,
-    cluster_linkage = "single",
-    K = 5L,
-    T_start = 1,
-    T_end = 1,
-    n_outer = 1L,
-    inner_iter = 1L,
-    max_converge_iter = 0L,
-    verbose = FALSE
+    num_bins = 5L,
+    max_iter = 0L,
+    verbose = FALSE,
+    control = mpcurve_control(anneal_start = 1, anneal_steps = 1L, anneal_sweeps = 1L),
+    init_control = mpcurve_init_control(max_intrinsic_dim = 3L, min_cluster_size = 2L, spline_r2_df = 5L, cluster_linkage = "single")
   ))
 
   expect_s3_class(fit, "mpcurve")
-  expect_identical(fit$intrinsic_dim, 2L)
+  expect_identical(fit$model_intrinsic_dim, 2L)
   expect_true(is.list(fit$dimension_initialization))
 
   dimension_init <- fit$dimension_initialization
@@ -243,6 +273,9 @@ test_that("fit_mpcurve auto dimension uses cluster-size adaptive initialization"
     tolerance = 1e-12
   )
 
+  expect_identical(fit$data, sim$X)
+  expect_identical(fit$fit$data, sim$X)
+  expect_identical(fit$similarity_init$similarity_normalization, "centered_unit_variance")
   expect_identical(fit$fit$control$similarity_metric, "spline_r2")
   expect_identical(fit$fit$control$spline_r2_df, 5L)
   expect_identical(fit$fit$control$similarity_min_cluster_size, 2L)

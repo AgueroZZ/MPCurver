@@ -299,8 +299,6 @@
     T_now = T_now,
     partition_prior = control$partition_prior,
     partition_prior_init = control$partition_prior_init,
-    assignment_prior = control$assignment_prior,
-    ordering_alpha = control$ordering_alpha,
     assignment_M = M,
     active_orderings = rep(TRUE, M),
     active_feature_pairs = matrix(TRUE, nrow(weights), M),
@@ -458,8 +456,9 @@
     M,
     fits_init,
     init_methods,
+    method_args,
+    init_on_failure,
     pca_components,
-    partition_init,
     similarity_metric,
     spline_r2_df,
     smooth_fit_lambda_mode,
@@ -485,8 +484,6 @@
     position_prior_init,
     partition_prior,
     partition_prior_init,
-    assignment_prior,
-    ordering_alpha,
     verbose) {
   X <- as.matrix(X)
   n <- nrow(X)
@@ -500,6 +497,8 @@
       S = S,
       M = M,
       methods = init_methods,
+      method_args = method_args,
+      init_on_failure = init_on_failure,
       pca_components = pca_components,
       K = K,
       rw_q = rw_q,
@@ -513,7 +512,6 @@
       sigma_min = sigma_min,
       sigma_max = sigma_max,
       discretization = discretization,
-      partition_init = partition_init,
       similarity_metric = similarity_metric,
       cluster_linkage = cluster_linkage,
       similarity_min_feature_sd = similarity_min_feature_sd,
@@ -560,8 +558,6 @@
   assignment_ctl <- .validate_partition_assignment_controls(
     partition_prior = partition_prior,
     partition_prior_init = partition_prior_init,
-    assignment_prior = assignment_prior,
-    ordering_alpha = ordering_alpha,
     M = M,
     partition_prior_missing = FALSE,
     caller = "soft_partition_cavi()"
@@ -638,8 +634,8 @@
     position_prior = position_ctl$position_prior,
     partition_prior = assignment_ctl$partition_prior,
     partition_prior_init = assignment_ctl$partition_prior_init,
-    assignment_prior = assignment_ctl$legacy_assignment_prior,
-    ordering_alpha = assignment_ctl$ordering_alpha,
+    assignment_prior = NULL,
+    ordering_alpha = NULL,
     fix_lambda = isTRUE(fix_lambda),
     lambda_sd_prior_rate = lambda_sd_prior_rate,
     lambda_min = lambda_min,
@@ -649,7 +645,9 @@
     ridge = ridge,
     rw_q = rw_q,
     discretization = discretization,
-    partition_init = partition_init,
+    partition_init = "similarity",
+    method_args = method_args,
+    init_on_failure = init_on_failure,
     similarity_metric = similarity_metric,
     spline_r2_df = as.integer(spline_r2_df)[1],
     smooth_fit_lambda_mode = smooth_fit_lambda_mode,
@@ -736,7 +734,8 @@
         lambda_trace = list(state$lambda_mat[, m]),
         sigma2_trace = list(state$sigma2),
         pi_trace = list(state$position_pi[[m]]),
-        iter = max(0L, length(objective_history) - 1L),
+        iter = (state$iteration_offset %||% 0L) +
+          max(0L, length(objective_history) - 1L),
         converged = FALSE,
         control = utils::modifyList(
           state$control,
@@ -791,7 +790,9 @@
       score_history = histories$local_blocks,
       sigma2_trace = histories$sigma2,
       lambda_trace = histories$lambda,
-      iter = max(0L, length(histories$objective) - 1L),
+      iter = (state$iteration_offset %||% 0L) +
+        max(0L, length(histories$objective) - 1L),
+      iteration_offset = state$iteration_offset %||% 0L,
       M = state$M,
       K = state$K,
       n = state$n,
@@ -803,12 +804,14 @@
       ordering_similarity = state$ordering_similarity,
       similarity_init = state$similarity_init,
       dimension_initialization = state$dimension_initialization %||% NULL,
+      dimension_estimation = state$dimension_estimation %||% NULL,
       converged = isTRUE(converged),
       convergence_info = list(
         tol_outer = state$control$tol_outer,
         convergence = state$control$convergence,
         n_observations = state$n * state$d,
-        iterations = max(0L, length(histories$objective) - 1L),
+        iterations = (state$iteration_offset %||% 0L) +
+          max(0L, length(histories$objective) - 1L),
         converged = isTRUE(converged)
       ),
       control = utils::modifyList(
@@ -841,8 +844,9 @@
     M = 2L,
     fits_init = NULL,
     init_methods = NULL,
+    method_args = list(),
+    init_on_failure = "pca",
     pca_components = NULL,
-    partition_init = c("similarity", "ordering_methods"),
     similarity_metric = c("spearman", "pearson", "smooth_fit", "spline_r2"),
     spline_r2_df = 5L,
     smooth_fit_lambda_mode = c("optimize", "fixed"),
@@ -856,7 +860,7 @@
     discretization = c("quantile", "equal", "kmeans"),
     T_start = 5,
     T_end = 1,
-    n_outer = 25L,
+    n_outer = 0L,
     inner_iter = 1L,
     max_converge_iter = 100L,
     tol_outer = 1e-6,
@@ -874,9 +878,7 @@
     position_prior_init = NULL,
     partition_prior = c("adaptive", "fixed"),
     partition_prior_init = NULL,
-    assignment_prior = NULL,
-    ordering_alpha = NULL,
-    hard_assign_final = FALSE,
+
     freeze_unused_ordering = NULL,
     freeze_unused_ordering_threshold = NULL,
     freeze_feature = NULL,
@@ -899,8 +901,8 @@
   inner_iter <- as.integer(inner_iter)
   max_converge_iter <- as.integer(max_converge_iter)
   if (M < 2L) stop("M must be >= 2 for partition models.", call. = FALSE)
-  if (n_outer < 1L || inner_iter < 1L || max_converge_iter < 0L) {
-    stop("n_outer and inner_iter must be positive; max_converge_iter must be nonnegative.",
+  if (n_outer < 0L || inner_iter < 1L || max_converge_iter < 0L) {
+    stop("n_outer and max_converge_iter must be nonnegative; inner_iter must be positive.",
          call. = FALSE)
   }
   if (!is.finite(T_start) || !is.finite(T_end) || T_start <= 0 || T_end <= 0) {
@@ -909,7 +911,6 @@
   if (!is.finite(tol_outer) || tol_outer < 0) {
     stop("tol_outer must be a finite nonnegative value.", call. = FALSE)
   }
-  partition_init <- match.arg(partition_init)
   similarity_metric <- match.arg(similarity_metric)
   smooth_fit_lambda_mode <- match.arg(smooth_fit_lambda_mode)
   discretization <- match.arg(discretization)
@@ -924,8 +925,9 @@
     M = M,
     fits_init = fits_init,
     init_methods = init_methods,
+    method_args = method_args,
+    init_on_failure = init_on_failure,
     pca_components = pca_components,
-    partition_init = partition_init,
     similarity_metric = similarity_metric,
     spline_r2_df = spline_r2_df,
     smooth_fit_lambda_mode = smooth_fit_lambda_mode,
@@ -951,8 +953,6 @@
     position_prior_init = position_prior_init,
     partition_prior = partition_prior,
     partition_prior_init = partition_prior_init,
-    assignment_prior = assignment_prior,
-    ordering_alpha = ordering_alpha,
     verbose = verbose
   )
   state$control$convergence <- convergence
@@ -962,9 +962,10 @@
   state$control$n_outer <- n_outer
   state$control$inner_iter <- inner_iter
   state$control$max_converge_iter <- max_converge_iter
+  initial_temperature <- if (n_outer > 0L) T_start else 1
   state$assignment_info <- .structural_partition_assignment_info(
     state$pi_weights,
-    T_start,
+    initial_temperature,
     state$control
   )
   state$objective_terms <- .structural_partition_objective(
@@ -977,14 +978,16 @@
   state$objective <- state$objective_terms$objective
   histories <- list(
     objective = state$objective,
-    temperature = T_start,
+    temperature = initial_temperature,
     weights = list(state$pi_weights),
     local_blocks = list(state$local_blocks),
     sigma2 = list(state$sigma2),
     lambda = list(state$lambda_mat)
   )
 
-  schedule <- if (n_outer == 1L) {
+  schedule <- if (n_outer == 0L) {
+    numeric(0)
+  } else if (n_outer == 1L) {
     T_end
   } else {
     exp(seq(log(T_start), log(T_end), length.out = n_outer))
@@ -1039,22 +1042,7 @@
     }
   }
 
-  if (isTRUE(hard_assign_final)) {
-    hard <- matrix(0, nrow = state$d, ncol = state$M)
-    hard[cbind(seq_len(state$d), max.col(state$pi_weights, ties.method = "first"))] <- 1
-    colnames(hard) <- state$ordering_labels
-    state$pi_weights <- hard
-    state$assignment_info <- .structural_partition_assignment_info(hard, 1, state$control)
-    state$objective_terms <- .structural_partition_objective(
-      gamma = state$gamma,
-      position_pi = state$position_pi,
-      weights = hard,
-      local_blocks = state$local_blocks,
-      assignment_info = state$assignment_info
-    )
-    state$objective <- state$objective_terms$objective
-    histories <- .structural_partition_append_history(histories, state, 1)
-  }
+
 
   .structural_partition_finalize(state, histories, converged)
 }
@@ -1108,7 +1096,9 @@
     init_info = fit$init_info,
     ordering_similarity = fit$ordering_similarity,
     similarity_init = fit$similarity_init,
-    dimension_initialization = fit$dimension_initialization %||% NULL
+    dimension_initialization = fit$dimension_initialization %||% NULL,
+    dimension_estimation = fit$dimension_estimation %||% NULL,
+    iteration_offset = fit$iteration_offset %||% 0L
   )
 }
 
@@ -1128,6 +1118,9 @@
   iter <- as.integer(iter)
   if (iter < 1L) stop("iter must be at least 1.", call. = FALSE)
   state <- .structural_partition_state_from_fit(fit)
+  old_lambda <- state$lambda_mat
+  old_rate <- state$control$lambda_sd_prior_rate
+  old_sigma2 <- state$sigma2
   if (!is.null(S) && !.cavi_same_measurement_sd(S, state$measurement_sd)) {
     stop("Supplied S does not match measurement_sd stored on the fit.", call. = FALSE)
   }
@@ -1150,6 +1143,12 @@
   state$control$lambda_max <- lambda_max %||% state$control$lambda_max
   state$control$sigma_min <- sigma_min %||% state$control$sigma_min
   state$control$sigma_max <- sigma_max %||% state$control$sigma_max
+  state$lambda_mat <- pmin(pmax(state$lambda_mat, state$control$lambda_min),
+                           state$control$lambda_max)
+  if (!is.null(state$sigma2)) {
+    state$sigma2 <- pmin(pmax(state$sigma2, state$control$sigma_min),
+                         state$control$sigma_max)
+  }
   state$control$convergence <- match.arg(
     convergence %||% state$control$convergence %||% "relative",
     c("normalized", "relative")
@@ -1170,6 +1169,20 @@
   )
   converged <- FALSE
   previous <- tail(histories$objective, 1L)
+  if (!identical(old_lambda, state$lambda_mat) ||
+      !identical(old_rate, state$control$lambda_sd_prior_rate) ||
+      !identical(old_sigma2, state$sigma2)) {
+    # Compare the next sweep to the current posterior under the revised prior,
+    # rather than to a historical objective defined by different precisions.
+    local_blocks <- .structural_partition_local_blocks(
+      X = state$data, gamma = state$gamma, q_u = state$q_u,
+      sigma2 = state$sigma2, measurement_sd = state$measurement_sd,
+      lambda_mat = state$lambda_mat, Q_K = state$Q_K, rw_q = state$rw_q,
+      lambda_sd_prior_rate = state$control$lambda_sd_prior_rate)
+    previous <- .structural_partition_objective(
+      state$gamma, state$position_pi, state$pi_weights, local_blocks,
+      state$assignment_info)$objective
+  }
   for (i in seq_len(iter)) {
     state <- .structural_partition_sweep(state, T_now = 1)
     histories <- .structural_partition_append_history(histories, state, 1)

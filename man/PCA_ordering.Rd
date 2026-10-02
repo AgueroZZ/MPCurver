@@ -2,7 +2,7 @@
 % Please edit documentation in R/01_initialization.R
 \name{PCA_ordering}
 \alias{PCA_ordering}
-\title{PCA ordering (PC1)}
+\title{Principal-component ordering}
 \usage{
 PCA_ordering(X, center = TRUE, scale = FALSE, scale01 = TRUE, component = 1L)
 }
@@ -22,5 +22,5 @@ score. Defaults to 1.}
 list(t, keep_idx)
 }
 \description{
-PCA ordering (PC1)
+Principal-component ordering
 }

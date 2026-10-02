@@ -689,10 +689,9 @@ convergence diagnostics belong to this fixed-$T=1$ segment.  `do_mpcurve()`
 continues a structural fit only with $T=1$ sweeps from the top-level canonical
 state.
 
-If `hard_assign_final = TRUE`, the final $w_{jm}$ values are projected to
-one-hot assignments.  That projection is a reporting or downstream-use
-choice, not the soft variational coordinate maximizer, and its final objective
-need not improve over the preceding soft state.
+The returned $w_{jm}$ values retain the soft variational solution. For reporting,
+`fit$partition$assign` gives the most probable ordering for each feature without
+changing these probabilities or the objective.
 
 ## 9  Reduction to one ordering
 

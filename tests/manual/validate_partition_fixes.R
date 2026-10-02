@@ -70,7 +70,7 @@ ok <- run_experiment("Experiment 2: backward greedy still runs after cache inval
     d1 = 4,
     d2 = 4,
     d_noise = 2,
-    sigma = 0.2,
+    noise_sd = 0.2,
     seed = 2
   )
 
@@ -101,7 +101,7 @@ ok <- run_experiment("Experiment 3: soft two-trajectory output stays on the A/B 
     d1 = 4,
     d2 = 4,
     d_noise = 2,
-    sigma = 0.2,
+    noise_sd = 0.2,
     seed = 3
   )
 

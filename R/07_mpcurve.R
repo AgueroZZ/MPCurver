@@ -170,33 +170,41 @@
   )
 }
 
-.mpcurve_validate_effective_weight_tol <- function(tol, M) {
-  if (!is.numeric(M) || length(M) != 1L || !is.finite(M) ||
-      M < 1 || M != floor(M)) {
-    stop("intrinsic_dim must be a single positive integer.", call. = FALSE)
+.mpcurve_validate_effective_count_tol <- function(tol, M, num_features) {
+  if (!is.numeric(num_features) || length(num_features) != 1L ||
+      !is.finite(num_features) || num_features < 1) {
+    stop("X must contain at least one feature column.", call. = FALSE)
   }
   if (!is.numeric(tol) || length(tol) != 1L || !is.finite(tol) ||
-      tol < 0 || tol >= 1 / M) {
+      tol < 0 || tol >= num_features / M) {
     stop(
-      "effective_weight_tol must be a single finite number in [0, 1 / intrinsic_dim).",
+      "effective_count_tol must be a single finite number in [0, ncol(X) / intrinsic_dim).",
       call. = FALSE
     )
   }
   as.numeric(tol)
 }
 
-.mpcurve_effective_intrinsic_dim <- function(priors, M, tol) {
+.mpcurve_effective_count_tol <- function(fit, M, num_features) {
+  ctl <- fit$control %||% list()
+  # Preserve the meaning of explicit fraction thresholds in older saved fits.
+  tol <- ctl$effective_count_tol %||%
+    if (!is.null(ctl$effective_weight_tol)) {
+      num_features * ctl$effective_weight_tol
+    } else 1e-8
+  .mpcurve_validate_effective_count_tol(tol, M, num_features)
+}
+
+.mpcurve_effective_intrinsic_dim <- function(priors, M, tol, feature_counts) {
   if (is.null(priors$partition) ||
       !identical(priors$partition$mode, "adaptive")) {
     return(as.integer(M))
   }
-
-  omega <- as.numeric(priors$partition$omega)
-  if (length(omega) != M || any(!is.finite(omega)) || any(omega < 0)) {
-    stop("The fitted adaptive partition prior has invalid ordering weights.",
-         call. = FALSE)
+  if (!is.numeric(feature_counts) || length(feature_counts) != M ||
+      any(!is.finite(feature_counts)) || any(feature_counts < 0)) {
+    stop("The fitted partition has invalid expected feature counts.", call. = FALSE)
   }
-  as.integer(sum(omega > tol))
+  as.integer(sum(feature_counts > tol))
 }
 
 .mpcurve_partition_assignment_info_from_fit <- function(fit) {
@@ -213,7 +221,7 @@
     partition_prior = partition_prior,
     partition_prior_init = ctl$partition_prior_init %||% NULL,
     assignment_prior = assignment_prior,
-    ordering_alpha = ctl$ordering_alpha %||% NULL,
+
     assignment_M = fit$M %||% length(fit$fits),
     active_orderings = fit$active_orderings,
     active_feature_pairs = fit$active_feature_pairs,
@@ -366,6 +374,26 @@
 
 .mpcurve_check_legacy_public_args <- function(dots,
                                               caller = "fit_mpcurve()") {
+  # Reject removed arguments before the ellipsis can forward them to a backend.
+  removed_args <- c(
+    "algorithm",
+    "freeze_unused_ordering",
+    "freeze_unused_ordering_threshold",
+    "freeze_feature",
+    "freeze_feature_weight_threshold",
+    "drop_unused_ordering"
+  )
+  removed <- intersect(names(dots), removed_args)
+  if (length(removed)) {
+    stop(
+      caller, " no longer accepts: ",
+      paste(sprintf("`%s`", removed), collapse = ", "),
+      ". Omit these arguments; fitting uses CAVI and structural VI has no ",
+      "freeze/drop controls.",
+      call. = FALSE
+    )
+  }
+
   legacy_args <- c(
     "relative_lambda",
     "adaptive",
@@ -435,14 +463,22 @@
   )
 }
 
-.mpcurve_requested_intrinsic_dim <- function(x) {
-  if (inherits(x, "mpcurve")) {
-    return(as.integer(x$intrinsic_dim %||% x$requested_intrinsic_dim %||% 1L))
-  }
+# Stored ordering slots determine array sizes, independently of the reported
+# intrinsic dimension. Fall back to the old schema for saved pre-0.4 objects.
+.mpcurve_model_intrinsic_dim <- function(x) {
   if (inherits(x, "soft_partition_cavi")) {
-    return(as.integer(x$M %||% length(x$fits) %||% 1L))
+    return(as.integer(x$M %||% length(x$fits)))
   }
-  1L
+  as.integer(x$model_intrinsic_dim %||% x$num_orderings %||% x$fit$M %||%
+               x$requested_intrinsic_dim %||% x$intrinsic_dim %||% 1L)
+}
+
+.mpcurve_reported_intrinsic_dim <- function(x) {
+  as.integer(x$effective_intrinsic_dim %||% x$intrinsic_dim %||% 1L)
+}
+
+.mpcurve_requested_intrinsic_dim <- function(x) {
+  .mpcurve_model_intrinsic_dim(x)
 }
 
 .mpcurve_active_intrinsic_dim <- function(x) {
@@ -1191,11 +1227,11 @@
 #'   \item \code{$locations$map$pseudotime}: pseudotime corresponding to the MAP component
 #' }
 #'
-#' For partition fits (\code{intrinsic_dim >= 2}), \code{$locations} is a named
-#' list with one such location object per ordering. All fits also store
-#' \code{$effective_intrinsic_dim}. For adaptive partition priors, it counts
-#' ordering weights above \code{$effective_weight_tol}; otherwise it equals
-#' the fitted number of orderings.
+#' For partition fits (\code{model_intrinsic_dim >= 2}), \code{$locations} is a named
+#' list with one such location object per ordering. All current fits store
+#' their actual model dimension in \code{$intrinsic_dim}. Automatic adaptive
+#' fits remove empty orderings before conversion. Legacy objects can retain
+#' an effective count distinct from their stored model slots.
 #' @noRd
 as_mpcurve <- function(x, ...) {
   ns <- asNamespace("MPCurver")
@@ -1209,7 +1245,7 @@ as_mpcurve <- function(x, ...) {
       inherits = FALSE
     )
     if (is.function(method)) {
-      return(method(x, ...))
+      return(.mpcurve_label_results(method(x, ...)))
     }
   }
 
@@ -1245,7 +1281,7 @@ as_mpcurve <- function(x, ...) {
 #' @param ordering Optional ordering label or 1-based ordering index. For a
 #'   single-ordering position prior it may identify the sole ordering; for a
 #'   partition fit use the labels in \code{names(x$locations)}.
-#' @param ... Unused.
+#' @param ... No additional arguments are accepted.
 #'
 #' @return If \code{type = "position"}, a numeric vector for a
 #'   single-ordering fit, a named list of vectors for an unfiltered partition
@@ -1258,6 +1294,7 @@ fitted_prior <- function(x,
                          type = c("position", "partition"),
                          ordering = NULL,
                          ...) {
+  if (length(list(...))) stop("fitted_prior() does not accept additional arguments.", call. = FALSE)
   UseMethod("fitted_prior")
 }
 
@@ -1339,10 +1376,10 @@ as_mpcurve.csmooth_em <- function(x, ...) {
       algorithm      = "csmooth_em",
       modelName      = modelName,
       intrinsic_dim  = 1L,
+      model_intrinsic_dim = 1L,
       requested_intrinsic_dim = 1L,
       active_intrinsic_dim = 1L,
       displayed_intrinsic_dim = 1L,
-      effective_intrinsic_dim = 1L,
       priors         = .mpcurve_priors_from_legacy_fit(x),
       converged      = x$converged %||% NULL,
       convergence_info = x$convergence_info %||% NULL,
@@ -1385,15 +1422,16 @@ as_mpcurve.cavi <- function(x, ...) {
       algorithm      = "cavi",
       modelName      = x$control$modelName %||% "homoskedastic",
       intrinsic_dim  = 1L,
+      model_intrinsic_dim = 1L,
       requested_intrinsic_dim = 1L,
       active_intrinsic_dim = 1L,
       displayed_intrinsic_dim = 1L,
-      effective_intrinsic_dim = 1L,
       priors        = .mpcurve_priors_from_cavi_fit(x),
       init_info     = x$init_info %||% NULL,
       ordering_similarity = x$ordering_similarity %||% NULL,
       similarity_init = x$similarity_init %||% NULL,
       dimension_initialization = x$dimension_initialization %||% NULL,
+      dimension_estimation = x$dimension_estimation %||% NULL,
       converged     = x$converged %||% NULL,
       convergence_info = x$convergence_info %||% NULL,
       control       = x$control %||% list(),
@@ -1446,10 +1484,10 @@ as_mpcurve.smooth_em <- function(x, ...) {
       algorithm      = "smooth_em",
       modelName      = modelName,
       intrinsic_dim  = 1L,
+      model_intrinsic_dim = 1L,
       requested_intrinsic_dim = 1L,
       active_intrinsic_dim = 1L,
       displayed_intrinsic_dim = 1L,
-      effective_intrinsic_dim = 1L,
       priors         = .mpcurve_priors_from_legacy_fit(x),
       converged      = x$converged %||% NULL,
       convergence_info = x$convergence_info %||% NULL,
@@ -1471,9 +1509,7 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
     fits_mp <- stats::setNames(lapply(x$fits, as_mpcurve), ord_labels)
     locations <- stats::setNames(lapply(fits_mp, `[[`, "locations"), ord_labels)
     priors <- .mpcurve_priors_from_partition_fit(x)
-    effective_weight_tol <- .mpcurve_validate_effective_weight_tol(
-      (x$control %||% list())$effective_weight_tol %||% 1e-12, M
-    )
+    effective_count_tol <- .mpcurve_effective_count_tol(x, M, x$d)
     return(structure(
       list(
         data = x$data,
@@ -1506,20 +1542,21 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
         d = x$d,
         algorithm = "cavi",
         modelName = "partition_cavi_structured",
-        intrinsic_dim = M,
+        model_intrinsic_dim = M,
         requested_intrinsic_dim = M,
         active_intrinsic_dim = M,
         displayed_intrinsic_dim = M,
-        effective_intrinsic_dim = .mpcurve_effective_intrinsic_dim(
-          priors, M, effective_weight_tol
-        ),
-        effective_weight_tol = effective_weight_tol,
+        intrinsic_dim = if (identical(x$control$intrinsic_dim_semantics, "model")) M else
+          .mpcurve_effective_intrinsic_dim(
+            priors, M, effective_count_tol, colSums(x$pi_weights)),
+        effective_count_tol = effective_count_tol,
         variational_family = "structured",
         priors = priors,
         init_info = x$init_info,
         ordering_similarity = x$ordering_similarity,
         similarity_init = x$similarity_init,
         dimension_initialization = x$dimension_initialization %||% NULL,
+        dimension_estimation = x$dimension_estimation %||% NULL,
         converged = x$converged,
         convergence_info = x$convergence_info,
         control = x$control,
@@ -1554,9 +1591,7 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
   visible_active <- if (drop_view) rep(TRUE, length(keep_idx)) else active_full[keep_idx]
   visible_frozen <- if (drop_view) rep(FALSE, length(keep_idx)) else frozen_full[keep_idx]
   priors <- .mpcurve_priors_from_partition_fit(x)
-  effective_weight_tol <- .mpcurve_validate_effective_weight_tol(
-    (x$control %||% list())$effective_weight_tol %||% 1e-12, M
-  )
+  effective_count_tol <- .mpcurve_effective_count_tol(x, M, ref$d)
 
   structure(
     list(
@@ -1591,14 +1626,14 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
       d             = ref$d,
       algorithm     = "cavi",
       modelName     = "partition_cavi",
-      intrinsic_dim = as.integer(M),
+      model_intrinsic_dim = as.integer(M),
       requested_intrinsic_dim = as.integer(M),
       active_intrinsic_dim = as.integer(sum(active_full)),
       displayed_intrinsic_dim = as.integer(length(keep_idx)),
-      effective_intrinsic_dim = .mpcurve_effective_intrinsic_dim(
-        priors, M, effective_weight_tol
+      intrinsic_dim = .mpcurve_effective_intrinsic_dim(
+        priors, M, effective_count_tol, colSums(x$pi_weights)
       ),
-      effective_weight_tol = effective_weight_tol,
+      effective_count_tol = effective_count_tol,
       priors        = priors,
       init_info     = x$init_info,
       ordering_similarity = x$ordering_similarity,
@@ -1630,7 +1665,8 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
 #' @return Invisibly returns \code{x}.
 #' @export
 print.mpcurve <- function(x, ...) {
-  idim <- x$intrinsic_dim %||% 1L
+  idim <- .mpcurve_reported_intrinsic_dim(x)
+  M <- .mpcurve_model_intrinsic_dim(x)
   active_dim <- x$active_intrinsic_dim %||% .mpcurve_active_intrinsic_dim(x)
   displayed_dim <- x$displayed_intrinsic_dim %||% if (.mpcurve_is_partition(x)) length(x$fits %||% list()) else 1L
   is_partition <- .mpcurve_is_partition(x)
@@ -1648,12 +1684,12 @@ print.mpcurve <- function(x, ...) {
       cat(sprintf(
         "  M selection   : %s (upper bound %d -> selected %d)\n",
         selection_info$direction,
-        selection_info$max_intrinsic_dim,
+        (selection_info$max_intrinsic_dim %||% selection_info$max_num_orderings),
         selection_info$selected_M
       ))
     }
     initialization_info <- x$dimension_initialization %||% NULL
-    if (!is.null(initialization_info)) {
+    if (!is.null(initialization_info) && is.null(x$dimension_estimation)) {
       cat(sprintf(
         "  Auto M init    : mean silhouette (upper bound %d -> selected %d; min size %d)\n",
         initialization_info$requested_max_intrinsic_dim,
@@ -1671,12 +1707,11 @@ print.mpcurve <- function(x, ...) {
       ))
     }
     if (structured) {
-      cat(sprintf("  Intrinsic dim  : %d (fixed)\n", idim))
+      if (M != idim) cat(sprintf("  Model dim      : %d\n", M))
     } else {
-      cat(sprintf("  Dim (req/act/view): %d / %d / %d\n", idim, active_dim, displayed_dim))
+      cat(sprintf("  Dim (req/act/view): %d / %d / %d\n", M, active_dim, displayed_dim))
     }
-    cat(sprintf("  Effective dim  : %d\n",
-                x$effective_intrinsic_dim %||% idim))
+    cat(sprintf("  Intrinsic dim  : %d\n", idim))
     cat(sprintf("  n / d / K      : %d / %d / %d\n", x$n, x$d, x$K))
     cat(sprintf("  Iterations     : %d\n", x$iter))
     part <- x$partition
@@ -1686,7 +1721,7 @@ print.mpcurve <- function(x, ...) {
       cat(sprintf("  Partition      : %s\n", part_str))
       if (!structured) {
         active <- part$active_orderings
-        ord_labels <- colnames(part$pi_weights) %||% .mpcurve_ordering_labels(idim)
+        ord_labels <- colnames(part$pi_weights) %||% .mpcurve_ordering_labels(M)
         if (!is.null(active)) {
           cat(sprintf("  Active         : %s\n",
                       paste(ord_labels[active], collapse = ", ")))
@@ -1717,12 +1752,12 @@ print.mpcurve <- function(x, ...) {
       cat(sprintf(
         "  M selection   : %s (upper bound %d -> selected %d)\n",
         selection_info$direction,
-        selection_info$max_intrinsic_dim,
+        (selection_info$max_intrinsic_dim %||% selection_info$max_num_orderings),
         selection_info$selected_M
       ))
     }
     initialization_info <- x$dimension_initialization %||% NULL
-    if (!is.null(initialization_info)) {
+    if (!is.null(initialization_info) && is.null(x$dimension_estimation)) {
       cat(sprintf(
         "  Auto M init    : mean silhouette (upper bound %d -> selected %d; min size %d)\n",
         initialization_info$requested_max_intrinsic_dim,
@@ -1765,11 +1800,12 @@ print.mpcurve <- function(x, ...) {
 #'   ignored for structural partition summaries.
 #' @return An object of class \code{summary.mpcurve}. Every result contains
 #'   \code{$algorithm}, \code{$modelName}, \code{$intrinsic_dim},
-#'   \code{$effective_intrinsic_dim},
+#'   \code{$model_intrinsic_dim},
 #'   \code{$dimension_selection} when returned by
 #'   \code{select_mpcurve_dimension()},
 #'   \code{$dimension_initialization} when \code{intrinsic_dim = "auto"} was
 #'   used,
+#'   \code{$dimension_estimation} for automatic dimension finalization,
 #'   \code{$K}, \code{$n}, \code{$d}, \code{$priors}, and
 #'   \code{$converged}. A single-ordering result also contains
 #'   \code{$underlying}. A structural partition result instead contains
@@ -1779,7 +1815,8 @@ print.mpcurve <- function(x, ...) {
 #'   \code{$variational_family}.
 #' @export
 summary.mpcurve <- function(object, ...) {
-  idim <- object$intrinsic_dim %||% 1L
+  idim <- .mpcurve_reported_intrinsic_dim(object)
+  M <- .mpcurve_model_intrinsic_dim(object)
   active_dim <- object$active_intrinsic_dim %||% .mpcurve_active_intrinsic_dim(object)
   displayed_dim <- object$displayed_intrinsic_dim %||% if (.mpcurve_is_partition(object)) length(object$fits %||% list()) else 1L
   priors <- .mpcurve_get_priors(object)
@@ -1789,11 +1826,12 @@ summary.mpcurve <- function(object, ...) {
     result <- list(
       algorithm     = object$algorithm,
       intrinsic_dim = idim,
-      requested_intrinsic_dim = object$requested_intrinsic_dim %||% idim,
+      model_intrinsic_dim = M,
+      requested_intrinsic_dim = object$requested_intrinsic_dim %||% M,
       active_intrinsic_dim = active_dim,
       displayed_intrinsic_dim = displayed_dim,
-      effective_intrinsic_dim = object$effective_intrinsic_dim %||% idim,
-      effective_weight_tol = object$effective_weight_tol %||% 1e-12,
+      effective_count_tol = object$effective_count_tol %||%
+        .mpcurve_effective_count_tol(object$fit, M, object$d),
       modelName     = object$modelName %||% "partition_cavi",
       K             = object$K,
       n             = object$n,
@@ -1811,7 +1849,8 @@ summary.mpcurve <- function(object, ...) {
         (object$control %||% list())$variational_family,
       greedy_selection = object$greedy_selection %||% NULL,
       dimension_selection = object$dimension_selection %||% NULL,
-      dimension_initialization = object$dimension_initialization %||% NULL
+      dimension_initialization = object$dimension_initialization %||% NULL,
+      dimension_estimation = object$dimension_estimation %||% NULL
     )
   } else {
     underlying <- summary(object$fit, ...)
@@ -1819,9 +1858,9 @@ summary.mpcurve <- function(object, ...) {
       algorithm     = object$algorithm,
       modelName     = object$modelName,
       intrinsic_dim = idim,
+      model_intrinsic_dim = M,
       active_intrinsic_dim = active_dim,
       displayed_intrinsic_dim = displayed_dim,
-      effective_intrinsic_dim = object$effective_intrinsic_dim %||% idim,
       K             = object$K,
       n             = object$n,
       d             = object$d,
@@ -1830,7 +1869,8 @@ summary.mpcurve <- function(object, ...) {
       underlying    = underlying,
       greedy_selection = object$greedy_selection %||% NULL,
       dimension_selection = object$dimension_selection %||% NULL,
-      dimension_initialization = object$dimension_initialization %||% NULL
+      dimension_initialization = object$dimension_initialization %||% NULL,
+      dimension_estimation = object$dimension_estimation %||% NULL
     )
   }
   class(result) <- "summary.mpcurve"
@@ -1842,8 +1882,9 @@ summary.mpcurve <- function(object, ...) {
 #' @param x A \code{summary.mpcurve} object.
 #' @export
 print.summary.mpcurve <- function(x, ...) {
-  idim <- x$intrinsic_dim %||% 1L
-  active_dim <- x$active_intrinsic_dim %||% idim
+  idim <- .mpcurve_reported_intrinsic_dim(x)
+  M <- .mpcurve_model_intrinsic_dim(x)
+  active_dim <- x$active_intrinsic_dim %||% M
   displayed_dim <- x$displayed_intrinsic_dim %||% if (!is.null(x$partition)) length(x$partition$kept_labels %||% character(0)) else 1L
   is_partition <- !is.null(x$partition)
 
@@ -1857,11 +1898,11 @@ print.summary.mpcurve <- function(x, ...) {
     if (!is.null(selection_info)) {
       cat(sprintf("M selection : %s  |  upper bound = %d  |  selected = %d\n",
                   selection_info$direction,
-                  selection_info$max_intrinsic_dim,
+                  (selection_info$max_intrinsic_dim %||% selection_info$max_num_orderings),
                   selection_info$selected_M))
     }
     initialization_info <- x$dimension_initialization %||% NULL
-    if (!is.null(initialization_info)) {
+    if (!is.null(initialization_info) && is.null(x$dimension_estimation)) {
       cat(sprintf(
         "Auto M init : mean silhouette  |  upper bound = %d  |  selected = %d  |  min size = %d\n",
         initialization_info$requested_max_intrinsic_dim,
@@ -1877,9 +1918,10 @@ print.summary.mpcurve <- function(x, ...) {
                   greedy_info$selected_intrinsic_dim))
     }
     if (structured) {
-      cat(sprintf("Algorithm : %s  |  structural VI  |  fixed M=%d  |  n=%d  d=%d  K=%d\n",
-                  x$algorithm, idim, x$n, x$d, x$K))
-      cat(sprintf("Effective M : %d\n", x$effective_intrinsic_dim %||% idim))
+      cat(sprintf("Algorithm : %s  |  structural VI  |  n=%d  d=%d  K=%d\n",
+                  x$algorithm, x$n, x$d, x$K))
+      if (M != idim) cat(sprintf("Retained model dimension : %d\n", M))
+      cat(sprintf("Intrinsic dimension : %d\n", idim))
       if (is.null(x$measurement_sd)) {
         cat(sprintf("Shared sigma2 range : [%.4g, %.4g]\n", min(x$sigma2), max(x$sigma2)))
       } else {
@@ -1887,8 +1929,8 @@ print.summary.mpcurve <- function(x, ...) {
       }
     } else {
       cat(sprintf("Algorithm : %s  |  requested=%d  active=%d  displayed=%d  |  n=%d  d=%d  K=%d\n",
-                  x$algorithm, idim, active_dim, displayed_dim, x$n, x$d, x$K))
-      cat(sprintf("Effective M : %d\n", x$effective_intrinsic_dim %||% idim))
+                  x$algorithm, M, active_dim, displayed_dim, x$n, x$d, x$K))
+      cat(sprintf("Intrinsic dimension : %d\n", idim))
     }
     if (!is.null(x$partition)) {
       tbl <- table(x$partition$assign)
@@ -1896,7 +1938,7 @@ print.summary.mpcurve <- function(x, ...) {
       cat(sprintf("Partition : %s\n", part_str))
       if (!structured) {
         active <- x$partition$active_orderings
-        ord_labels <- colnames(x$partition$pi_weights) %||% .mpcurve_ordering_labels(idim)
+        ord_labels <- colnames(x$partition$pi_weights) %||% .mpcurve_ordering_labels(M)
         if (!is.null(active)) {
           cat(sprintf("Active    : %s\n", paste(ord_labels[active], collapse = ", ")))
         }
@@ -1961,11 +2003,11 @@ print.summary.mpcurve <- function(x, ...) {
     if (!is.null(selection_info)) {
       cat(sprintf("M selection : %s  |  upper bound = %d  |  selected = %d\n",
                   selection_info$direction,
-                  selection_info$max_intrinsic_dim,
+                  (selection_info$max_intrinsic_dim %||% selection_info$max_num_orderings),
                   selection_info$selected_M))
     }
     initialization_info <- x$dimension_initialization %||% NULL
-    if (!is.null(initialization_info)) {
+    if (!is.null(initialization_info) && is.null(x$dimension_estimation)) {
       cat(sprintf(
         "Auto M init : mean silhouette  |  upper bound = %d  |  selected = %d  |  min size = %d\n",
         initialization_info$requested_max_intrinsic_dim,
@@ -2004,6 +2046,29 @@ print.summary.mpcurve <- function(x, ...) {
 
 # Draws a vertical gradient bar in the top-right corner of the current plot.
 # Must be called after the main plot so par("usr") reflects real axis limits.
+# R's arrow renderer cannot determine a direction below 0.001 inches.
+.mpcurve_visible_segment <- function(from, to) {
+  dx <- diff(graphics::grconvertX(c(from[1], to[1]), from = "user", to = "inches"))
+  dy <- diff(graphics::grconvertY(c(from[2], to[2]), from = "user", to = "inches"))
+  is.finite(dx) && is.finite(dy) && sqrt(dx^2 + dy^2) >= 1e-3
+}
+
+.mpcurve_pseudotime_colors <- function(pseudotime, pal) {
+  index <- 1L + floor(pmax(0, pmin(1, pseudotime)) * (length(pal) - 1L))
+  pal[index]
+}
+
+.mpcurve_plot_call <- function(fun, defaults, ...) {
+  overrides <- list(...)
+  if (length(overrides)) {
+    if (is.null(names(overrides)) || any(!nzchar(names(overrides)))) {
+      stop("Additional plot arguments must be named.", call. = FALSE)
+    }
+    defaults[names(overrides)] <- overrides
+  }
+  do.call(fun, defaults)
+}
+
 .draw_gradient_legend <- function(
     pal,
     title    = "pseudotime",
@@ -2065,7 +2130,7 @@ print.summary.mpcurve <- function(x, ...) {
     )
   }
 
-  M <- as.integer(x$intrinsic_dim %||% length(means))
+  M <- .mpcurve_model_intrinsic_dim(x)
   if (length(M) != 1L || is.na(M) || M < 2L || length(means) != M) {
     stop(
       "x$conditional_posterior$mean must contain one matrix per fixed ordering.",
@@ -2166,23 +2231,19 @@ print.summary.mpcurve <- function(x, ...) {
     panel_title <- sprintf("Ordering %s\n%s", ordering_labels[m], weight_text)
 
     if (length(dims) == 2L) {
-      graphics::plot(
+      .mpcurve_plot_call(graphics::plot, list(
         mu_m[dims[1L], ], mu_m[dims[2L], ],
         type = "o", pch = 16, col = "orange", lwd = 2,
-        xlab = sprintf("dim %d", dims[1L]),
-        ylab = sprintf("dim %d", dims[2L]),
-        main = panel_title,
-        ...
-      )
+        xlab = .mpcurve_feature_label(x, dims[1L]),
+        ylab = .mpcurve_feature_label(x, dims[2L]),
+        main = panel_title), ...)
     } else {
-      graphics::plot(
+      .mpcurve_plot_call(graphics::plot, list(
         positions, mu_m[dims[1L], ],
         type = "o", pch = 16, col = "orange", lwd = 2,
         xlab = "pseudotime",
-        ylab = sprintf("dim %d", dims[1L]),
-        main = panel_title,
-        ...
-      )
+        ylab = .mpcurve_feature_label(x, dims[1L]),
+        main = panel_title), ...)
     }
   }
 
@@ -2203,7 +2264,8 @@ print.summary.mpcurve <- function(x, ...) {
 #' \eqn{q(C^{(m)})} responsibilities for pseudotime and overlays the
 #' conditional trajectory mean from \eqn{q(U_j\mid Z_j=m)}. The fitted
 #' feature-assignment probabilities for the selected dimensions are shown in
-#' each panel title.
+#' each panel title. Point colors use the same absolute `[0,1]` pseudotime
+#' scale in every panel, without stretching each panel's observed range.
 #'
 #' \describe{
 #'   \item{\code{"scatterplot"}}{Scatter of two chosen dimensions, colored by
@@ -2211,9 +2273,9 @@ print.summary.mpcurve <- function(x, ...) {
 #'     multi-ordering fit, draws one panel per ordering. With one dimension,
 #'     displays the observed feature values against inferred pseudotime.}
 #'   \item{\code{"elbo"}}{Variational objective over fitting iterations.
-#'     For multi-ordering fits, the initial annealing phase is followed by
-#'     iterations at \eqn{T=1}. Assess convergence within that final segment,
-#'     since changing the temperature changes the objective.}
+#'     Fitting uses \eqn{T=1} throughout by default. If optional annealing is
+#'     enabled, assess convergence within the final \eqn{T=1} segment, since
+#'     changing the temperature changes the objective.}
 #'   \item{\code{"mu"}}{Posterior-mean trajectory only. With one selected
 #'     dimension, plots the feature mean against normalized latent position;
 #'     with two dimensions, plots the posterior-mean path in that feature
@@ -2225,9 +2287,10 @@ print.summary.mpcurve <- function(x, ...) {
 #' @param x An \code{mpcurve} object.
 #' @param plot_type One of \code{"scatterplot"} (default), \code{"elbo"},
 #'   \code{"mu"}.
-#' @param dims Integer vector of length one or two identifying feature columns.
-#'   It determines the scatterplot axes and the trajectory coordinates used by
-#'   \code{plot_type = "mu"}. Defaults to \code{c(1, 2)}.
+#' @param dims One or two feature column indices or names. Determines the
+#'   scatterplot axes and trajectory coordinates for \code{plot_type = "mu"}.
+#'   \code{NULL} selects the first two features, or the only feature in a
+#'   one-feature fit. Available feature names are used as axis labels.
 #' @param data Optional numeric \code{n x d} matrix used by scatterplots. If
 #'   \code{NULL}, data stored on \code{x} are used. It is not required for
 #'   \code{plot_type = "elbo"} or \code{plot_type = "mu"}.
@@ -2246,9 +2309,8 @@ print.summary.mpcurve <- function(x, ...) {
 #' fit <- fit_mpcurve(
 #'   sim$X,
 #'   intrinsic_dim = 2,
-#'   K = 8,
-#'   n_outer = 3,
-#'   max_converge_iter = 3
+#'   num_bins = 8,
+#'   max_iter = 3
 #' )
 #' plot(fit, plot_type = "scatterplot", dims = c(1, 4))
 #' plot(fit, plot_type = "mu", dims = 1)
@@ -2259,7 +2321,7 @@ print.summary.mpcurve <- function(x, ...) {
 plot.mpcurve <- function(
     x,
     plot_type  = c("scatterplot", "elbo", "mu"),
-    dims       = c(1L, 2L),
+    dims       = NULL,
     data       = NULL,
     pal        = grDevices::colorRampPalette(
                    c("#0000FF", "#00FFFF", "#00FF00",
@@ -2269,6 +2331,9 @@ plot.mpcurve <- function(
 ) {
   if (!inherits(x, "mpcurve")) stop("x must be an 'mpcurve' object.")
   plot_type <- match.arg(plot_type)
+  if (plot_type != "elbo") {
+    dims <- .mpcurve_plot_dimensions(dims, x$d, colnames(x$data))
+  }
   is_partition <- .mpcurve_is_partition(x)
   displayed_dim <- x$displayed_intrinsic_dim %||% if (is_partition) length(x$fits %||% list()) else 1L
 
@@ -2307,10 +2372,7 @@ plot.mpcurve <- function(
       t_pseudo_m <- as.numeric(gamma_m %*% positions_m)
 
       # Colour by pseudotime
-      rng <- range(t_pseudo_m, na.rm = TRUE)
-      z <- (t_pseudo_m - rng[1]) / (rng[2] - rng[1] + 1e-12)
-      idx <- pmax(1L, pmin(length(pal), 1L + floor(z * (length(pal) - 1L))))
-      pt_col <- pal[idx]
+      pt_col <- .mpcurve_pseudotime_colors(t_pseudo_m, pal)
 
       # Weight annotation for plotted dims
       w_dims <- pi_w[dims, m]
@@ -2320,14 +2382,14 @@ plot.mpcurve <- function(
       mu_m <- sub_fit$params$mu   # d x K
 
       if (length(dims) == 2L) {
-        plot(data[, dims[1]], data[, dims[2]],
+        .mpcurve_plot_call(plot, list(data[, dims[1]], data[, dims[2]],
              pch = 19, col = pt_col, cex = 0.6,
              main = main_m,
-             xlab = sprintf("dim %d", dims[1]),
-             ylab = sprintf("dim %d", dims[2]),
-             ...)
+             xlab = .mpcurve_feature_label(x, dims[1]),
+             ylab = .mpcurve_feature_label(x, dims[2])), ...)
         # Overlay component means with arrows
         for (k in 2:K_m) {
+          if (!.mpcurve_visible_segment(mu_m[dims, k - 1], mu_m[dims, k])) next
           arrows(mu_m[dims[1], k - 1], mu_m[dims[2], k - 1],
                  mu_m[dims[1], k], mu_m[dims[2], k],
                  col = "orange", lwd = 1.5, length = 0.06)
@@ -2336,12 +2398,11 @@ plot.mpcurve <- function(
                pch = 8, col = "orange", cex = 0.9)
       } else {
         j <- dims[1]
-        plot(t_pseudo_m, data[, j],
+        .mpcurve_plot_call(plot, list(t_pseudo_m, data[, j],
              pch = 19, col = pt_col, cex = 0.6,
              main = main_m,
              xlab = "pseudotime",
-             ylab = sprintf("dim %d", j),
-             ...)
+             ylab = .mpcurve_feature_label(x, j)), ...)
         mu_j <- mu_m[j, ]
         lines(positions_m, mu_j, col = "orange", lwd = 2)
         points(positions_m, mu_j, pch = 8, col = "orange", cex = 0.9)
@@ -2376,7 +2437,7 @@ plot.mpcurve <- function(
     on.exit(graphics::par(old_par), add = TRUE)
     graphics::par(mfrow = c(1L, length(legacy_fits)), mar = c(4, 4, 4, 1))
     for (m in seq_along(legacy_fits)) {
-      plot(legacy_fits[[m]], plot_type = "mu", dims = dims, ...)
+      .mpcurve_plot_call(plot, list(legacy_fits[[m]], plot_type = "mu", dims = dims), ...)
       graphics::mtext(
         sprintf("Ordering %s", names(legacy_fits)[m] %||% m),
         side = 3,
@@ -2393,20 +2454,18 @@ plot.mpcurve <- function(
       # The partition ELBO is stored only in the canonical structural state.
       obj <- x$objective_history
       if (length(obj) > 0L) {
-        plot(obj, type = "b", pch = 19, cex = 0.7,
+        .mpcurve_plot_call(plot, list(obj, type = "b", pch = 19, cex = 0.7,
              xlab = "Iteration", ylab = "Fixed-M structural objective",
-             main = "Fixed-M structural objective trace")
+             main = "Fixed-M structural objective trace"), ...)
       }
     } else {
-      plot(
+      .mpcurve_plot_call(plot, list(
         x$fit,
         plot_type = plot_type,
         dims = dims,
         data = data,
         pal = pal,
-        add_legend = add_legend,
-        ...
-      )
+        add_legend = add_legend), ...)
     }
     return(invisible(x))
   }
@@ -2440,39 +2499,35 @@ plot.mpcurve <- function(
                   x$algorithm, K)
 
   # ---- map pseudotime -> color ----
-  rng <- range(t_pseudo, na.rm = TRUE)
-  z   <- (t_pseudo - rng[1]) / (rng[2] - rng[1] + 1e-12)
-  idx <- pmax(1L, pmin(length(pal), 1L + floor(z * (length(pal) - 1L))))
-  pt_col <- pal[idx]
+  pt_col <- .mpcurve_pseudotime_colors(t_pseudo, pal)
 
   if (length(dims) == 2L) {
     # ===== 2D scatter =====
     mu_list_dims <- lapply(seq_len(K), function(k) mu_mat[dims, k])
 
-    plot_EM_embedding2D(
+    .mpcurve_plot_call(plot_EM_embedding2D, list(
       mu_list    = mu_list_dims,
       X2         = data[, dims, drop = FALSE],
-      t_vec      = t_pseudo,
+      t_vec      = NULL,
+      col        = pt_col,
       pal        = pal,
       add_legend = FALSE,
       main       = main,
-      xlab       = sprintf("dim %d", dims[1]),
-      ylab       = sprintf("dim %d", dims[2]),
-      ...
-    )
+      xlab       = .mpcurve_feature_label(x, dims[1]),
+      ylab       = .mpcurve_feature_label(x, dims[2])), ...)
 
   } else {
     # ===== 1D: pseudotime (x) vs selected dimension (y) =====
     j    <- dims[1]
     xlab <- "pseudotime"
-    ylab <- sprintf("dim %d", j)
+    ylab <- .mpcurve_feature_label(x, j)
 
     mu_j <- mu_mat[j, ]               # length K
     mu_t <- positions                  # pseudotime of each component (0..1)
 
-    graphics::plot(t_pseudo, data[, j],
+    .mpcurve_plot_call(graphics::plot, list(t_pseudo, data[, j],
                    pch = 19, col = pt_col, cex = 0.7,
-                   xlab = xlab, ylab = ylab, main = main, ...)
+                   xlab = xlab, ylab = ylab, main = main), ...)
     graphics::lines(mu_t, mu_j, col = "orange", lwd = 2)
     graphics::points(mu_t, mu_j, pch = 8, col = "orange", cex = 1)
   }
@@ -2486,662 +2541,120 @@ plot.mpcurve <- function(
 
 # ---- do_mpcurve ------------------------------------------------
 
-#' Run additional iterations of a fitted MPCurve model
+#' Continue a fitted MPCurve model
 #'
-#' Refines a fitted model by running additional coordinate-ascent variational
-#' iterations. Use this when the objective is still increasing at the
-#' iteration limit, or to explore a change in smoothing parameters.
+#' Resume coordinate-ascent variational inference from the stored data,
+#' posterior, and parameters. Measurement errors, trajectory priors, and
+#' initialization are inherited. Partition inference resumes at temperature 1.
 #'
+#' @param object An `mpcurve` object returned by [fit_mpcurve()]. Legacy
+#'   augmented partition fits are read-only and require refitting.
+#' @param max_iter Positive integer maximum number of additional CAVI sweeps.
+#' @param tol Optional nonnegative stopping tolerance. `NULL` inherits the
+#'   stored tolerance; zero disables early stopping. See [fit_mpcurve()].
+#' @param verbose Print fitting progress?
+#' @param control Settings from [mpcurve_continue_control()] or a named list
+#'   of its options. Omitted or `NULL` settings inherit the fitted values.
 #' @details
-#' Fitting resumes from the stored posterior and parameter estimates. A
-#' single-ordering fit appends to \code{$elbo_trace}. A multi-ordering fit
-#' refines all \eqn{M} orderings, trajectories, and feature assignments at
-#' temperature \eqn{T=1}, appending to \code{$objective_history} and
-#' \code{$temperature_history}.
-#'
-#' With unchanged model settings, the additional objective values should be
-#' nondecreasing up to numerical tolerance. Changing a smoothing prior or
-#' parameter bounds can change the objective or feasible parameter range;
-#' assess convergence within the new run in that case.
-#'
-#' @param object An \code{mpcurve} object returned by \code{fit_mpcurve()}.
-#'   Partition fits saved before version 0.3.0 require refitting with
-#'   \code{fit_mpcurve()} before they can be continued.
-#' @param iter Integer >= 1. Maximum number of additional CAVI sweeps (single
-#'   ordering) or exact \code{T = 1} partition steps.
-#' @param lambda Optional positive smoothness value(s). A single-ordering fit
-#'   accepts a scalar or length-\code{d} vector. A structural partition fit
-#'   accepts a scalar, a length-\code{d} vector broadcast across orderings, a
-#'   flattened length-\code{d * M} vector, or a \code{d x M} matrix; this
-#'   resets \code{lambda_mat} before continuation.
-#' @param S Optional known measurement standard deviations. If \code{NULL},
-#'   reuse the value stored on \code{object}. Supplying a new \code{S} is only
-#'   allowed when it matches the stored specification.
-#' @param tol Optional ELBO-change tolerance for single-ordering CAVI. If
-#'   \code{NULL}, reuse the stored value.
-#' @param lambda_sd_prior_rate Optional positive rate for the induced
-#'   exponential prior on \code{1 / sqrt(lambda_j)}. If \code{NULL}, the stored
-#'   control value is reused. Use \code{0} to remove this penalty.
-#' @param lambda_min,lambda_max Optional positive bounds for \code{lambda_j}. If
-#'   \code{NULL}, reuse the stored values.
-#' @param sigma_min,sigma_max Optional positive bounds for \code{sigma_j^2}. If
-#'   \code{NULL}, reuse the stored values.
-#' @param tol_outer For partition fits only: ELBO-change tolerance used
-#'   after annealing. If \code{NULL}, reuse the stored value.
-#' @param freeze_unused_ordering,freeze_unused_ordering_threshold,freeze_feature,freeze_feature_weight_threshold,drop_unused_ordering
-#'   Deprecated; leave as \code{NULL}. Explicit values are ignored with a warning.
-#' @param assignment_prior,ordering_alpha Deprecated; leave as \code{NULL}.
-#'   Continuation uses the fitted partition prior. Explicit values are ignored
-#'   with a warning.
-#' @param verbose Logical. Print per-iteration progress?
-#'
-#' @param convergence Optional stopping rule: \code{"normalized"} or
-#'   \code{"relative"}; see \code{fit_mpcurve()}. If \code{NULL}, reuse the
-#'   stored rule. Fits saved before version 0.3.2 use \code{"relative"} unless
-#'   explicitly overridden. Changing the rule does not rescale stored traces.
-#'
-#' @return An updated \code{mpcurve} object with refined estimates and extended
-#'   convergence traces.
+#' Objective and parameter traces are extended. Changing precision, its prior,
+#' or parameter bounds can change the objective or feasible parameter range;
+#' assess convergence within the new run. Use [fit_mpcurve()] to change the
+#' random-walk order, ridge, data, known measurement errors, or prior modes.
+#' Model selection records are retained and marked as continued. Automatic
+#' dimension estimates retain their estimation records and remove any new
+#' empty orderings after continuation without additional fitting sweeps.
+#' @return An updated `mpcurve` object.
+#' @examples
+#' sim <- simulate_spiral2d(n = 40, seed = 1)
+#' fit <- fit_mpcurve(sim$obs, num_bins = 5, max_iter = 2)
+#' fit <- do_mpcurve(fit, max_iter = 3)
+#' fixed <- do_mpcurve(fit, max_iter = 3,
+#'   control = mpcurve_continue_control(lambda_init = 5, fix_lambda = TRUE))
+#' @md
 #' @export
-do_mpcurve <- function(object,
-                       iter = 1,
-                       lambda = NULL,
-                       S = NULL,
-                       tol = NULL,
-                       lambda_sd_prior_rate = NULL,
-                       lambda_min = NULL,
-                       lambda_max = NULL,
-                       sigma_min = NULL,
-                       sigma_max = NULL,
-                       tol_outer = NULL,
-                       freeze_unused_ordering = NULL,
-                       freeze_unused_ordering_threshold = NULL,
-                       freeze_feature = NULL,
-                       freeze_feature_weight_threshold = NULL,
-                       drop_unused_ordering = NULL,
-                       assignment_prior = NULL,
-                       ordering_alpha = NULL,
-                       verbose = FALSE,
-                       convergence = NULL) {
-  if (!inherits(object, "mpcurve")) {
-    stop("object must be an 'mpcurve' object.")
+do_mpcurve <- function(object, max_iter = 1L, tol = NULL,
+                       verbose = FALSE, control = NULL) {
+  if (!inherits(object, "mpcurve")) stop("object must be an 'mpcurve' object.")
+  max_iter <- .mpcurve_integer_setting(max_iter, "max_iter")
+  if (!is.null(tol)) {
+    .mpcurve_positive_setting(tol, "tol", allow_zero = TRUE)
+    if (length(tol) != 1L) stop("tol must be a scalar.", call. = FALSE)
   }
-  iter <- as.integer(iter)
-  if (length(iter) != 1L || is.na(iter) || iter < 1L) {
-    stop("iter must be a single integer >= 1.")
-  }
+  verbose <- .mpcurve_logical_setting(verbose, "verbose")
+  ctrl <- .mpcurve_interface_options(control, mpcurve_continue_control, "control")
   if (!identical(object$algorithm, "cavi")) {
-    stop(
-      "do_mpcurve() is now a CAVI-only public wrapper. ",
-      "For legacy fits, call do_csmoothEM() or do_smoothEM() directly.",
-      call. = FALSE
-    )
+    stop("Only CAVI fits can be continued; refit with fit_mpcurve().", call. = FALSE)
   }
-
-  .structural_partition_warn_legacy_controls(
-    freeze_unused_ordering = freeze_unused_ordering,
-    freeze_unused_ordering_threshold = freeze_unused_ordering_threshold,
-    freeze_feature = freeze_feature,
-    freeze_feature_weight_threshold = freeze_feature_weight_threshold,
-    drop_unused_ordering = drop_unused_ordering,
-    caller = "do_mpcurve()"
-  )
-  if (!is.null(assignment_prior) || !is.null(ordering_alpha)) {
-    warning(
-      "do_mpcurve(): assignment_prior and ordering_alpha are deprecated ",
-      "no-op compatibility arguments. Structural continuation reuses the ",
-      "partition-prior state stored on the fit.",
-      call. = FALSE
-    )
-  }
-
-  if (inherits(object$fit, "soft_partition_cavi")) {
-    if (identical(
-      object$fit$variational_family %||%
-        (object$fit$control %||% list())$variational_family,
-      "structured"
-    )) {
-      raw <- .continue_structural_partition_cavi(
-        fit = object$fit,
-        iter = iter,
-        lambda = lambda,
-        S = S,
-        tol_outer = tol_outer,
-        convergence = convergence,
-        lambda_sd_prior_rate = lambda_sd_prior_rate,
-        lambda_min = lambda_min,
-        lambda_max = lambda_max,
-        sigma_min = sigma_min,
-        sigma_max = sigma_max,
-        verbose = verbose
-      )
-      out <- as_mpcurve(raw)
-      out$dimension_selection <- object$dimension_selection %||% NULL
-      if (!is.null(out$dimension_selection)) {
-        out$dimension_selection$continued_after_selection <- TRUE
-      }
-      out$dimension_initialization <-
-        object$dimension_initialization %||% raw$dimension_initialization %||% NULL
-      if (!is.null(out$dimension_initialization)) {
-        out$fit$dimension_initialization <- out$dimension_initialization
-      }
-      return(out)
-    }
-    stop(
-      "Legacy augmented partition fits are read-only. Refit with fit_mpcurve() ",
-      "to continue under the structural variational family.",
-      call. = FALSE
-    )
-
-    sp <- object$fit
-    M <- sp$M %||% 2L
-    fits <- sp$fits
-    if (!length(fits)) {
-      stop("No ordering fits found in object$fit$fits.")
-    }
-    stored_S <- object$measurement_sd %||% sp$measurement_sd %||% (fits[[1]]$measurement_sd %||% NULL)
-    if (!is.null(S)) {
-      if (is.null(stored_S)) {
-        stop("This fit was created without S; refit with S instead of adding it in do_mpcurve().",
-             call. = FALSE)
-      }
-      if (!.cavi_same_measurement_sd(stored_S, S)) {
-        stop("Supplied S does not match the measurement_sd stored on object.", call. = FALSE)
-      }
-    }
-
-    X <- fits[[1]]$data
-    if (is.null(X)) stop("No data found in fits[[1]]$data.")
-
-    control <- sp$control %||% list()
-    fit_control <- fits[[1]]$control %||% list()
-    lmin <- lambda_min %||% fit_control$lambda_min %||% 1e-10
-    lmax <- lambda_max %||% fit_control$lambda_max %||% 1e10
-    tol_outer_use <- tol_outer %||% control$tol_outer %||%
-      .partition_convergence_defaults()$tol_outer
-    tol_outer_use <- as.numeric(tol_outer_use)[1]
-    ord_labels <- .mpcurve_ordering_labels(M)
-    active_orderings <- sp$active_orderings %||% rep(TRUE, M)
-    active_feature_pairs <- sp$active_feature_pairs %||%
-      matrix(rep(active_orderings, each = ncol(X)), nrow = ncol(X), ncol = M)
-
-    if (is.null(freeze_unused_ordering)) {
-      freeze_unused_ordering <- control$freeze_unused_ordering %||% TRUE
-    }
-    if (is.null(freeze_unused_ordering_threshold)) {
-      freeze_unused_ordering_threshold <- control$freeze_unused_ordering_threshold %||% 0.5
-    }
-    if (is.null(drop_unused_ordering)) {
-      drop_unused_ordering <- control$drop_unused_ordering %||% FALSE
-    }
-    if (is.null(freeze_feature)) {
-      freeze_feature <- control$freeze_feature %||% TRUE
-    }
-    if (is.null(freeze_feature_weight_threshold)) {
-      freeze_feature_weight_threshold <- control$freeze_feature_weight_threshold %||% 0.1
-    }
-    if (is.null(lambda_sd_prior_rate)) {
-      lambda_sd_prior_rate <- control$lambda_sd_prior_rate %||% NULL
-    } else {
-      lambda_sd_prior_rate <- .normalize_lambda_sd_prior_rate(lambda_sd_prior_rate)
-    }
-    position_prior_use <- control$position_prior %||%
-      (fits[[1]]$control %||% list())$position_prior %||% "adaptive"
-    stored_partition_prior <- control$partition_prior %||%
-      if (identical(control$assignment_prior %||% NULL, "uniform")) "fixed" else "adaptive"
-    stored_partition_prior_init <- control$partition_prior_init %||% NULL
-    assignment_prior_compat <- assignment_prior %||% control$assignment_prior %||% NULL
-    if (!is.null(assignment_prior_compat) &&
-        !assignment_prior_compat %in% c("uniform", "dirichlet")) {
-      assignment_prior_compat <- NULL
-    }
-    assignment_ctl <- .validate_partition_assignment_controls(
-      partition_prior = stored_partition_prior,
-      partition_prior_init = stored_partition_prior_init,
-      assignment_prior = assignment_prior_compat,
-      ordering_alpha = ordering_alpha %||% control$ordering_alpha %||% NULL,
-      M = M,
-      partition_prior_missing = is.null(control$partition_prior),
-      caller = "do_mpcurve()"
-    )
-
-    fits <- lapply(fits, function(fit) {
-      fit$control <- utils::modifyList(
-        fit$control %||% list(),
-        list(
-          position_prior = position_prior_use,
-          lambda_sd_prior_rate = lambda_sd_prior_rate,
-          lambda_min = lmin,
-          lambda_max = lmax
-        )
-      )
-      fit
-    })
-
-    convergence_info <- sp$convergence_info
-    if (is.null(convergence_info) ||
-        !isTRUE(all.equal(convergence_info$tol_outer, tol_outer_use))) {
-      convergence_info <- .partition_init_convergence_info(
-        tol_outer = tol_outer_use,
-        phase2_iters = sp$convergence_info$phase2_iters %||% 0L
-      )
-    }
-
-    new_obj <- numeric(iter)
-    new_scores <- vector("list", iter)
-    new_weights <- vector("list", iter)
-    new_effective_weights <- vector("list", iter)
-    new_events <- list()
-    new_feature_events <- list()
-    assignment_posterior <- sp$assignment_posterior %||% NULL
-    obj_prev <- if (length(sp$objective_history %||% numeric(0)) > 0L) {
-      tail(sp$objective_history, 1L)
-    } else {
-      -Inf
-    }
-    n_run <- 0L
-
-    for (i in seq_len(iter)) {
-      step <- .soft_partition_step(
-        fits, X, T_now = 1, inner_iter = 1L,
-        lambda_min = lmin, lambda_max = lmax,
-        active_orderings = active_orderings,
-        active_feature_pairs = active_feature_pairs,
-        weights_prev = sp$pi_weights,
-        position_prior = position_prior_use,
-        freeze_unused_ordering = freeze_unused_ordering,
-        freeze_unused_ordering_threshold = freeze_unused_ordering_threshold,
-        freeze_feature = freeze_feature,
-        freeze_feature_weight_threshold = freeze_feature_weight_threshold,
-        drop_unused_ordering = drop_unused_ordering,
-        partition_prior = assignment_ctl$partition_prior,
-        partition_prior_init = assignment_ctl$partition_prior_init,
-        assignment_prior = assignment_ctl$legacy_assignment_prior,
-        ordering_alpha = assignment_ctl$ordering_alpha,
-        iter_index = length(sp$objective_history %||% numeric(0)) + i,
-        ordering_labels = ord_labels
-      )
-      fits <- step$fits
-      active_orderings <- step$active_orderings
-      active_feature_pairs <- step$active_feature_pairs
-      sp$pi_weights <- step$pi_weights
-      sp$effective_pi_weights <- step$effective_pi_weights
-      new_obj[i] <- step$objective
-      new_scores[[i]] <- step$score_mat
-      new_weights[[i]] <- step$pi_weights
-      new_effective_weights[[i]] <- step$effective_pi_weights
-      new_events <- c(new_events, step$ordering_events)
-      new_feature_events <- c(new_feature_events, step$feature_events)
-      assignment_posterior <- step$assignment_posterior
-      n_run <- i
-
-      delta <- step$objective - obj_prev
-      convergence_info <- .partition_update_convergence_info(
-        info = convergence_info,
-        obj_prev = obj_prev,
-        obj_now = step$objective,
-        freeze_step = step$freeze_happened
-      )
-      if (verbose) {
-        cat(sprintf(
-          "[do_mpcurve conv %3d] obj=%.6f delta=%.3e rel_delta=%.3e streak=%d/%d\n",
-          i,
-          step$objective,
-          delta,
-          convergence_info$last_rel_delta,
-          convergence_info$consecutive_small_steps,
-          convergence_info$consecutive_required
-        ))
-      }
-      if (is.finite(obj_prev) && delta < -1e-8) {
-        warning(
-          sprintf("soft_partition_cavi objective decreased by %.3e during do_mpcurve() step %d.",
-                  delta, i),
-          call. = FALSE
-        )
-      }
-      if (isTRUE(convergence_info$converged)) {
-        break
-      }
-      obj_prev <- step$objective
-    }
-
-    if (n_run < iter) {
-      new_obj <- new_obj[seq_len(n_run)]
-      new_scores <- new_scores[seq_len(n_run)]
-      new_weights <- new_weights[seq_len(n_run)]
-      new_effective_weights <- new_effective_weights[seq_len(n_run)]
-    }
-    if (!isTRUE(convergence_info$converged) && convergence_info$tol_outer > 0) {
-      convergence_info$reason <- sprintf(
-        "do_mpcurve() ran %d exact T=1 steps without meeting the %d-step convergence rule (last rel_delta=%.3e).",
-        convergence_info$phase2_iters,
-        convergence_info$consecutive_required,
-        convergence_info$last_rel_delta
-      )
-    }
-
-    sp$fits <- fits
-    sp$pi_weights <- if (n_run > 0L) step$pi_weights else sp$pi_weights
-    sp$effective_pi_weights <- if (n_run > 0L) step$effective_pi_weights else (sp$effective_pi_weights %||% sp$pi_weights)
-    colnames(sp$pi_weights) <- ord_labels
-    colnames(sp$effective_pi_weights) <- ord_labels
-    sp$assign <- ord_labels[max.col(sp$pi_weights, ties.method = "first")]
-    sp$objective_history <- c(sp$objective_history, new_obj)
-    sp$score_history <- c(sp$score_history, new_scores)
-    sp$weight_history <- c(sp$weight_history, new_weights)
-    sp$effective_weight_history <- c(sp$effective_weight_history %||% list(), new_effective_weights)
-    sp$active_orderings <- active_orderings
-    sp$active_feature_pairs <- active_feature_pairs
-    sp$frozen_orderings <- !active_orderings
-    sp$ordering_events <- c(sp$ordering_events %||% list(), new_events)
-    sp$feature_events <- c(sp$feature_events %||% list(), new_feature_events)
-    sp$assignment_posterior <- assignment_posterior
-    sp$converged <- isTRUE(convergence_info$converged)
-    sp$convergence_info <- convergence_info
-    assignment_info_final <- .cavi_partition_assignment_info(
-      weights = sp$pi_weights,
-      T_now = 1,
-      partition_prior = assignment_ctl$partition_prior,
-      partition_prior_init = assignment_ctl$partition_prior_init,
-      assignment_prior = assignment_ctl$legacy_assignment_prior,
-      ordering_alpha = assignment_ctl$ordering_alpha,
-      assignment_M = M,
-      active_orderings = sp$active_orderings,
-      active_feature_pairs = sp$active_feature_pairs,
-      drop_unused_ordering = isTRUE(drop_unused_ordering)
-    )
-    sp$control <- utils::modifyList(
-      control,
-      list(
-        position_prior = position_prior_use,
-        lambda_sd_prior_rate = lambda_sd_prior_rate,
-        partition_prior = assignment_ctl$partition_prior,
-        partition_prior_init = assignment_ctl$partition_prior_init,
-        assignment_prior = assignment_info_final$assignment_prior,
-        assignment_mode = assignment_ctl$assignment_mode,
-        ordering_alpha = assignment_ctl$ordering_alpha,
-        tol_outer = tol_outer_use,
-        freeze_unused_ordering = isTRUE(freeze_unused_ordering),
-        freeze_unused_ordering_threshold = as.numeric(freeze_unused_ordering_threshold),
-        freeze_feature = isTRUE(freeze_feature),
-        freeze_feature_weight_threshold = as.numeric(freeze_feature_weight_threshold),
-        drop_unused_ordering = isTRUE(drop_unused_ordering)
-      )
-    )
-    sp$priors <- NULL
-    sp$priors <- .mpcurve_priors_from_partition_fit(sp)
-    sp <- .mpcurve_apply_greedy_provenance_raw(
-      sp,
-      .mpcurve_extract_greedy_provenance(object)
-    )
-
-    out <- as_mpcurve(sp)
-    out$greedy_selection <- object$greedy_selection %||% NULL
-    return(out)
-  }
-
-  if (!inherits(object$fit, "cavi")) {
+  raw <- object$fit
+  if (!inherits(raw, c("cavi", "soft_partition_cavi"))) {
     stop("object$fit must be a cavi or soft_partition_cavi object.")
   }
-
-  tol_use <- tol %||% (object$fit$control %||% list())$tol %||% 1e-6
-  new_fit <- do_cavi(
-    object = object$fit,
-    iter = iter,
-    lambda = lambda,
-    S = S,
-    lambda_sd_prior_rate = lambda_sd_prior_rate,
-    lambda_min = lambda_min,
-    lambda_max = lambda_max,
-    sigma_min = sigma_min,
-    sigma_max = sigma_max,
-    tol = tol_use,
-    convergence = convergence,
-    verbose = verbose
-  )
-
-  new_fit <- .mpcurve_apply_greedy_provenance_raw(
-    new_fit,
-    .mpcurve_extract_greedy_provenance(object)
-  )
-  new_fit$dimension_initialization <-
-    object$dimension_initialization %||%
+  partition <- inherits(raw, "soft_partition_cavi")
+  if (partition && !identical(raw$variational_family %||%
+                              raw$control$variational_family, "structured")) {
+    stop("Legacy augmented partition fits are read-only. Refit with fit_mpcurve().",
+         call. = FALSE)
+  }
+  if (!is.null(ctrl$fix_lambda)) raw$control$fix_lambda <- ctrl$fix_lambda
+  bounds <- ctrl$lambda_bounds %||%
+    c(raw$control$lambda_min %||% 1e-10, raw$control$lambda_max %||% 1e10)
+  if (partition) {
+    updated <- .continue_structural_partition_cavi(
+      fit = raw, iter = max_iter, lambda = ctrl$lambda_init, tol_outer = tol,
+      convergence = ctrl$convergence,
+      lambda_sd_prior_rate = ctrl$lambda_sd_prior_rate,
+      lambda_min = bounds[1], lambda_max = bounds[2],
+      sigma_min = if (!is.null(ctrl$sigma2_bounds)) ctrl$sigma2_bounds[1],
+      sigma_max = if (!is.null(ctrl$sigma2_bounds)) ctrl$sigma2_bounds[2],
+      verbose = verbose)
+  } else {
+    # Precision overrides reset the value; only fix_lambda changes its update mode.
+    if (!is.null(ctrl$lambda_init)) {
+      d <- ncol(raw$data)
+      if (!(length(ctrl$lambda_init) %in% c(1L, d)) ||
+          !is.null(dim(ctrl$lambda_init))) {
+        stop("lambda_init must be a scalar or one value per feature.", call. = FALSE)
+      }
+      raw$lambda_vec <- rep(as.numeric(ctrl$lambda_init), length.out = d)
+    }
+    raw$lambda_vec <- pmax(bounds[1], pmin(bounds[2], raw$lambda_vec))
+    updated <- do_cavi(
+      object = raw, iter = max_iter, tol = tol,
+      convergence = ctrl$convergence,
+      lambda_sd_prior_rate = ctrl$lambda_sd_prior_rate,
+      lambda_min = bounds[1], lambda_max = bounds[2],
+      sigma_min = if (!is.null(ctrl$sigma2_bounds)) ctrl$sigma2_bounds[1],
+      sigma_max = if (!is.null(ctrl$sigma2_bounds)) ctrl$sigma2_bounds[2],
+      verbose = verbose)
+  }
+  updated$dimension_initialization <- object$dimension_initialization %||%
     object$fit$dimension_initialization %||% NULL
-  out <- as_mpcurve(new_fit)
-  out$greedy_selection <- object$greedy_selection %||% NULL
+  updated$dimension_estimation <- object$dimension_estimation %||%
+    object$fit$dimension_estimation %||% NULL
+  updated$control$effective_count_tol <- raw$control$effective_count_tol
+  updated$control$intrinsic_dim_semantics <- raw$control$intrinsic_dim_semantics
+  updated <- .mpcurve_finalize_automatic_dimension(updated)
+  out <- as_mpcurve(updated)
   out$dimension_selection <- object$dimension_selection %||% NULL
-  out$dimension_initialization <- object$dimension_initialization %||% NULL
   if (!is.null(out$dimension_selection)) {
     out$dimension_selection$continued_after_selection <- TRUE
   }
-  if (!is.null(out$dimension_initialization)) {
-    out$fit$dimension_initialization <- out$dimension_initialization
-  }
-  out$requested_intrinsic_dim <- object$requested_intrinsic_dim %||% out$intrinsic_dim
+  out$dimension_initialization <- updated$dimension_initialization
+  out$requested_intrinsic_dim <- if (isTRUE(updated$dimension_initialization$automatic)) {
+    out$model_intrinsic_dim
+  } else object$requested_intrinsic_dim %||% out$model_intrinsic_dim
+  out$continuation_history <- c(object$continuation_history %||% list(), list(list(
+    start_trace_length = length(object$elbo_trace), max_iter = max_iter,
+    tol = tol, control = ctrl)))
   out
 }
 
 
 # ---- fit_mpcurve -----------------------------------------------
 
-#' Estimate sample orderings and smooth feature trajectories
-#'
-#' Fits a Gaussian trajectory model to a sample-by-feature matrix. With
-#' \code{intrinsic_dim = 1}, all features share one latent sample ordering.
-#' With \code{intrinsic_dim = M >= 2}, the model estimates \code{M} orderings
-#' and a probability distribution over orderings for each feature. Random-walk
-#' priors encourage smooth trajectories, and variational inference estimates
-#' uncertainty in both sample positions and feature trajectories.
-#'
-#' @details
-#' The latent grid has \code{K} ordered positions. Each sample has a posterior
-#' probability of occupying each position, and each feature has a Gaussian
-#' trajectory posterior across the grid. Noise variances are estimated per
-#' feature unless measurement standard deviations are supplied through \code{S}.
-#'
-#' For \eqn{M \ge 2}, structural variational inference uses
-#' \deqn{q(C)\prod_{j=1}^d q(Z_j)q(U_j\mid Z_j).}
-#' Here \eqn{C} denotes the sample positions across orderings, \eqn{Z_j} is
-#' feature \eqn{j}'s ordering assignment, and \eqn{U_j} is its trajectory.
-#' Conditioning the trajectory on the assignment preserves their posterior
-#' dependence. Smoothness parameters vary by feature and ordering; the
-#' estimated noise variance \eqn{\sigma_j^2} is shared across orderings.
-#'
-#' The number of orderings \code{M} is specified by \code{intrinsic_dim} and
-#' held fixed during fitting. Choose it using the scientific question and
-#' assess the stability and interpretation of the resulting feature groups.
-#' The variational objective measures progress for a given \code{M}; comparing
-#' different values requires a separate model-selection criterion.
-#'
-#' Use \code{summary()} to inspect the fit, \code{plot()} to visualize sample
-#' orderings and trajectories, and \code{\link{do_mpcurve}} to run additional
-#' iterations. See \code{\link{mpcurve}} for the fitted-object fields.
-#'
-#' @param X Numeric matrix (n x d), with samples in rows and features in columns.
-#' @param algorithm Fitting algorithm. Use \code{"cavi"} for coordinate-ascent
-#'   variational inference, the supported fitting method.
-#' @param method Initialisation method(s) for the trajectory ordering. In the
-#'   single-ordering case, multiple methods are all attempted only when
-#'   \code{num_cores > 1}; otherwise only \code{method[[1]]} is fitted. For
-#'   partition fits, \code{length(method)} must be either 1 or
-#'   \code{intrinsic_dim}. With \code{partition_init = "similarity"}, a
-#'   length-one method is applied independently within every selected feature
-#'   block. The default is PCA using that block's own first principal
-#'   component.
-#' @param K Integer number of mixture components (grid knots).
-#' @param rw_q Integer random-walk order for the GMRF prior.
-#' @param lambda Positive initial smoothness value(s). A single-ordering fit
-#'   accepts a scalar or length-\code{d} vector. A structural partition fit
-#'   accepts a scalar, a length-\code{d} vector broadcast across orderings, a
-#'   flattened length-\code{d * M} vector, or a \code{d x M} matrix.
-#' @param S Optional known measurement standard deviations. If a length-\code{d}
-#'   vector, each feature uses a known shared standard deviation across
-#'   observations. If an \code{n x d} matrix, each observation-feature pair uses
-#'   its own known standard deviation.
-#' @param sigma2_init Optional scalar or length-\code{d} initial variance
-#'   vector. Partition fits use one vector shared across all orderings. It
-#'   cannot be supplied together with \code{S}.
-#' @param fix_lambda Logical; if \code{TRUE}, keep all smoothness parameters
-#'   fixed at the supplied initial value.
-#' @param iter Maximum number of CAVI sweeps for the single-ordering fit.
-#' @param tol ELBO-change tolerance for the single-ordering fit, interpreted
-#'   using \code{convergence}. Defaults to \code{1e-6}; zero disables early
-#'   stopping.
-#' @param num_cores Integer >= 1. Workers for parallel multi-method
-#'   single-ordering runs.
-#' @param intrinsic_dim Integer intrinsic dimensionality of the latent ordering
-#'   system, or \code{"auto"}. \code{intrinsic_dim = 1} fits the standard
-#'   single-ordering model. Values \code{>= 2} fit the fixed-\eqn{M} structural
-#'   partition model. \code{"auto"} cuts the feature-similarity tree at the
-#'   eligible dimension with the largest mean silhouette before fitting.
-#' @param max_intrinsic_dim For \code{intrinsic_dim = "auto"}, the largest
-#'   candidate number of orderings. Candidates also cannot exceed one less
-#'   than the number of features because silhouette is undefined for an
-#'   all-singleton cut.
-#' @param similarity_min_cluster_size For \code{intrinsic_dim = "auto"}, the
-#'   minimum number of features allowed in every selected cluster. The default
-#'   of 2 prevents a single feature from serving as the sole evidence for an
-#'   initialized ordering. If no multi-ordering cut is eligible, one ordering
-#'   is fitted.
-#' @param greedy Use \code{"none"}; specify the number of orderings through
-#'   \code{intrinsic_dim}. The values \code{"forward"} and \code{"backward"}
-#'   are unsupported.
-#' @param partition_init For partition fits only: either
-#'   \code{"similarity"} for feature-similarity-driven block initialization or
-#'   \code{"ordering_methods"} for method-based initial orderings. The
-#'   default is \code{"similarity"}; it applies the selected ordering method
-#'   separately to each feature block.
-#' @param discretization Optional discretization method passed to ordering-based
-#'   initialization. For partition fits, MPCurver enforces a common \code{K}
-#'   across orderings; if quantile cuts collapse, it falls back to equal-width
-#'   bins.
-#' @param ridge Nonnegative diagonal term added to the random-walk precision.
-#'   The default \code{0} uses an intrinsic prior, with the likelihood
-#'   identifying directions unpenalized by the prior. A positive value gives
-#'   a proper Gaussian prior. An identifiability error indicates that the
-#'   likelihood and prior together leave some trajectory directions undetermined.
-#' @param lambda_sd_prior_rate Optional positive rate for an exponential prior
-#'   on \code{1 / sqrt(lambda_j)}. Larger rates encourage smoother
-#'   trajectories. The default \code{NULL}, or \code{0}, applies no additional
-#'   penalty to the smoothness parameter.
-#' @param lambda_min,lambda_max Positive bounds for \code{lambda_j}.
-#' @param sigma_min,sigma_max Positive bounds for \code{sigma_j^2}. Structural
-#'   partition fits update one feature-specific vector shared across orderings.
-#' @param position_prior Either \code{"adaptive"} or \code{"fixed"} for the
-#'   single-ordering component prior \code{pi}. Partition fits apply the same
-#'   mode independently to each ordering's position responsibilities.
-#' @param position_prior_init Optional length-\code{K} initial/fixed vector for
-#'   the component prior \code{pi}. When \code{position_prior = "fixed"} and
-#'   this is \code{NULL}, a uniform prior over the \code{K} positions is used.
-#'   For \code{intrinsic_dim > 1}, a single length-\code{K} vector is
-#'   broadcast to all orderings.
-#' @param partition_prior For partition fits only: either \code{"adaptive"} or
-#'   \code{"fixed"} for the ordering-usage prior \code{omega}. The adaptive
-#'   mode uses an empirical-Bayes update proportional to \code{colSums(w)}.
-#'   The fixed mode keeps a constant prior over the fixed set of \eqn{M}
-#'   orderings.
-#' @param partition_prior_init For partition fits only: optional length-\code{M}
-#'   initial/fixed vector for the ordering prior \code{omega}. Used only when
-#'   \code{partition_prior = "fixed"}. When omitted, the fixed prior defaults
-#'   to uniform over the \eqn{M} orderings.
-#' @param effective_weight_tol Nonnegative threshold for reporting the effective
-#'   number of orderings under \code{partition_prior = "adaptive"}. An ordering
-#'   counts when its fitted prior mass \eqn{\omega_m} exceeds this threshold.
-#'   The default is \code{1e-12}; the value must be less than
-#'   \code{1 / intrinsic_dim}. It does not change the fitted model. The result
-#'   stores the threshold in \code{$effective_weight_tol} for partition fits.
-#' @param assignment_prior Deprecated; use \code{partition_prior} and
-#'   \code{partition_prior_init}. The value \code{"uniform"} specifies a fixed
-#'   uniform prior; \code{"dirichlet"} specifies a Dirichlet prior using
-#'   \code{ordering_alpha}.
-#' @param ordering_alpha Dirichlet concentration for the deprecated
-#'   \code{assignment_prior = "dirichlet"} option.
-#' @param similarity_metric For \code{partition_init = "similarity"} only:
-#'   feature-similarity metric used to construct feature blocks. One of
-#'   \code{"spearman"}, \code{"pearson"}, \code{"smooth_fit"}, or
-#'   \code{"spline_r2"}. The
-#'   \code{"smooth_fit"} metric scores how well features follow each other's
-#'   orderings under a random-walk smoother. With \code{ridge = 0}, this score
-#'   uses the rank and generalized determinant of the intrinsic precision.
-#'   With positive \code{ridge}, it uses a proper Gaussian prior. When
-#'   \code{intrinsic_dim = "auto"} and this argument is omitted,
-#'   \code{"spline_r2"} is used.
-#' @param spline_r2_df For \code{similarity_metric = "spline_r2"}, fixed
-#'   degrees of freedom for the natural cubic spline used to calculate
-#'   directional variance explained. Defaults to 5.
-#' @param smooth_fit_lambda_mode For \code{similarity_metric = "smooth_fit"}
-#'   only: whether the directional smoother optimizes \code{lambda} or keeps it
-#'   fixed at \code{smooth_fit_lambda_value}.
-#' @param smooth_fit_lambda_value For \code{similarity_metric = "smooth_fit"}
-#'   only: fixed \code{lambda} value used when
-#'   \code{smooth_fit_lambda_mode = "fixed"}, and the starting value when
-#'   \code{smooth_fit_lambda_mode = "optimize"}.
-#' @param cluster_linkage For \code{partition_init = "similarity"} only:
-#'   hierarchical-clustering linkage applied to \code{1 - S(X)}. Defaults to
-#'   \code{"single"}.
-#' @param similarity_min_feature_sd For \code{partition_init = "similarity"}
-#'   only: low-variance feature threshold used when building \code{S(X)}.
-#' @param T_start,T_end Positive starting and ending temperatures for the
-#'   feature-assignment annealing schedule. Higher temperatures encourage
-#'   more diffuse assignments during initialization. After this schedule,
-#'   fitting continues at \eqn{T=1}. Assess convergence in that final segment;
-#'   changing the temperature changes the objective.
-#' @param n_outer Number of annealing steps for partition CAVI.
-#' @param inner_iter Number of structural coordinate sweeps per annealing step.
-#' @param max_converge_iter Maximum number of exact \code{T = 1} partition
-#'   iterations after annealing. Defaults to \code{iter} when \code{NULL}.
-#' @param tol_outer ELBO-change tolerance for partition convergence at
-#'   \eqn{T=1} after annealing, interpreted using \code{convergence}. Defaults
-#'   to \code{1e-6}; zero disables early stopping.
-#' @param freeze_unused_ordering,freeze_unused_ordering_threshold,freeze_feature,freeze_feature_weight_threshold,drop_unused_ordering
-#'   Deprecated; leave as \code{NULL}. Explicit values are ignored with a warning.
-#' @param verbose Logical; print per-iteration progress?
-#' @param convergence Stopping rule. The default, \code{"normalized"}, uses
-#'   \eqn{|\mathrm{ELBO}_{new} - \mathrm{ELBO}_{old}|/(ND)}, with
-#'   \eqn{N = nrow(X)} samples and \eqn{D = ncol(X)} features. The denominator
-#'   excludes the number of orderings and grid positions. The fit stops at the first
-#'   eligible increment below \code{tol} (one ordering) or \code{tol_outer}
-#'   (multiple orderings). Single-ordering increments must be nonnegative;
-#'   partition fits retain a numerical decrease allowance of
-#'   \eqn{10^{-8}(|\mathrm{ELBO}_{old}|+1)}. The optional \code{"relative"}
-#'   rule divides by \eqn{|\mathrm{ELBO}_{old}|+1} for one ordering and
-#'   \eqn{|\mathrm{ELBO}_{old}|+10^{-12}} for partition fits. To reproduce
-#'   the pre-0.3.2 defaults, use \code{convergence = "relative"},
-#'   \code{tol = 1e-6}, and \code{tol_outer = 1e-5}. The rule is saved in
-#'   \code{fit$fit$control$convergence}. ELBO traces remain on their original
-#'   scale. A small increment does not bound the remaining optimization gap.
-#' @param ... Additional variational fitting options, including initialization
-#'   controls such as \code{responsibilities_init}, \code{fits_init},
-#'   \code{init_methods}, \code{pca_components}, or \code{hard_assign_final}.
-#'
-#' @return An \code{\link{mpcurve}} object, or (for parallel multi-method
-#'   single-ordering runs) a named list whose successful entries are
-#'   \code{mpcurve} objects and whose failed entries are \code{NULL}. The list
-#'   has a \code{summary} attribute recording success, convergence, final ELBO,
-#'   and any error message for every attempted method. Every returned fit
-#'   stores inferred cell
-#'   locations in \code{$locations}; for single-ordering fits this includes both
-#'   posterior-mean and MAP locations derived from \code{$gamma}. A structural
-#'   partition result stores named ordering-specific \code{$params$pi},
-#'   \code{$params$mu}, \code{$gamma}, and \code{$locations}; one shared
-#'   \code{$params$sigma2}; \code{$conditional_posterior}; a
-#'   \code{d x M} \code{$lambda_mat}; and
-#'   \code{$partition$pi_weights}. Every fit has
-#'   \code{$effective_intrinsic_dim}; adaptive partition fits calculate it
-#'   from the fitted ordering prior using \code{effective_weight_tol}, while
-#'   other fits set it to the fitted \code{M}. Fits requested with
-#'   \code{intrinsic_dim = "auto"} also store
-#'   \code{$dimension_initialization}, including candidate silhouettes,
-#'   eligibility, selected clusters, similarity diagnostics, and the initial
-#'   ordering probabilities. See \code{\link{mpcurve}} for the complete object
-#'   description.
-#'
-#' @export
-fit_mpcurve <- function(
+.fit_mpcurve <- function(
     X,
-    algorithm = c("cavi", "csmooth_em", "smooth_em"),
-    method = c("PCA", "fiedler", "pcurve", "tSNE", "random", "isomap"),
+    method = "PCA",
     K = NULL,
     rw_q = 2,
     lambda = 1,
@@ -3150,10 +2663,7 @@ fit_mpcurve <- function(
     fix_lambda = FALSE,
     iter = 100,
     tol = 1e-6,
-    num_cores = 1L,
     intrinsic_dim = 1L,
-    greedy = c("none", "forward", "backward"),
-    partition_init = c("similarity", "ordering_methods"),
     discretization = NULL,
     ridge = 0,
     lambda_sd_prior_rate = NULL,
@@ -3165,9 +2675,7 @@ fit_mpcurve <- function(
     position_prior_init = NULL,
     partition_prior = c("adaptive", "fixed"),
     partition_prior_init = NULL,
-    effective_weight_tol = 1e-12,
-    assignment_prior = NULL,
-    ordering_alpha = NULL,
+    effective_count_tol = 1e-8,
     similarity_metric = c("spearman", "pearson", "smooth_fit", "spline_r2"),
     smooth_fit_lambda_mode = c("optimize", "fixed"),
     smooth_fit_lambda_value = 1,
@@ -3175,15 +2683,10 @@ fit_mpcurve <- function(
     similarity_min_feature_sd = 1e-8,
     T_start = 5,
     T_end = 1,
-    n_outer = 25L,
+    n_outer = 0L,
     inner_iter = 1L,
     max_converge_iter = NULL,
     tol_outer = 1e-6,
-    freeze_unused_ordering = NULL,
-    freeze_unused_ordering_threshold = NULL,
-    freeze_feature = NULL,
-    freeze_feature_weight_threshold = NULL,
-    drop_unused_ordering = NULL,
     verbose = FALSE,
     convergence = c("normalized", "relative"),
     max_intrinsic_dim = 8L,
@@ -3192,9 +2695,7 @@ fit_mpcurve <- function(
     ...
 ) {
   convergence <- match.arg(convergence)
-  method_missing <- missing(method)
   similarity_metric_missing <- missing(similarity_metric)
-  num_cores <- as.integer(num_cores)
   automatic_dimension <- is.character(intrinsic_dim) &&
     length(intrinsic_dim) == 1L && !is.na(intrinsic_dim) &&
     identical(intrinsic_dim, "auto")
@@ -3206,18 +2707,8 @@ fit_mpcurve <- function(
       intrinsic_dim, "intrinsic_dim"
     )
   }
-  greedy <- match.arg(greedy)
-  algorithm <- match.arg(algorithm)
-  partition_init <- match.arg(partition_init)
   position_prior <- match.arg(position_prior)
-  partition_prior_missing <- missing(partition_prior)
   partition_prior <- match.arg(partition_prior)
-  if (isTRUE(partition_prior_missing) && !is.null(assignment_prior)) {
-    assignment_prior_chr <- as.character(assignment_prior)[1]
-    if (assignment_prior_chr %in% c("uniform", "dirichlet")) {
-      partition_prior <- if (identical(assignment_prior_chr, "uniform")) "fixed" else "adaptive"
-    }
-  }
   similarity_metric <- if (automatic_dimension && similarity_metric_missing) {
     "spline_r2"
   } else {
@@ -3241,32 +2732,10 @@ fit_mpcurve <- function(
   }
   max_converge_iter <- max_converge_iter %||% as.integer(iter)
 
-  if (!identical(algorithm, "cavi")) {
-    stop(
-      "fit_mpcurve() is now a CAVI-only public wrapper. ",
-      "Requested `algorithm = \"", algorithm, "\"` is no longer supported here.",
-      call. = FALSE
-    )
-  }
-
-  if (!identical(greedy, "none")) {
-    stop(
-      "greedy dimension selection is temporarily unavailable for structural VI. ",
-      "Use select_mpcurve_dimension() for fixed-uniform-prior ELBO selection.",
-      call. = FALSE
-    )
-  }
-
   similarity_precomputed <- NULL
   initial_partition_probabilities <- NULL
   dimension_initialization <- NULL
   if (automatic_dimension) {
-    if (!identical(partition_init, "similarity")) {
-      stop(
-        "intrinsic_dim = \"auto\" requires partition_init = \"similarity\".",
-        call. = FALSE
-      )
-    }
     if ("fits_init" %in% names(dots)) {
       stop(
         "fits_init cannot be supplied when intrinsic_dim = \"auto\" because ",
@@ -3287,7 +2756,7 @@ fit_mpcurve <- function(
       discretization %||% "quantile",
       c("quantile", "equal", "kmeans")
     )
-    K_similarity <- .cavi_resolve_K(X_similarity, K)
+    K_similarity <- .cavi_resolve_K(X_similarity, K, rw_q)
     similarity_precomputed <- .compute_same_ordering_similarity(
       X = X_similarity,
       S = S,
@@ -3340,103 +2809,18 @@ fit_mpcurve <- function(
     dimension_initialization$similarity <- similarity_precomputed$S
     dimension_initialization$distance <- similarity_precomputed$distance
 
-    if (intrinsic_dim == 1L && method_missing) {
-      method <- "PCA"
-    }
   }
-  effective_weight_tol <- .mpcurve_validate_effective_weight_tol(
-    effective_weight_tol, intrinsic_dim
-  )
-
-  fit_args <- list(
-    X = X,
-    method = method,
-    K = K,
-    rw_q = rw_q,
-    lambda = lambda,
-    S = S,
-    sigma2_init = sigma2_init,
-    fix_lambda = fix_lambda,
-    iter = iter,
-    tol = tol,
-    convergence = convergence,
-    num_cores = num_cores,
-    intrinsic_dim = intrinsic_dim,
-    max_intrinsic_dim = max_intrinsic_dim,
-    partition_init = partition_init,
-    discretization = discretization,
-    ridge = ridge,
-    lambda_sd_prior_rate = lambda_sd_prior_rate,
-    lambda_min = lambda_min,
-    lambda_max = lambda_max,
-    sigma_min = sigma_min,
-    sigma_max = sigma_max,
-    position_prior = position_prior,
-    position_prior_init = position_prior_init,
-    partition_prior = partition_prior,
-    partition_prior_init = partition_prior_init,
-    effective_weight_tol = effective_weight_tol,
-    assignment_prior = assignment_prior,
-    ordering_alpha = ordering_alpha,
-    similarity_metric = similarity_metric,
-    spline_r2_df = spline_r2_df,
-    smooth_fit_lambda_mode = smooth_fit_lambda_mode,
-    smooth_fit_lambda_value = smooth_fit_lambda_value,
-    cluster_linkage = cluster_linkage,
-    similarity_min_feature_sd = similarity_min_feature_sd,
-    similarity_min_cluster_size = similarity_min_cluster_size,
-    T_start = T_start,
-    T_end = T_end,
-    n_outer = n_outer,
-    inner_iter = inner_iter,
-    max_converge_iter = max_converge_iter,
-    tol_outer = tol_outer,
-    freeze_unused_ordering = freeze_unused_ordering,
-    freeze_unused_ordering_threshold = freeze_unused_ordering_threshold,
-    freeze_feature = freeze_feature,
-    freeze_feature_weight_threshold = freeze_feature_weight_threshold,
-    drop_unused_ordering = drop_unused_ordering,
-    verbose = verbose
+  effective_count_tol <- .mpcurve_validate_effective_count_tol(
+    effective_count_tol, intrinsic_dim, ncol(X)
   )
 
   # ---- Partition model (intrinsic_dim >= 2) ----
   if (intrinsic_dim >= 2L) {
     M <- intrinsic_dim
 
-    if (method_missing) {
-      method <- "PCA"
-    }
+    init_methods <- rep(method, M)
+    pca_components <- NULL
 
-    if (identical(partition_init, "ordering_methods")) {
-      if (length(method) == 1L) {
-        init_methods <- c(method[1], rep("PCA", M - 1L))
-        pca_counter <- 1L
-        pca_components <- rep(NA_integer_, M)
-        if (method[1] == "PCA") {
-          pca_components[1] <- 1L
-        }
-        for (m in 2:M) {
-          pca_counter <- pca_counter + 1L
-          pca_components[m] <- pca_counter
-        }
-      } else if (length(method) == M) {
-        init_methods <- method
-        pca_components <- NULL
-      } else {
-        stop(sprintf("method must have length 1 or intrinsic_dim=%d.", M))
-      }
-    } else {
-      if (!(length(method) %in% c(1L, M))) {
-        stop(sprintf("method must have length 1 or intrinsic_dim=%d.", M))
-      }
-      init_methods <- method
-      pca_components <- NULL
-    }
-
-    if ("init_methods" %in% names(dots)) {
-      init_methods <- dots$init_methods
-      dots$init_methods <- NULL
-    }
     if ("pca_components" %in% names(dots)) {
       pca_components <- dots$pca_components
       dots$pca_components <- NULL
@@ -3449,7 +2833,6 @@ fit_mpcurve <- function(
         M = M,
         init_methods = init_methods,
         pca_components = pca_components,
-        partition_init = partition_init,
         similarity_metric = similarity_metric,
         spline_r2_df = spline_r2_df,
         smooth_fit_lambda_mode = smooth_fit_lambda_mode,
@@ -3482,22 +2865,17 @@ fit_mpcurve <- function(
         position_prior_init = position_prior_init,
         partition_prior = partition_prior,
         partition_prior_init = partition_prior_init,
-        assignment_prior = assignment_prior,
-        ordering_alpha = ordering_alpha,
-        freeze_unused_ordering = freeze_unused_ordering,
-        freeze_unused_ordering_threshold = freeze_unused_ordering_threshold,
-        freeze_feature = freeze_feature,
-        freeze_feature_weight_threshold = freeze_feature_weight_threshold,
-        drop_unused_ordering = drop_unused_ordering,
         verbose = verbose
       ),
       dots
     )
     raw <- do.call(soft_partition_cavi, sp_args)
-    raw$control$effective_weight_tol <- effective_weight_tol
+    raw$control$effective_count_tol <- effective_count_tol
+    raw$control$intrinsic_dim_semantics <- "model"
     if (automatic_dimension) {
       raw$control$max_intrinsic_dim <- max_intrinsic_dim
       raw$dimension_initialization <- dimension_initialization
+      raw <- .mpcurve_finalize_automatic_dimension(raw)
     }
     out <- as_mpcurve(raw)
     if (automatic_dimension) {
@@ -3507,7 +2885,11 @@ fit_mpcurve <- function(
     return(out)
   }
 
-  parallel <- num_cores > 1L && length(method) > 1L
+  # Automatic initialization can fall back to one ordering.
+  if ("pca_components" %in% names(dots)) {
+    dots$method_args$component <- .mpcurve_integer_setting(dots$pca_components, "pca_components")
+    dots$pca_components <- NULL
+  }
   run_one_cavi <- function(method_i) {
     cavi_args <- c(
       list(
@@ -3552,41 +2934,6 @@ fit_mpcurve <- function(
     )
   }
 
-  if (parallel) {
-    fit_info <- if (.Platform$OS.type == "unix") {
-      parallel::mclapply(method, run_one_cavi, mc.cores = num_cores)
-    } else {
-      lapply(method, run_one_cavi)
-    }
-    names(fit_info) <- method
-
-    smry <- data.frame(
-      method = method,
-      K = vapply(fit_info, function(x) if (is.null(x$result)) NA_integer_ else length(x$result$params$pi), integer(1)),
-      success = vapply(fit_info, function(x) !is.null(x$result), logical(1)),
-      elbo_last = vapply(fit_info, function(x) if (is.null(x$result)) NA_real_ else tail(x$result$elbo_trace, 1L), numeric(1)),
-      converged = vapply(fit_info, function(x) if (is.null(x$result)) FALSE else isTRUE(x$result$converged), logical(1)),
-      error_message = vapply(
-        fit_info,
-        function(x) if (is.null(x$error)) NA_character_ else conditionMessage(x$error),
-        character(1)
-      ),
-      stringsAsFactors = FALSE
-    )
-
-    out <- lapply(fit_info, function(x) {
-      if (is.null(x$result)) return(NULL)
-      fitted <- as_mpcurve(x$result)
-      if (automatic_dimension) {
-        fitted$dimension_initialization <- dimension_initialization
-        fitted$fit$dimension_initialization <- dimension_initialization
-      }
-      fitted
-    })
-    attr(out, "summary") <- smry
-    return(out)
-  }
-
   fit_info <- run_one_cavi(method[[1L]])
   if (is.null(fit_info$result)) {
     if (!is.null(fit_info$error)) {
@@ -3604,11 +2951,13 @@ fit_mpcurve <- function(
 
   if (automatic_dimension) {
     fit_info$result$dimension_initialization <- dimension_initialization
+    fit_info$result$control$effective_count_tol <- effective_count_tol
     fit_info$result$control$max_intrinsic_dim <- max_intrinsic_dim
     fit_info$result$control$similarity_metric <- similarity_metric
     fit_info$result$control$spline_r2_df <- as.integer(spline_r2_df)[1]
     fit_info$result$control$similarity_min_cluster_size <-
       as.integer(similarity_min_cluster_size)[1]
+    fit_info$result <- .mpcurve_finalize_automatic_dimension(fit_info$result)
   }
   out <- as_mpcurve(fit_info$result)
   if (automatic_dimension) out$dimension_initialization <- dimension_initialization

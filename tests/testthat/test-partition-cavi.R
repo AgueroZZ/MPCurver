@@ -4,7 +4,7 @@ test_that("soft_two_trajectory_cavi returns a stable A/B interface", {
     d1 = 5,
     d2 = 5,
     d_noise = 0,
-    sigma = 0.1,
+    noise_sd = 0.1,
     seed = 2
   )
 
@@ -31,7 +31,7 @@ test_that("soft partition accepts full-data fits rebuilt from subset gamma start
     d1 = 4,
     d2 = 4,
     d_noise = 0,
-    sigma = 0.1,
+    noise_sd = 0.1,
     seed = 7
   )
 
@@ -95,7 +95,7 @@ test_that("soft_partition_cavi supports similarity-based initialization metadata
     n = 90,
     d_signal = c(4, 4, 4),
     d_noise = 0,
-    sigma = 0.08,
+    noise_sd = 0.08,
     seed = 11,
     trajectory_family = rep("linear", 3)
   )
@@ -104,7 +104,6 @@ test_that("soft_partition_cavi supports similarity-based initialization metadata
     sim$X,
     M = 3,
     init_methods = c("PCA", "random", "PCA"),
-    partition_init = "similarity",
     similarity_metric = "spearman",
     cluster_linkage = "single",
     similarity_min_feature_sd = 1e-8,
@@ -169,7 +168,7 @@ test_that("soft_partition_cavi stores smooth-fit similarity diagnostics", {
     n = 50,
     d_signal = c(3, 3),
     d_noise = 0,
-    sigma = 0.08,
+    noise_sd = 0.08,
     seed = 21,
     trajectory_family = c("monotone", "quadratic")
   )
@@ -177,7 +176,6 @@ test_that("soft_partition_cavi stores smooth-fit similarity diagnostics", {
   res <- suppressWarnings(soft_partition_cavi(
     sim$X,
     M = 2,
-    partition_init = "similarity",
     similarity_metric = "smooth_fit",
     cluster_linkage = "single",
     K = 6,
@@ -217,7 +215,7 @@ test_that("smooth-fit similarity supports fixed lambda mode and warns for ridge 
     n = 50,
     d_signal = c(3, 3),
     d_noise = 0,
-    sigma = 0.08,
+    noise_sd = 0.08,
     seed = 22,
     trajectory_family = c("monotone", "quadratic")
   )
@@ -226,7 +224,6 @@ test_that("smooth-fit similarity supports fixed lambda mode and warns for ridge 
     res_intrinsic <- soft_partition_cavi(
       sim$X,
       M = 2,
-      partition_init = "similarity",
       similarity_metric = "smooth_fit",
       K = 6,
       ridge = 0,
@@ -246,7 +243,6 @@ test_that("smooth-fit similarity supports fixed lambda mode and warns for ridge 
   res_fixed <- suppressWarnings(soft_partition_cavi(
     sim$X,
     M = 2,
-    partition_init = "similarity",
     similarity_metric = "smooth_fit",
     smooth_fit_lambda_mode = "fixed",
     smooth_fit_lambda_value = 2,
@@ -268,7 +264,7 @@ test_that("soft_partition_cavi supports known measurement sd with smooth-fit ini
     n = 45,
     d_signal = c(3, 3),
     d_noise = 0,
-    sigma = 0.08,
+    noise_sd = 0.08,
     seed = 45,
     trajectory_family = c("monotone", "quadratic")
   )
@@ -280,7 +276,6 @@ test_that("soft_partition_cavi supports known measurement sd with smooth-fit ini
     sim$X,
     S = S,
     M = 2,
-    partition_init = "similarity",
     similarity_metric = "smooth_fit",
     K = 6,
     ridge = 1e-6,
@@ -313,7 +308,7 @@ test_that("fit_mpcurve can use similarity initialization for intrinsic_dim > 1",
     n = 80,
     d_signal = c(4, 4, 4),
     d_noise = 0,
-    sigma = 0.08,
+    noise_sd = 0.08,
     seed = 12,
     trajectory_family = rep("monotone", 3)
   )
@@ -321,19 +316,16 @@ test_that("fit_mpcurve can use similarity initialization for intrinsic_dim > 1",
   fit <- suppressWarnings(fit_mpcurve(
     sim$X,
     intrinsic_dim = 3,
-    partition_init = "similarity",
-    similarity_metric = "spearman",
-    cluster_linkage = "single",
-    K = 7,
-    n_outer = 2,
-    inner_iter = 1L,
-    max_converge_iter = 2L,
-    verbose = FALSE
+    num_bins = 7,
+    max_iter = 2L,
+    verbose = FALSE,
+    control = mpcurve_control(anneal_steps = 2, anneal_sweeps = 1L),
+    init_control = mpcurve_init_control(similarity_metric = "spearman", cluster_linkage = "single")
   ))
 
   expect_s3_class(fit, "mpcurve")
   expect_equal(fit$algorithm, "cavi")
-  expect_equal(fit$intrinsic_dim, 3L)
+  expect_equal(fit$model_intrinsic_dim, 3L)
   expect_equal(fit$requested_intrinsic_dim, 3L)
   expect_equal(fit$fit$control$partition_init, "similarity")
   expect_true(!is.null(fit$similarity_init))

@@ -67,21 +67,10 @@
   error <- NA_character_
   fit <- tryCatch(
     withCallingHandlers(
-      do.call(
-        fit_mpcurve,
-        c(
-          list(
-            X = X,
-            intrinsic_dim = M,
-            greedy = "none",
-            partition_init = if (M == 1L) "similarity" else initialization,
-            partition_prior = "fixed",
-            partition_prior_init = NULL
-          ),
-          if (M >= 2L) list(hard_assign_final = FALSE) else list(),
-          fit_options
-        )
-      ),
+      {
+        do.call(fit_mpcurve, c(list(X = X, intrinsic_dim = M,
+                                   partition_prior = "fixed"), fit_options))
+      },
       warning = function(w) {
         warnings <<- c(warnings, conditionMessage(w))
       }
@@ -165,8 +154,8 @@
 #' orderings. Forward selection starts at one ordering; backward selection
 #' starts at `max_intrinsic_dim`. At each step, the candidate is accepted only
 #' if its final soft-assignment objective at `T = 1` is strictly larger.
-#' For each dimension above one, both similarity and ordering-method
-#' initializations are attempted and the higher finite objective is used.
+#' Each candidate dimension is fitted once, grouping features by similarity
+#' and applying the selected `initial_method` independently within each group.
 #'
 #' This is a greedy comparison of variational solutions. The selected dimension
 #' can depend on initialization and convergence; inspect the returned candidate
@@ -175,11 +164,13 @@
 #' @param X Sample-by-feature data matrix, as for [fit_mpcurve()].
 #' @param max_intrinsic_dim Positive integer upper bound for the search.
 #' @param direction Either `"forward"` or `"backward"`.
-#' @param ... Additional fixed-model arguments passed to [fit_mpcurve()].
-#'   The selector controls `intrinsic_dim`, `greedy`, `partition_init`,
-#'   `partition_prior`, `partition_prior_init`, and `hard_assign_final`.
-#'   A scalar `method` may be supplied. Dimension-specific initial fits are
-#'   not accepted through `...`.
+#' @inheritParams fit_mpcurve
+#' @param init_control Initialization settings from [mpcurve_init_control()].
+#'   Supplied fits, responsibilities, and PCA components cannot be shared across
+#'   candidate counts.
+#' @param control Model and optimization settings from [mpcurve_control()].
+#'   Comparisons require a fixed uniform partition prior and soft final
+#'   assignments. Custom partition weights and hard assignments are rejected.
 #'
 #' @return The selected [fit_mpcurve()] `mpcurve` object. Its
 #'   `$dimension_selection` record contains `direction`,
@@ -189,101 +180,54 @@
 #'   error, and a `$history` table including the rejected stopping step.
 #' @md
 #' @export
-select_mpcurve_dimension <- function(X,
-                                     max_intrinsic_dim,
-                                     direction = c("forward", "backward"),
-                                     ...) {
+select_mpcurve_dimension <- function(
+    X, max_intrinsic_dim, direction = c("forward", "backward"),
+    S = NULL, num_bins = NULL, initial_method = "PCA",
+    position_prior = c("adaptive", "fixed"), max_iter = 100L, tol = 1e-6,
+    verbose = FALSE, init_control = NULL, control = NULL) {
+  X <- .mpcurve_validate_data(X, S)
   direction <- match.arg(direction)
-  if (length(max_intrinsic_dim) != 1L ||
-      !is.numeric(max_intrinsic_dim) ||
-      is.na(max_intrinsic_dim) ||
-      !is.finite(max_intrinsic_dim) ||
-      max_intrinsic_dim < 1 ||
-      max_intrinsic_dim != floor(max_intrinsic_dim) ||
-      max_intrinsic_dim > .Machine$integer.max) {
-    stop("max_intrinsic_dim must be a single positive integer.", call. = FALSE)
-  }
-  max_intrinsic_dim <- as.integer(max_intrinsic_dim)
-
-  fit_options <- list(...)
-  if (is.null(names(fit_options))) names(fit_options) <- rep("", length(fit_options))
-  if (any(!nzchar(names(fit_options)))) {
-    stop("All additional fit arguments must be named.", call. = FALSE)
-  }
-  if (anyDuplicated(names(fit_options))) {
-    stop("Additional fit arguments must have unique names.", call. = FALSE)
-  }
-  forbidden <- c(
-    "X", "intrinsic_dim", "partition_init", "assignment_prior",
-    "ordering_alpha", "fits_init", "responsibilities_init",
-    "init_methods", "pca_components"
-  )
-  conflicting <- intersect(names(fit_options), forbidden)
-  if (length(conflicting)) {
-    stop(
-      "The selector controls or cannot share these arguments across M: ",
-      paste(conflicting, collapse = ", "), ".",
-      call. = FALSE
-    )
-  }
-  if ("greedy" %in% names(fit_options) &&
-      !identical(fit_options$greedy, "none")) {
-    stop("greedy must be 'none'; use direction for dimension selection.",
+  max_intrinsic_dim <- .mpcurve_integer_setting(max_intrinsic_dim, "max_intrinsic_dim")
+  position_prior <- match.arg(position_prior)
+  fit_options <- list(S = S, num_bins = num_bins, initial_method = initial_method,
+    position_prior = position_prior, max_iter = max_iter, tol = tol,
+    verbose = verbose, init_control = init_control, control = control)
+  init <- .mpcurve_interface_options(fit_options$init_control,
+                                     mpcurve_init_control, "init_control")
+  if (!is.null(init$fits_init) || !is.null(init$responsibilities_init) ||
+      !is.null(init$pca_components)) {
+    stop("The selector cannot share supplied fits, responsibilities, or PCA components across dimensions.",
          call. = FALSE)
   }
-  if ("partition_prior" %in% names(fit_options) &&
-      !identical(fit_options$partition_prior, "fixed")) {
-    stop("Dimension selection requires partition_prior = 'fixed'.",
+  ctrl <- .mpcurve_interface_options(fit_options$control, mpcurve_control, "control")
+  if (!is.null(ctrl$partition_prior_weights)) {
+    stop("Dimension selection requires a uniform partition prior; partition_prior_weights must be NULL.",
          call. = FALSE)
   }
-  if ("partition_prior_init" %in% names(fit_options) &&
-      !is.null(fit_options$partition_prior_init)) {
-    stop("Dimension selection requires a uniform partition prior; partition_prior_init must be NULL.",
-         call. = FALSE)
+  if (!is.null(fit_options$initial_method) && length(fit_options$initial_method) != 1L) {
+    stop("initial_method must select exactly one initialization method.", call. = FALSE)
   }
-  if ("hard_assign_final" %in% names(fit_options) &&
-      !identical(fit_options$hard_assign_final, FALSE)) {
-    stop("Dimension selection requires hard_assign_final = FALSE.",
-         call. = FALSE)
-  }
-  if ("method" %in% names(fit_options) &&
-      length(fit_options$method) != 1L) {
-    stop("method must have length one for a search across dimensions.",
-         call. = FALSE)
-  }
-  fit_options[c("greedy", "partition_prior", "partition_prior_init",
-                "hard_assign_final")] <- NULL
+  fit_options$partition_prior <- NULL
+  fit_options$control <- ctrl
+  fit_options$init_control <- init
 
   candidates <- .mpcurve_dimension_empty_candidates()
   history <- .mpcurve_dimension_empty_history()
   fitted_K <- NULL
 
   fit_dimension <- function(M) {
-    initializations <- if (M == 1L) "single" else
-      c("similarity", "ordering_methods")
-    attempts <- lapply(initializations, function(initialization) {
-      .mpcurve_dimension_fit_candidate(X, M, initialization, fit_options)
-    })
-    rows <- do.call(rbind, lapply(attempts, `[[`, "row"))
-    successful <- which(rows$status == "success")
-    if (!length(successful)) {
-      detail <- paste(rows$error, collapse = " | ")
-      stop(sprintf("All fits failed for M=%d: %s", M, detail), call. = FALSE)
+    initialization <- if (M == 1L) "single" else "similarity"
+    result <- .mpcurve_dimension_fit_candidate(X, M, initialization, fit_options)
+    if (identical(result$row$status, "failed")) {
+      stop(sprintf("Fit failed for M=%d using %s initialization: %s",
+                   M, initialization, result$row$error), call. = FALSE)
     }
-    successful_K <- unique(rows$K[successful])
-    if (length(successful_K) != 1L) {
-      stop(
-        sprintf("Cannot compare initializations for M=%d: fitted K differs.", M),
-        call. = FALSE
-      )
-    }
-    best_idx <- successful[which.max(rows$score[successful])]
-    rows$selected_for_M[best_idx] <- TRUE
+    result$row$selected_for_M <- TRUE
     list(
-      fit = attempts[[best_idx]]$fit,
-      score = rows$score[best_idx],
-      K = rows$K[best_idx],
-      rows = rows
+      fit = result$fit,
+      score = result$row$score,
+      K = result$row$K,
+      rows = result$row
     )
   }
 

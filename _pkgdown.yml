@@ -7,22 +7,31 @@ template:
 home:
   sidebar: false
 
+news:
+  cran_dates: false
+
 navbar:
   components:
     news:
       text: Changelog
-      href: https://github.com/AgueroZZ/MPCurver/blob/main/NEWS.md
+      href: news/index.html
 
 reference:
   - title: Model fitting
     contents:
       - fit_mpcurve
+      - mpcurve_control
+      - mpcurve_init_control
+      - mpcurve_continue_control
       - select_mpcurve_dimension
       - do_mpcurve
       - fitted_prior
       - mpcurve
   - title: Inspection and visualization
     contents:
+      - fitted_positions
+      - fitted_trajectories
+      - fitted_assignments
       - print.mpcurve
       - summary.mpcurve
       - plot.mpcurve
@@ -35,7 +44,7 @@ reference:
       - tSNE_ordering
   - title: Simulation helpers
     contents:
-      - simulate_cavi_toy
+      - simulate_mpcurve
       - simulate_dual_trajectory
       - simulate_intrinsic_trajectories
       - simulate_spiral2d
@@ -48,7 +57,13 @@ articles:
     contents:
       - mpcurve_intro
       - partition
+      - intrinsic_dimension
   - title: Case studies
     navbar: Case studies
     contents:
       - fitness
+  - title: Algorithm details
+    navbar: Algorithm details
+    contents:
+      - cavi_single
+      - cavi_partition

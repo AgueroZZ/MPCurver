@@ -1,0 +1,183 @@
+---
+title: "Multi-ordering CAVI"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Multi-ordering CAVI}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+This page describes the structured CAVI algorithm for the
+[multiple-ordering model](partition.html#statistical-model). The tutorial
+presents the model and software use; this page gives the variational family
+and the updates used to fit it.
+
+There are $n$ samples, $P$ features, $M$ orderings, and $K$ grid positions.
+$C_i^{(m)}$ is sample $i$'s position along ordering $m$, $Z_j$ is feature $j$'s
+ordering assignment, and $U_j$ is its trajectory. Position probabilities are
+$\pi_{mk}$, assignment prior weights are $\omega_m$, noise variances are
+$\sigma_j^2$, and smoothness precisions are $\lambda_{jm}$. The random-walk
+precision $Q_K$ acts along the grid.
+
+## Variational family
+
+MPCurver uses the structured variational family
+
+$$
+q(C,Z,U)
+=
+\prod_{m=1}^M\prod_{i=1}^n q(C_i^{(m)})
+\prod_{j=1}^P q(Z_j)q(U_j\mid Z_j).
+$$
+
+Write $r_{imk}=q(C_i^{(m)}=k)$ and $w_{jm}=q(Z_j=m)$, with
+
+$$
+q(U_j\mid Z_j=m)=N(\mu_{jm},V_{jm}).
+$$
+
+Keeping the trajectory posterior conditional on the feature assignment
+represents uncertainty about both its shape and its ordering. Each possible
+assignment has a trajectory mean and covariance, including assignments with
+small $w_{jm}$.
+
+The algorithm maximizes the evidence lower bound (ELBO) by alternating
+trajectory, sample-position, feature-assignment, and parameter updates.
+Fitting uses temperature $T=1$ throughout by default, with no annealing.
+
+## Conditional trajectories
+
+Let $R^{(m)}=(r_{imk})$. Define the expected sample count in bin $k$ of
+ordering $m$ and the corresponding $K$-dimensional count vector as
+
+$$
+n_{mk}=\sum_{i=1}^n r_{imk},\qquad
+\mathbf n_m=(n_{m1},\ldots,n_{mK})^T.
+$$
+
+Each sample contributes its position probability to each bin, so
+$\sum_{k=1}^K n_{mk}=n$ for every ordering. These are soft sample counts.
+Conditional on $Z_j=m$,
+
+$$
+A_{jm}=\lambda_{jm}Q_K+
+\operatorname{diag}\!\left(\frac{\mathbf n_m}{\sigma_j^2}\right),\qquad
+b_{jm}=\frac{(R^{(m)})^T X_{\cdot j}}{\sigma_j^2},
+$$
+
+$$
+V_{jm}=A_{jm}^{-1},\qquad \mu_{jm}=V_{jm}b_{jm}.
+$$
+
+These updates combine the smoothness prior with the full likelihood
+conditional on that assignment. The conditional trajectory posterior is
+proper when $A_{jm}$ is positive definite, so its covariance $A_{jm}^{-1}$
+exists.
+
+## Sample positions
+
+The position update weights each feature by its assignment probability:
+
+$$
+\log r_{imk}\stackrel{+}{=}
+\log\pi_{mk}-\frac12\sum_{j=1}^P w_{jm}
+\frac{(x_{ij}-\mu_{jmk})^2+V_{jm,kk}}{\sigma_j^2}.
+$$
+
+Here $\stackrel{+}{=}$ means equality up to a normalizing constant over $k$.
+A feature with large $w_{jm}$ contributes more to ordering $m$.
+The posterior variance $V_{jm,kk}$ propagates trajectory uncertainty into
+the position update.
+
+## Feature assignments
+
+For each feature and ordering, the local objective $B_{jm}$ combines expected
+log likelihood, expected trajectory log prior, and trajectory entropy.
+Assignment probabilities then satisfy
+
+$$
+w_{jm}=\frac{\omega_m\exp(B_{jm})}
+{\sum_{\ell=1}^M\omega_\ell\exp(B_{j\ell})}.
+$$
+
+Thus assignments depend on data fit, smoothness, and posterior uncertainty.
+
+Define the expected residual sum of squares and roughness as
+
+$$
+E_{jm}=\sum_{i,k}r_{imk}
+\left[(x_{ij}-\mu_{jmk})^2+V_{jm,kk}\right],\qquad
+G_{jm}=\mu_{jm}^TQ_K\mu_{jm}+\operatorname{tr}(Q_KV_{jm}).
+$$
+
+Let $\rho=\operatorname{rank}(Q_K)$. These quantities also determine the
+noise-variance and smoothness updates below.
+
+<details>
+<summary>Local objective for a feature assignment</summary>
+
+Writing $|Q_K|_+$ for the generalized determinant, the standard local
+objective is
+
+$$
+\begin{aligned}
+B_{jm}=\;&-\frac n2\log(2\pi\sigma_j^2)-\frac{E_{jm}}{2\sigma_j^2}\\
+&+\frac12\left[\rho\{\log\lambda_{jm}-\log(2\pi)\}
++\log|Q_K|_+-\lambda_{jm}G_{jm}\right]\\
+&+\frac12\left[K\log(2\pi e)+\log|V_{jm}|\right].
+\end{aligned}
+$$
+
+The intrinsic prior uses a fixed reference measure on its null space.
+An optional smoothness-parameter prior adds $\log p(\lambda_{jm})$ to this
+expression; its contribution is zero in the standard model.
+
+</details>
+
+## Empirical-Bayes parameters and stopping
+
+With $E_{jm}$ and $G_{jm}$ as defined above, the standard parameter updates
+are
+
+$$
+\widehat{\sigma_j^2}=\frac1n\sum_{m=1}^M w_{jm}E_{jm},\qquad
+\widehat{\lambda}_{jm}=\frac{\rho}{G_{jm}},
+$$
+
+$$
+\widehat{\pi}_{mk}=\frac1n\sum_i r_{imk},\qquad
+\widehat{\omega}_m=\frac1P\sum_j w_{jm}.
+$$
+
+The implementation applies numerical bounds to noise variances and
+smoothness precisions. Each joint sweep updates the conditional trajectories,
+sample positions and $\pi$, noise variances and smoothness precisions, then
+feature assignments and $\omega$. The model dimension $M$ stays fixed.
+
+Fitting stops when the absolute ELBO increment divided by $nP$ is below
+`tol` (default `1e-6`), subject to a numerical nondecrease check, or when
+`max_iter` sweeps have been reached. The default `max_iter` is 100;
+`tol = 0` disables early stopping.
+
+
+## Known measurement errors
+
+When `S` is supplied, $S_{ij}$ is the known measurement standard deviation
+for sample $i$ and feature $j$. Replace $\sigma_j^2$ in the likelihood by
+the known variance $S_{ij}^2$. The conditional trajectory precision and
+linear term become
+
+$$
+A_{jm}=\lambda_{jm}Q_K+
+\operatorname{diag}_k\!\left(\sum_i\frac{r_{imk}}{S_{ij}^2}\right),\qquad
+b_{jmk}=\sum_i\frac{r_{imk}x_{ij}}{S_{ij}^2}.
+$$
+
+For a feature-specific vector `S`, use $S_{ij}=S_j$ for every sample $i$.
+The sample-position update uses these known variances, and the update of
+$\sigma_j^2$ is omitted.
+
+Return to the [multiple-ordering example](partition.html#fit-a-model-with-m-2)
+or see [Single-ordering CAVI](cavi_single.html).

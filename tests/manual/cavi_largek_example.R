@@ -1,8 +1,4 @@
-source("R/00_utils.R")
-source("R/01_initialization.R")
-source("R/02_prior.R")
-source("R/06_cSmoothEM.R")
-source("R/09_cavi.R")
+pkgload::load_all(".", quiet = TRUE)
 
 args <- commandArgs(trailingOnly = TRUE)
 plot_out <- if (length(args) >= 1L) args[[1L]] else NULL
@@ -39,14 +35,12 @@ score_orientation <- function(est_mu, true_mu) {
 }
 
 evaluate_run <- function(seed) {
-  sim <- simulate_cavi_toy(
+  sim <- simulate_mpcurve(
     n = 220,
     d = 24,
-    K = 12,
-    rw_q = 2,
-    lambda_range = c(0.8, 3.5),
-    sigma_range = c(0.07, 0.18),
-    seed = seed
+    num_bins = 12,
+    seed = seed,
+    control = list(rw_order = 2, lambda_range = c(0.8, 3.5), noise_sd_range = c(0.07, 0.18))
   )
 
   fit <- cavi(

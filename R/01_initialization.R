@@ -232,27 +232,8 @@ make_init <- function(
 # Ordering methods
 # =========================
 
-#' Fiedler ordering from a kNN graph
-#'
-#' Builds a kNN graph on rows of \code{X}, computes a 1D ordering coordinate using
-#' the Fiedler direction of a normalized graph operator, and returns an ordering
-#' \code{t} scaled to \eqn{[0,1]}.
-#'
-#' @param X Numeric matrix \eqn{n \times D} (rows are observations).
-#' @param k Number of nearest neighbors. If left at the default and the
-#'   resulting kNN graph is disconnected, the function automatically increases
-#'   \code{k} until the graph becomes connected.
-#' @param weight Similarity type: \code{"rbf"}, \code{"inv"}, or \code{"binary"}.
-#' @param sigma Bandwidth for \code{weight="rbf"}; if \code{NULL}, uses median kNN distance.
-#' @param keep Component handling: \code{"giant"} keeps the largest connected component;
-#'   \code{"all"} uses all nodes (may be unstable if disconnected).
-#' @param return_full If \code{TRUE} (default), return \code{t} of length \eqn{n}
-#'   with \code{NA} for nodes excluded by \code{keep="giant"}.
-#'   If \code{FALSE}, return \code{t} only for the kept nodes.
-#' @return A list with \code{t}, \code{keep_idx}, \code{n_components}, and
-#'   \code{k_used}.
-#' @export
-fiedler_ordering <- function(
+# Internal numerical implementation of fiedler_ordering.
+.fiedler_ordering <- function(
     X,
     k = 15,
     weight = c("binary", "rbf", "inv"),
@@ -398,19 +379,8 @@ fiedler_ordering <- function(
 }
 
 
-#' t-SNE ordering
-#'
-#' @param X numeric matrix (n x D).
-#' @param tSNE_dims integer; embedding dimension passed to Rtsne.
-#' @param component which embedding coordinate to use as ordering (default 1).
-#' @param perplexity t-SNE perplexity; must satisfy < (n-1)/3.
-#' @param max_iter max iterations.
-#' @param seed optional integer for reproducibility.
-#' @param scale01 logical; if TRUE, rescale returned t to [0,1].
-#' @param orient_by_pc1 logical; if TRUE, flip sign to align with PC1.
-#' @return list(t, keep_idx)
-#' @export
-tSNE_ordering <- function(
+# Internal numerical implementation of tSNE_ordering.
+.tSNE_ordering <- function(
     X,
     tSNE_dims = 1,
     component = 1,
@@ -445,7 +415,7 @@ tSNE_ordering <- function(
 }
 
 
-#' PCA ordering (PC1)
+#' Principal-component ordering
 #'
 #' @param X numeric matrix (n x D).
 #' @param center logical.
@@ -463,8 +433,7 @@ PCA_ordering <- function(
     component = 1L
 ) {
   X <- as.matrix(X)
-  component <- as.integer(component)
-  if (component < 1L) stop("component must be >= 1.")
+  component <- .mpcurve_integer_setting(component, "component")
   max_comp <- min(nrow(X), ncol(X))
   if (component > max_comp)
     stop(sprintf("component %d exceeds available PCs (%d).", component, max_comp))
@@ -480,16 +449,8 @@ PCA_ordering <- function(
 }
 
 
-#' Principal curve ordering
-#'
-#' @param X numeric matrix (n x D).
-#' @param smoother a function (recommended) or a name like "smooth_spline".
-#' @param thresh,maxit,stretch,approx_points passed to princurve::principal_curve.
-#' @param scale01 logical; if TRUE, rescale returned t to [0,1].
-#' @param orient_by_pc1 logical; if TRUE, flip sign to align with PC1.
-#' @return list(t, keep_idx, fit)
-#' @export
-pcurve_ordering <- function(
+# Internal numerical implementation of pcurve_ordering.
+.pcurve_ordering <- function(
     X,
     smoother = c("smooth_spline", "lowess", "periodic_lowess"),
     thresh = 0.001,
@@ -517,30 +478,8 @@ pcurve_ordering <- function(
   list(t = t, keep_idx = seq_len(nrow(X)), fit = pc_fit)
 }
 
-#' Landmark Isomap ordering (no vegan; avoids O(n^2) dist matrix)
-#'
-#' @description
-#' Landmark approximation to Isomap for fast ordering. Builds a weighted kNN graph
-#' on rows of \code{X}, computes geodesic distances to a subset of landmark points,
-#' embeds landmarks by classical MDS, then projects all points by inverse-distance
-#' weighted averaging.
-#'
-#' @param X numeric matrix (n x D).
-#' @param k number of nearest neighbors in the kNN graph (2 <= k < n).
-#' @param ndim embedding dimension (>= component).
-#' @param component which embedding coordinate to use as ordering.
-#' @param landmark integer; number of landmark points. If \code{NULL}, uses \code{min(1000, n)}.
-#' @param landmark_method how to choose landmarks: \code{"random"} (default) or \code{"kmeans"}.
-#' @param seed optional integer for reproducibility.
-#' @param keep component handling: \code{"giant"} keeps the largest connected component;
-#'   \code{"all"} uses all nodes (may yield Inf distances if disconnected).
-#' @param return_full if TRUE, return length-n t with NA for excluded nodes (keep="giant").
-#' @param orient_by_pc1 logical; if TRUE, flip sign to align with PC1.
-#' @param scale01 logical; if TRUE, rescale returned t to [0,1].
-#' @param eps small positive number to stabilize inverse-distance weights.
-#' @return list(t, keep_idx, n_components, embed, landmark_idx, geodesic_to_landmark)
-#' @export
-isomap_ordering <- function(
+# Internal numerical implementation of isomap_ordering.
+.isomap_ordering <- function(
     X,
     k = 15,
     ndim = 1,
