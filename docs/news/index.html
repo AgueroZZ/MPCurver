@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -47,6 +47,10 @@
       <small>Source: <a href="https://github.com/AgueroZZ/MPCurver/blob/HEAD/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.4.1" id="mpcurver-041">MPCurver 0.4.1<a class="anchor" aria-label="anchor" href="#mpcurver-041"></a></h2>
+<ul><li>Isomap now defaults to <code>num_neighbors = NULL</code>, selecting the smallest neighbor count that connects the full undirected graph (<code>k_min</code>) separately within each feature group. Explicit counts remain fixed; counts of one are supported. Ordering results and fit initialization metadata record <code>k_used</code>. Neighbor queries exclude each sample itself and break distance ties by row index, keeping graphs nested during the connectivity search.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.4.0" id="mpcurver-040">MPCurver 0.4.0<a class="anchor" aria-label="anchor" href="#mpcurver-040"></a></h2>
 <ul><li><p>Added <code><a href="../reference/fitted_positions.html">fitted_positions()</a></code>, <code><a href="../reference/fitted_trajectories.html">fitted_trajectories()</a></code>, and <code><a href="../reference/fitted_assignments.html">fitted_assignments()</a></code> with consistent dimensions across ordering counts, posterior uncertainty extraction, and preserved sample/feature names.</p></li>

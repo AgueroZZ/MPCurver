@@ -217,7 +217,7 @@ data.frame(
 #>    method elbo_last
 #> 1     PCA -424.1734
 #> 2 fiedler -375.5500
-#> 3  isomap -376.9430
+#> 3  isomap -376.5416
 ```
 
 For these fits with the same model and data, a larger final ELBO
@@ -240,9 +240,12 @@ fit_rw3_fixed <- fit_mpcurve(
 
 Use `lambda_bounds` and `sigma2_bounds` in the same constructor to set
 parameter limits. `mpcurve_init_control()` configures feature grouping
-and ordering-helper arguments. For example,
-`method_args = list(num_neighbors = 10)` controls the neighborhood size
-when `initial_method = "isomap"`.
+and ordering-helper arguments. Isomap defaults to `k_min`, the smallest
+neighbor count connecting all samples in its undirected graph, computed
+separately within each feature group. Its realized count is stored as
+`k_used` in the initialization metadata. For a fixed count, use
+`method_args = list(num_neighbors = 10)` when
+`initial_method = "isomap"`.
 
 Invalid initialization settings raise an error. If the requested
 ordering computation fails, fitting warns with the cause and retries

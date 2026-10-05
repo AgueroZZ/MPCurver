@@ -4,7 +4,9 @@ test_that("invalid initializer settings error before computation in every dimens
   cases <- list(
     list("fiedler", list(num_neighbors = 1), "num_neighbors"),
     list("fiedler", list(num_neighbors = 40), "num_neighbors"),
-    list("isomap", list(num_neighbors = NULL), "num_neighbors"),
+    list("isomap", list(num_neighbors = 0), "num_neighbors"),
+    list("isomap", list(num_neighbors = 1.5), "num_neighbors"),
+    list("isomap", list(num_neighbors = 40), "num_neighbors"),
     list("isomap", list(component = 2), "embedding_dims"),
     list("tSNE", list(perplexity = 20), "perplexity"),
     list("tSNE", list(max_iter = 1.5), "max_iter"),

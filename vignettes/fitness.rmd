@@ -221,7 +221,8 @@ structure in the dataset?
 
 The fitting choices are:
 
-- `initial_method = "isomap"` supplies the initialization;
+- `initial_method = "isomap"` initializes with the smallest neighbor count
+  connecting all samples in the undirected graph;
 - `num_bins = 50` uses a 50-bin latent grid;
 - `mpcurve_control(rw_order = 2)` uses a second-order random-walk prior for smooth trajectories.
 
@@ -252,10 +253,10 @@ Figure 2 shows four panels showing fitted single-ordering CAVI trajectories for 
 
 ```{r uni-trajectories, fig.height = 8, out.width = "100%", fig.alt = "Four panels showing fitted single-ordering CAVI trajectories for the first four environment dimensions.", fig.cap="Figure 2. Four panels showing fitted single-ordering CAVI trajectories for the first four environment dimensions."}
 par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
-plot(fit_unidir, dims = 1)
-plot(fit_unidir, dims = 2)
-plot(fit_unidir, dims = 3)
-plot(fit_unidir, dims = 4)
+plot(fit_unidir, dims = 1, main = "Single ordering")
+plot(fit_unidir, dims = 2, main = "Single ordering")
+plot(fit_unidir, dims = 3, main = "Single ordering")
+plot(fit_unidir, dims = 4, main = "Single ordering")
 par(mfrow = c(1, 1))
 ```
 
@@ -291,10 +292,10 @@ Figure 4 shows four panels showing fitted trajectories under the smoothed single
 
 ```{r uni-trajectories-smooth, fig.height = 8, out.width = "100%", fig.alt = "Four panels showing fitted trajectories under the smoothed single-ordering CAVI fit.", fig.cap="Figure 4. Four panels showing fitted trajectories under the smoothed single-ordering CAVI fit."}
 par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
-plot(fit_unidir_smooth, dims = 1)
-plot(fit_unidir_smooth, dims = 3)
-plot(fit_unidir_smooth, dims = 7)
-plot(fit_unidir_smooth, dims = 9)
+plot(fit_unidir_smooth, dims = 1, main = "Smoothed single ordering")
+plot(fit_unidir_smooth, dims = 3, main = "Smoothed single ordering")
+plot(fit_unidir_smooth, dims = 7, main = "Smoothed single ordering")
+plot(fit_unidir_smooth, dims = 9, main = "Smoothed single ordering")
 par(mfrow = c(1, 1))
 ```
 
@@ -440,10 +441,10 @@ Figure 8 shows four panels showing fitted trajectories for the single-ordering C
 
 ```{r uni-known-sd-trajectories, fig.height = 8, out.width = "100%", fig.alt = "Four panels showing fitted trajectories for the single-ordering CAVI fit with known measurement SDs.", fig.cap="Figure 8. Four panels showing fitted trajectories for the single-ordering CAVI fit with known measurement SDs."}
 par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
-plot(fit_unidir_known_sd, dims = 1)
-plot(fit_unidir_known_sd, dims = 2)
-plot(fit_unidir_known_sd, dims = 31)
-plot(fit_unidir_known_sd, dims = 45)
+plot(fit_unidir_known_sd, dims = 1, main = "Known measurement SD")
+plot(fit_unidir_known_sd, dims = 2, main = "Known measurement SD")
+plot(fit_unidir_known_sd, dims = 31, main = "Known measurement SD")
+plot(fit_unidir_known_sd, dims = 45, main = "Known measurement SD")
 par(mfrow = c(1, 1))
 ```
 

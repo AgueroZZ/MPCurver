@@ -1247,6 +1247,7 @@
       fallback = subset_res$fallback,
       fallback_reason = subset_res$fallback_reason
     )
+    if (!is.null(subset_res$k_used)) init_info[[m]]$k_used <- subset_res$k_used
   }
 
   names(init_info) <- ord_labels
@@ -1751,6 +1752,7 @@
     info$fallback <- TRUE
     info$fallback_reason <- reason
   }
+  if (!is.null(result$k_used)) info$k_used <- result$k_used
   attr(result, "init_info") <- info
   result
 }

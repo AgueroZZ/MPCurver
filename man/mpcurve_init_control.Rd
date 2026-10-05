@@ -52,7 +52,10 @@ shared as a scalar or supplied per group. The default is each group's PC1.}
 For \code{initial_method = "fiedler"} or \code{"isomap"}, set the graph's neighbor
 count with \code{method_args = list(num_neighbors = 20)}. Available arguments
 are documented in \code{\link[=fiedler_ordering]{fiedler_ordering()}}, \code{\link[=isomap_ordering]{isomap_ordering()}}, and the other
-ordering helpers.}
+ordering helpers.
+Isomap defaults to the smallest count connecting all samples, computed
+separately within each feature group. The realized count is recorded as
+\code{k_used} in the fit's initialization metadata.}
 
 \item{on_failure}{Action when the requested ordering initializer fails after
 argument validation. Default: \code{"pca"}, warning with the original error and

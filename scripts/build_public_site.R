@@ -176,12 +176,13 @@ normalize_public_html <- function() {
                       full.names = TRUE)
   for (path in paths) {
     lines <- readLines(path, warn = FALSE)
+    lines <- sub("[[:blank:]]+$", "", lines)
     if (length(lines) && !nzchar(tail(lines, 1L))) {
       while (length(lines) && !nzchar(tail(lines, 1L))) {
         lines <- head(lines, -1L)
       }
-      writeLines(lines, path)
     }
+    writeLines(lines, path)
   }
 }
 normalize_public_html()

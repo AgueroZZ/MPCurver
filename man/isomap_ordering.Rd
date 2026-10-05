@@ -6,7 +6,7 @@
 \usage{
 isomap_ordering(
   X,
-  num_neighbors = 15L,
+  num_neighbors = NULL,
   component = 1L,
   seed = NULL,
   control = NULL
@@ -15,7 +15,11 @@ isomap_ordering(
 \arguments{
 \item{X}{Numeric sample-by-feature matrix.}
 
-\item{num_neighbors}{Integer nearest-neighbor count; default 15.}
+\item{num_neighbors}{Integer nearest-neighbor count between 1 and
+\code{nrow(X)-1}. The default \code{NULL} selects \code{k_min}, the smallest count for
+which the undirected graph containing every sample is connected. An edge
+is included when either sample selects the other as a neighbor. Distance
+ties are broken by sample row index. An explicit count is held fixed.}
 
 \item{component}{Positive embedding-coordinate index; default 1.}
 
@@ -31,14 +35,22 @@ orientation aligns their sign with PC1. Inverse-distance stabilization
 is an internal numerical rule.}
 }
 \value{
-A list with \code{t}, \code{keep_idx}, \code{n_components}, \code{embed}, \code{landmark_idx},
-and \code{geodesic_to_landmark}.
+A list with \code{t}, \code{keep_idx}, \code{n_components}, the realized \code{k_used},
+\code{embed}, \code{landmark_idx}, and \code{geodesic_to_landmark}.
 }
 \description{
 Build a nearest-neighbor graph, calculate geodesic distances to landmarks,
 and use a landmark embedding coordinate to order samples.
 }
+\details{
+The automatic count uses graph connectivity, without fitting
+candidate models. In multi-ordering MPCurve initialization it is computed
+independently from each feature group's observations. Connectivity does
+not guarantee that the graph preserves the trajectory's local geometry.
+}
 \examples{
 set.seed(1)
-isomap_ordering(matrix(rnorm(80), 40, 2), num_neighbors = 10, seed = 1)
+X <- matrix(rnorm(80), 40, 2)
+isomap_ordering(X, seed = 1)$k_used
+isomap_ordering(X, num_neighbors = 10, seed = 1)
 }

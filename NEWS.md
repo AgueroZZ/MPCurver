@@ -1,3 +1,12 @@
+# MPCurver 0.4.1
+
+- Isomap now defaults to `num_neighbors = NULL`, selecting the smallest
+  neighbor count that connects the full undirected graph (`k_min`) separately
+  within each feature group. Explicit counts remain fixed; counts of one are
+  supported. Ordering results and fit initialization metadata record `k_used`.
+  Neighbor queries exclude each sample itself and break distance ties by row
+  index, keeping graphs nested during the connectivity search.
+
 # MPCurver 0.4.0
 
 - Added `fitted_positions()`, `fitted_trajectories()`, and

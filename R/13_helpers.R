@@ -71,7 +71,7 @@
     fiedler = list(num_neighbors = NULL),
     tSNE = list(component = 1L, perplexity = 10, max_iter = 500L, seed = NULL),
     pcurve = list(smoother = "smooth_spline", max_iter = 10L, tol = 0.001),
-    isomap = list(num_neighbors = 15L, component = 1L, seed = NULL))
+    isomap = list(num_neighbors = NULL, component = 1L, seed = NULL))
   args <- utils::modifyList(defaults, method_args, keep.null = TRUE)
   opts <- if (method != "PCA") .mpcurve_ordering_options(method, args$control) else list()
   for (nm in intersect(names(args), c("component", "max_iter"))) {
@@ -85,8 +85,9 @@
   }
   if (method %in% c("fiedler", "isomap")) {
     if (nrow(X) < 3L) stop("Ordering initialization requires at least 3 samples.", call. = FALSE)
-    if (method == "isomap" || !is.null(args$num_neighbors)) {
-      .mpcurve_integer_setting(args$num_neighbors, "num_neighbors", 2L)
+    if (!is.null(args$num_neighbors)) {
+      minimum <- if (method == "isomap") 1L else 2L
+      .mpcurve_integer_setting(args$num_neighbors, "num_neighbors", minimum)
       if (args$num_neighbors >= nrow(X)) stop("num_neighbors must be less than nrow(X).", call. = FALSE)
     }
   }
@@ -199,7 +200,11 @@ pcurve_ordering <- function(X, smoother = c("smooth_spline", "lowess", "periodic
 #' Build a nearest-neighbor graph, calculate geodesic distances to landmarks,
 #' and use a landmark embedding coordinate to order samples.
 #' @inheritParams fiedler_ordering
-#' @param num_neighbors Integer nearest-neighbor count; default 15.
+#' @param num_neighbors Integer nearest-neighbor count between 1 and
+#'   `nrow(X)-1`. The default `NULL` selects `k_min`, the smallest count for
+#'   which the undirected graph containing every sample is connected. An edge
+#'   is included when either sample selects the other as a neighbor. Distance
+#'   ties are broken by sample row index. An explicit count is held fixed.
 #' @param component Positive embedding-coordinate index; default 1.
 #' @param seed Optional random seed for landmark selection.
 #' @param control Named advanced settings list: `embedding_dims = 1` (at least
@@ -210,21 +215,28 @@ pcurve_ordering <- function(X, smoother = c("smooth_spline", "lowess", "periodic
 #'   full output has `NA` for excluded samples. Scaling maps scores to `[0,1]`;
 #'   orientation aligns their sign with PC1. Inverse-distance stabilization
 #'   is an internal numerical rule.
-#' @return A list with `t`, `keep_idx`, `n_components`, `embed`, `landmark_idx`,
-#'   and `geodesic_to_landmark`.
+#' @return A list with `t`, `keep_idx`, `n_components`, the realized `k_used`,
+#'   `embed`, `landmark_idx`, and `geodesic_to_landmark`.
+#' @details The automatic count uses graph connectivity, without fitting
+#'   candidate models. In multi-ordering MPCurve initialization it is computed
+#'   independently from each feature group's observations. Connectivity does
+#'   not guarantee that the graph preserves the trajectory's local geometry.
 #' @examples
 #' set.seed(1)
-#' isomap_ordering(matrix(rnorm(80), 40, 2), num_neighbors = 10, seed = 1)
+#' X <- matrix(rnorm(80), 40, 2)
+#' isomap_ordering(X, seed = 1)$k_used
+#' isomap_ordering(X, num_neighbors = 10, seed = 1)
 #' @md
 #' @export
-isomap_ordering <- function(X, num_neighbors = 15L, component = 1L,
+isomap_ordering <- function(X, num_neighbors = NULL, component = 1L,
                             seed = NULL, control = NULL) {
   opts <- .mpcurve_ordering_options("isomap", control)
   opts$ndim <- opts$embedding_dims
   opts$landmark <- opts$num_landmarks
   opts$embedding_dims <- opts$num_landmarks <- NULL
   do.call(.isomap_ordering, c(list(X = X,
-    k = .mpcurve_integer_setting(num_neighbors, "num_neighbors", 2L),
+    k = if (is.null(num_neighbors)) NULL else
+      .mpcurve_integer_setting(num_neighbors, "num_neighbors", 1L),
     component = .mpcurve_integer_setting(component, "component"), seed = seed), opts))
 }
 

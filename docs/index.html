@@ -23,7 +23,7 @@
 
     <a class="navbar-brand me-2" href="index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -205,7 +205,7 @@ Figure 4. Variational objective over fitting iterations for the spiral model.
 <span><span class="co">#&gt;    method elbo_last</span></span>
 <span><span class="co">#&gt; 1     PCA -424.1734</span></span>
 <span><span class="co">#&gt; 2 fiedler -375.5500</span></span>
-<span><span class="co">#&gt; 3  isomap -376.9430</span></span></code></pre></div>
+<span><span class="co">#&gt; 3  isomap -376.5416</span></span></code></pre></div>
 <p>For these fits with the same model and data, a larger final ELBO indicates a better variational objective. Inspect the fitted trajectories as well as this numerical comparison. Sample positions are available in <code>fitted_positions(fit)</code>, and <code>fitted_trajectories(fit)</code> contains the estimated feature trajectories.</p>
 <p>Model settings are collected in <code><a href="reference/mpcurve_control.html">mpcurve_control()</a></code>. The default RW2 prior uses empirical-Bayes smoothness updates. For RW3 with precision fixed at 5:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
@@ -214,7 +214,7 @@ Figure 4. Variational objective over fitting iterations for the spiral model.
 <span>  initial_method <span class="op">=</span> <span class="st">"isomap"</span>,</span>
 <span>  control <span class="op">=</span> <span class="fu"><a href="reference/mpcurve_control.html">mpcurve_control</a></span><span class="op">(</span>rw_order <span class="op">=</span> <span class="fl">3</span>, lambda_init <span class="op">=</span> <span class="fl">5</span>, fix_lambda <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Use <code>lambda_bounds</code> and <code>sigma2_bounds</code> in the same constructor to set parameter limits. <code><a href="reference/mpcurve_init_control.html">mpcurve_init_control()</a></code> configures feature grouping and ordering-helper arguments. For example, <code>method_args = list(num_neighbors = 10)</code> controls the neighborhood size when <code>initial_method = "isomap"</code>.</p>
+<p>Use <code>lambda_bounds</code> and <code>sigma2_bounds</code> in the same constructor to set parameter limits. <code><a href="reference/mpcurve_init_control.html">mpcurve_init_control()</a></code> configures feature grouping and ordering-helper arguments. Isomap defaults to <code>k_min</code>, the smallest neighbor count connecting all samples in its undirected graph, computed separately within each feature group. Its realized count is stored as <code>k_used</code> in the initialization metadata. For a fixed count, use <code>method_args = list(num_neighbors = 10)</code> when <code>initial_method = "isomap"</code>.</p>
 <p>Invalid initialization settings raise an error. If the requested ordering computation fails, fitting warns with the cause and retries using PCA component 1. Use <code>init_control = mpcurve_init_control(on_failure = "error")</code> to stop instead. If PCA fails, fitting stops; the initialization metadata records any successful fallback and its original cause.</p>
 <p>Continue a fit with <code>do_mpcurve(fit, max_iter = 100)</code>. It inherits the stored model and measurement errors. To change precision while continuing, use <code>control = mpcurve_continue_control(lambda_init = 5, fix_lambda = TRUE)</code>; <code>fix_lambda = FALSE</code> enables empirical-Bayes updates again. Omitted continuation settings inherit their fitted values.</p>
 <p>Ordering helpers keep method-specific advanced settings in a named <code>control</code> list. When fitting, nest this list inside <code>method_args</code>, for example <code>mpcurve_init_control(method_args = list(num_neighbors = 10, control = list(num_landmarks = 100)))</code> for Isomap. Reference pages list all accepted settings and defaults. Simulation helpers consistently use <code>n</code> for samples, <code>d</code> or block-specific counts for features, and <code>noise_sd</code> for Gaussian noise standard deviations; trajectory-shape settings use their own <code>control</code>.</p>

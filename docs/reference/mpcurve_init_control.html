@@ -13,7 +13,7 @@ fitted with separate calls."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -136,7 +136,10 @@ shared as a scalar or supplied per group. The default is each group's PC1.</p></
 For <code>initial_method = "fiedler"</code> or <code>"isomap"</code>, set the graph's neighbor
 count with <code>method_args = list(num_neighbors = 20)</code>. Available arguments
 are documented in <code><a href="fiedler_ordering.html">fiedler_ordering()</a></code>, <code><a href="isomap_ordering.html">isomap_ordering()</a></code>, and the other
-ordering helpers.</p></dd>
+ordering helpers.
+Isomap defaults to the smallest count connecting all samples, computed
+separately within each feature group. The realized count is recorded as
+<code>k_used</code> in the fit's initialization metadata.</p></dd>
 
 
 <dt id="arg-on-failure">on_failure<a class="anchor" aria-label="anchor" href="#arg-on-failure"></a></dt>

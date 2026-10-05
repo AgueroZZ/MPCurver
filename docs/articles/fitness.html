@@ -21,7 +21,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -69,14 +69,14 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Analyzing the eLife Fitness Dataset with MPCurver</h1>
-            
-      
+
+
       <small class="dont-index">Source: <a href="https://github.com/AgueroZZ/MPCurver/blob/HEAD/vignettes/fitness.rmd" class="external-link"><code>vignettes/fitness.rmd</code></a></small>
       <div class="d-none name"><code>fitness.rmd</code></div>
     </div>
 
-    
-    
+
+
 <div class="section level2">
 <h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h2>
@@ -302,8 +302,8 @@ the main structure in the dataset?</p>
 <p>The fitting choices are:</p>
 <ul>
 <li>
-<code>initial_method = "isomap"</code> supplies the
-initialization;</li>
+<code>initial_method = "isomap"</code> initializes with the smallest
+neighbor count connecting all samples in the undirected graph;</li>
 <li>
 <code>num_bins = 50</code> uses a 50-bin latent grid;</li>
 <li>
@@ -341,10 +341,10 @@ convergence over iterations.
 trajectories for the first four environment dimensions.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, dims <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, dims <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, dims <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, dims <span class="op">=</span> <span class="fl">1</span>, main <span class="op">=</span> <span class="st">"Single ordering"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, dims <span class="op">=</span> <span class="fl">2</span>, main <span class="op">=</span> <span class="st">"Single ordering"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, dims <span class="op">=</span> <span class="fl">3</span>, main <span class="op">=</span> <span class="st">"Single ordering"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir</span>, dims <span class="op">=</span> <span class="fl">4</span>, main <span class="op">=</span> <span class="st">"Single ordering"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
 <img src="fitness_files/figure-html/uni-trajectories-1.png" class="r-plt" alt="Four panels showing fitted single-ordering CAVI trajectories for the first four environment dimensions." width="100%"><p class="caption">
 Figure 2. Four panels showing fitted single-ordering CAVI trajectories
@@ -390,17 +390,17 @@ Figure 3. ELBO trace for the smoothed single-ordering CAVI fit.
 <span><span class="co">#&gt;   Model          : homoskedastic</span></span>
 <span><span class="co">#&gt;   Intrinsic dim  : 1</span></span>
 <span><span class="co">#&gt;   n / d / K      : 421 / 45 / 50</span></span>
-<span><span class="co">#&gt;   Iterations     : 341</span></span>
+<span><span class="co">#&gt;   Iterations     : 308</span></span>
 <span><span class="co">#&gt;   Converged      : yes</span></span>
-<span><span class="co">#&gt;   ELBO (last)    : 11842.393573</span></span></code></pre></div>
+<span><span class="co">#&gt;   ELBO (last)    : 11823.525564</span></span></code></pre></div>
 <p>Figure 4 shows four panels showing fitted trajectories under the
 smoothed single-ordering CAVI fit.</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">7</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">9</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">1</span>, main <span class="op">=</span> <span class="st">"Smoothed single ordering"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">3</span>, main <span class="op">=</span> <span class="st">"Smoothed single ordering"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">7</span>, main <span class="op">=</span> <span class="st">"Smoothed single ordering"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_smooth</span>, dims <span class="op">=</span> <span class="fl">9</span>, main <span class="op">=</span> <span class="st">"Smoothed single ordering"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
 <img src="fitness_files/figure-html/uni-trajectories-smooth-1.png" class="r-plt" alt="Four panels showing fitted trajectories under the smoothed single-ordering CAVI fit." width="100%"><p class="caption">
 Figure 4. Four panels showing fitted trajectories under the smoothed
@@ -420,7 +420,7 @@ between the default and smoothed single-ordering fits.</p>
 <span>  <span class="va">fit_unidir_smooth</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span>,</span>
 <span>  <span class="va">fit_unidir</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 0.9522832</span></span>
+<span><span class="co">#&gt; [1] 0.9547583</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span></span>
 <span>  <span class="va">fit_unidir_smooth</span><span class="op">$</span><span class="va">locations</span><span class="op">$</span><span class="va">mean</span><span class="op">$</span><span class="va">pseudotime</span>,</span>
@@ -473,8 +473,8 @@ model-selection assessment.</p>
 <span><span class="co">#&gt;   Intrinsic dim  : 2</span></span>
 <span><span class="co">#&gt;   n / d / K      : 421 / 45 / 50</span></span>
 <span><span class="co">#&gt;   Iterations     : 500</span></span>
-<span><span class="co">#&gt;   Partition      : A=27, B=18</span></span>
-<span><span class="co">#&gt;   Objective (last): 13064.825013</span></span>
+<span><span class="co">#&gt;   Partition      : A=11, B=34</span></span>
+<span><span class="co">#&gt;   Objective (last): 12457.376272</span></span>
 <span><span class="co">#&gt;   Converged      : FALSE</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="inspect-trajectories-under-each-ordering">Inspect trajectories under each ordering<a class="anchor" aria-label="anchor" href="#inspect-trajectories-under-each-ordering"></a>
@@ -520,47 +520,17 @@ uncertain assignments, inspect the corresponding row of
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td align="left">0.5% Raf</td>
-<td align="left">carbon source</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
 <td align="left">1.5% Suc, 1% Raf</td>
 <td align="left">carbon source</td>
 <td align="left">A</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">1% EtOH</td>
 <td align="left">carbon source</td>
 <td align="left">A</td>
 </tr>
-<tr class="even">
-<td align="left">1% Gly</td>
-<td align="left">carbon source</td>
-<td align="left">A</td>
-</tr>
 <tr class="odd">
-<td align="left">1% Raf</td>
-<td align="left">carbon source</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
 <td align="left">0.5 μg/ml Flu</td>
-<td align="left">drug / chemical</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
-<td align="left">17 μM GdA</td>
-<td align="left">drug / chemical</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
-<td align="left">2 μg/ml Flu</td>
-<td align="left">drug / chemical</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
-<td align="left">8.5 μM GdA (B9)</td>
 <td align="left">drug / chemical</td>
 <td align="left">A</td>
 </tr>
@@ -572,36 +542,6 @@ uncertain assignments, inspect the corresponding row of
 <tr class="odd">
 <td align="left">Baffle, 2 μg/ml Ben</td>
 <td align="left">drug / chemical</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
-<td align="left">1.4% Gluc</td>
-<td align="left">glucose / batch</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
-<td align="left">1.8% Gluc</td>
-<td align="left">glucose / batch</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
-<td align="left">EC 1BigBatch</td>
-<td align="left">other</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
-<td align="left">EC Batch 20</td>
-<td align="left">other</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
-<td align="left">EC Batch 21</td>
-<td align="left">other</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
-<td align="left">EC Batch 23</td>
-<td align="left">other</td>
 <td align="left">A</td>
 </tr>
 <tr class="even">
@@ -630,38 +570,58 @@ uncertain assignments, inspect the corresponding row of
 <td align="left">A</td>
 </tr>
 <tr class="odd">
-<td align="left">22 hr Ferm</td>
-<td align="left">time course</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
-<td align="left">4 Day</td>
-<td align="left">time course</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
-<td align="left">5 Day</td>
-<td align="left">time course</td>
-<td align="left">A</td>
-</tr>
-<tr class="even">
-<td align="left">6 Day</td>
-<td align="left">time course</td>
-<td align="left">A</td>
-</tr>
-<tr class="odd">
 <td align="left">7 Day</td>
 <td align="left">time course</td>
 <td align="left">A</td>
 </tr>
 <tr class="even">
+<td align="left">0.5% Raf</td>
+<td align="left">carbon source</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">1% Gly</td>
+<td align="left">carbon source</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">1% Raf</td>
+<td align="left">carbon source</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
 <td align="left">0.5% DMSO</td>
 <td align="left">drug / chemical</td>
 <td align="left">B</td>
 </tr>
+<tr class="even">
+<td align="left">17 μM GdA</td>
+<td align="left">drug / chemical</td>
+<td align="left">B</td>
+</tr>
 <tr class="odd">
+<td align="left">2 μg/ml Flu</td>
+<td align="left">drug / chemical</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
 <td align="left">8.5 μM GdA (B1)</td>
 <td align="left">drug / chemical</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">8.5 μM GdA (B9)</td>
+<td align="left">drug / chemical</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">1.4% Gluc</td>
+<td align="left">glucose / batch</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">1.8% Gluc</td>
+<td align="left">glucose / batch</td>
 <td align="left">B</td>
 </tr>
 <tr class="even">
@@ -700,17 +660,37 @@ uncertain assignments, inspect the corresponding row of
 <td align="left">B</td>
 </tr>
 <tr class="odd">
-<td align="left">EC Batch 13</td>
+<td align="left">EC 1BigBatch</td>
 <td align="left">other</td>
 <td align="left">B</td>
 </tr>
 <tr class="even">
-<td align="left">EC Batch 18</td>
+<td align="left">EC Batch 13</td>
 <td align="left">other</td>
 <td align="left">B</td>
 </tr>
 <tr class="odd">
+<td align="left">EC Batch 18</td>
+<td align="left">other</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
 <td align="left">EC Batch 19</td>
+<td align="left">other</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">EC Batch 20</td>
+<td align="left">other</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">EC Batch 21</td>
+<td align="left">other</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">EC Batch 23</td>
 <td align="left">other</td>
 <td align="left">B</td>
 </tr>
@@ -735,7 +715,27 @@ uncertain assignments, inspect the corresponding row of
 <td align="left">B</td>
 </tr>
 <tr class="even">
+<td align="left">22 hr Ferm</td>
+<td align="left">time course</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
 <td align="left">3 Day</td>
+<td align="left">time course</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">4 Day</td>
+<td align="left">time course</td>
+<td align="left">B</td>
+</tr>
+<tr class="odd">
+<td align="left">5 Day</td>
+<td align="left">time course</td>
+<td align="left">B</td>
+</tr>
+<tr class="even">
+<td align="left">6 Day</td>
 <td align="left">time course</td>
 <td align="left">B</td>
 </tr>
@@ -779,11 +779,11 @@ along occupied orderings.</caption>
 <tr class="odd">
 <td align="left">A</td>
 <td align="right">1.000</td>
-<td align="right">0.858</td>
+<td align="right">0.854</td>
 </tr>
 <tr class="even">
 <td align="left">B</td>
-<td align="right">0.858</td>
+<td align="right">0.854</td>
 <td align="right">1.000</td>
 </tr>
 </tbody>
@@ -825,10 +825,10 @@ measurement standard deviations.
 single-ordering CAVI fit with known measurement SDs.</p>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">31</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">45</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">1</span>, main <span class="op">=</span> <span class="st">"Known measurement SD"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">2</span>, main <span class="op">=</span> <span class="st">"Known measurement SD"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">31</span>, main <span class="op">=</span> <span class="st">"Known measurement SD"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_unidir_known_sd</span>, dims <span class="op">=</span> <span class="fl">45</span>, main <span class="op">=</span> <span class="st">"Known measurement SD"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
 <img src="fitness_files/figure-html/uni-known-sd-trajectories-1.png" class="r-plt" alt="Four panels showing fitted trajectories for the single-ordering CAVI fit with known measurement SDs." width="100%"><p class="caption">
 Figure 8. Four panels showing fitted trajectories for the
@@ -865,7 +865,7 @@ this noise model.</p>
 <span><span class="co">#&gt;   n / d / K      : 421 / 45 / 50</span></span>
 <span><span class="co">#&gt;   Iterations     : 500</span></span>
 <span><span class="co">#&gt;   Partition      : A=13, B=32</span></span>
-<span><span class="co">#&gt;   Objective (last): 13936.146602</span></span>
+<span><span class="co">#&gt;   Objective (last): 14099.757523</span></span>
 <span><span class="co">#&gt;   Converged      : FALSE</span></span></code></pre></div>
 <p>Figure 9 shows conditional posterior mean trajectory for environment
 dimension 31 under each of two fixed orderings with known measurement

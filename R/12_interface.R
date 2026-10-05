@@ -230,6 +230,9 @@ mpcurve_control <- function(
 #'   count with `method_args = list(num_neighbors = 20)`. Available arguments
 #'   are documented in [fiedler_ordering()], [isomap_ordering()], and the other
 #'   ordering helpers.
+#'   Isomap defaults to the smallest count connecting all samples, computed
+#'   separately within each feature group. The realized count is recorded as
+#'   `k_used` in the fit's initialization metadata.
 #' @section Initializing multiple orderings:
 #' Feature similarity scores are converted to distances as one minus similarity.
 #' Hierarchical clustering uses

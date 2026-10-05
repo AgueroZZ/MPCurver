@@ -478,10 +478,72 @@ PCA_ordering <- function(
   list(t = t, keep_idx = seq_len(nrow(X)), fit = pc_fit)
 }
 
+# Exact neighbors excluding the query sample. Break distance ties by row index
+# so graphs are nested as k increases, including when observations coincide.
+.isomap_neighbors <- function(X, k) {
+  n <- nrow(X)
+  query_count <- min(n, k + 2L)
+  repeat {
+    nn <- RANN::nn2(X, X, k = query_count, treetype = "kd", eps = 0)
+    idx <- matrix(NA_integer_, n, k)
+    distances <- matrix(NA_real_, n, k)
+    boundary_tie <- FALSE
+    for (row in seq_len(n)) {
+      candidates <- which(nn$nn.idx[row, ] != row)
+      ranked <- candidates[order(nn$nn.dists[row, candidates],
+                                 nn$nn.idx[row, candidates])]
+      chosen <- ranked[seq_len(k)]
+      idx[row, ] <- nn$nn.idx[row, chosen]
+      distances[row, ] <- nn$nn.dists[row, chosen]
+      if (query_count < n && nn$nn.dists[row, query_count] <= distances[row, k]) {
+        boundary_tie <- TRUE
+      }
+    }
+    if (!boundary_tie) return(list(idx = idx, distances = distances))
+    # Include every tie at the kth distance before applying the row-index rule.
+    query_count <- min(n, 2L * query_count)
+  }
+}
+
+.isomap_graph <- function(X, k) {
+  nn <- .isomap_neighbors(X, k)
+  edges <- data.frame(from = rep(seq_len(nrow(X)), each = k),
+                      to = as.vector(t(nn$idx)),
+                      weight = as.vector(t(nn$distances)))
+  graph <- igraph::graph_from_data_frame(edges, directed = FALSE,
+                                        vertices = seq_len(nrow(X)))
+  list(graph = graph, components = igraph::components(graph), k = k)
+}
+
+# Connectivity is monotone for nested union-kNN graphs. Bracket the first
+# connected graph by doubling k, then find its exact minimum by binary search.
+# Only the selected graph is embedded; no candidate MPCurve fits are needed.
+.isomap_connected_graph <- function(X) {
+  lower <- 0L
+  upper <- 1L
+  best <- .isomap_graph(X, upper)
+  while (best$components$no > 1L) {
+    lower <- upper
+    upper <- min(nrow(X) - 1L, 2L * upper)
+    best <- .isomap_graph(X, upper)
+  }
+  while (upper - lower > 1L) {
+    mid <- lower + (upper - lower) %/% 2L
+    candidate <- .isomap_graph(X, mid)
+    if (candidate$components$no == 1L) {
+      upper <- mid
+      best <- candidate
+    } else {
+      lower <- mid
+    }
+  }
+  best
+}
+
 # Internal numerical implementation of isomap_ordering.
 .isomap_ordering <- function(
     X,
-    k = 15,
+    k = NULL,
     ndim = 1,
     component = 1,
     landmark = NULL,
@@ -497,7 +559,7 @@ PCA_ordering <- function(
   n0 <- nrow(X)
 
   if (n0 < 3) stop("Need n >= 3.")
-  if (k < 2 || k >= n0) stop("Require 2 <= k < n.")
+  if (!is.null(k) && (k < 1 || k >= n0)) stop("Require 1 <= k < n.")
   if (ndim < 1) stop("ndim must be >= 1.")
   if (component < 1 || component > ndim) stop("component must be between 1 and ndim.")
 
@@ -507,19 +569,12 @@ PCA_ordering <- function(
   if (!is.null(seed)) set.seed(seed)
 
   # --- kNN graph (weighted by Euclidean distances) ---
-  nn <- RANN::nn2(data = X, query = X, k = k + 1, treetype = "kd")
-  idx  <- nn$nn.idx[, -1, drop = FALSE]
-  dist <- nn$nn.dists[, -1, drop = FALSE]
-
-  i <- rep(seq_len(n0), each = k)
-  j <- as.vector(t(idx))
-  w <- as.vector(t(dist))
-
-  edges <- data.frame(from = i, to = j, weight = w)
-  g <- igraph::graph_from_data_frame(edges, directed = FALSE, vertices = seq_len(n0))
+  graph_fit <- if (is.null(k)) .isomap_connected_graph(X) else .isomap_graph(X, k)
+  k <- graph_fit$k
+  g <- graph_fit$graph
 
   # --- connected components handling ---
-  comp <- igraph::components(g)
+  comp <- graph_fit$components
   keep_idx <- seq_len(n0)
 
   if (keep == "giant" && comp$no > 1) {
@@ -533,6 +588,7 @@ PCA_ordering <- function(
         t = rep(NA_real_, n0),
         keep_idx = keep_idx,
         n_components = comp$no,
+        k_used = k,
         embed = NULL,
         landmark_idx = integer(0),
         geodesic_to_landmark = NULL
@@ -657,6 +713,7 @@ PCA_ordering <- function(
     t = t_out,
     keep_idx = keep_idx,
     n_components = comp$no,
+    k_used = k,
     embed = embed_out,
     landmark_idx = landmark_idx_out,
     geodesic_to_landmark = D_to_L
