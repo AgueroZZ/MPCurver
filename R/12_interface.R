@@ -106,7 +106,7 @@
 #'   Default: `1`. Partition annealing performs `anneal_steps * anneal_sweeps`
 #'   sweeps, in addition to initialization and the final `max_iter` budget.
 #' @param convergence Stopping-rule scale. Default: `"normalized"`, checking
-#'   `abs(delta_ELBO) / (nrow(X) * ncol(X))` against the main `tol` argument.
+#'   `abs(delta_ELBO) / sum(!is.na(X))` against the main `tol` argument.
 #'   `"relative"` retains historical scaling by the previous ELBO magnitude
 #'   plus the backend's numerical offset. Stored objective values are unchanged.
 #' @param effective_count_tol Numerical-zero tolerance for estimated ordering
@@ -333,11 +333,13 @@ mpcurve_init_control <- function(
 #' conditional trajectories, and soft feature assignments.
 #'
 #' @param X Numeric sample-by-feature matrix or all-numeric data frame, with
-#'   finite values only. Rows are samples and columns are features. Handle
-#'   missing values before fitting; the function does not impute or standardize.
+#'   finite values or `NA`. Rows are samples and columns are features. Each
+#'   row and column must contain an observed value; `NaN` and infinities are
+#'   rejected. Fitting uses only observed entries and does not standardize.
 #'   Sample and feature names are retained in public results.
 #' @param S Optional known measurement standard deviations, as a length-d feature
-#'   vector or matrix matching `X`. Values must be finite and nonnegative, in
+#'   vector or matrix matching `X`. Values must be finite and nonnegative at
+#'   observed entries. A matrix may have `NA` only where `X` is `NA`. SDs are in
 #'   the same units and positional order as `X`; names do not trigger reordering.
 #'   Zero SDs are floored at `sqrt(.Machine$double.eps)` for computation. Otherwise
 #'   feature noise variances are estimated.
@@ -352,9 +354,12 @@ mpcurve_init_control <- function(
 #'   `control$effective_count_tol / ncol(X)` are removed without refitting.
 #'   An integer retains the specified dimension.
 #' @param initial_method One initialization method: `"PCA"`, `"fiedler"`,
-#'   `"pcurve"`, `"tSNE"`, `"random"`, or `"isomap"`. Under similarity
-#'   grouping this method is applied independently within each feature
-#'   block. The default PCA uses each block's own PC1. Method vectors are rejected.
+#'   `"pcurve"`, `"tSNE"`, `"random"`, or `"isomap"`. The method's ordering
+#'   score is cut into position bins by `init_control$discretization`.
+#'   `"random"` scores a random permutation of the samples; use [set.seed()]
+#'   for a reproducible start. Under similarity grouping this method is applied
+#'   independently within each feature block. The default PCA uses each
+#'   block's own PC1. Method vectors are rejected.
 #' @param position_prior Estimate position probabilities (`"adaptive"`) or keep
 #'   them fixed (`"fixed"`, uniform unless custom control weights are supplied).
 #' @param partition_prior Estimate ordering probabilities by empirical Bayes
@@ -364,7 +369,7 @@ mpcurve_init_control <- function(
 #'   enabling it adds `anneal_steps * anneal_sweeps` sweeps before this phase,
 #'   configured through [mpcurve_control()]. Zero skips this fitting phase.
 #' @param tol Shared ELBO-change stopping tolerance. The default rule uses
-#'   `abs(delta_ELBO) / (nrow(X) * ncol(X))`; partition stopping is checked
+#'   `abs(delta_ELBO) / sum(!is.na(X))`; partition stopping is checked
 #'   at temperature 1, after any optional annealing. Existing numerical decrease
 #'   checks apply.
 #'   Zero disables early stopping. A small increment does not bound the
@@ -377,6 +382,39 @@ mpcurve_init_control <- function(
 #' @param control Settings from [mpcurve_control()] or a named list of its
 #'   options. `NULL` uses defaults. Unknown settings are rejected.
 #' @details
+#' Missing entries are integrated out of the observation likelihood, assuming
+#' an ignorable missingness mechanism. Each feature's noise variance uses its
+#' own observed count. The original data and mask are retained for continuation;
+#' `$observations` records observed and missing counts and counts by sample and
+#' feature. Entirely missing rows or columns are rejected before initialization.
+#'
+#' Ordering initialization uses feature means to fill missing entries
+#' temporarily. Feature similarities for multi-ordering and automatic
+#' initialization use each pair's jointly observed samples; smooth-fit evidence
+#' gains are expressed per observation. Generated position starts mix 1 percent
+#' uniform mass into their initial probabilities when the input contains missing
+#' values. Supplied responsibilities are retained after normalization. Fitted
+#' likelihoods, trajectory precision matrices, and objective values use the
+#' original observed entries only.
+#'
+#' A position bin carries data for a feature when that feature's observed
+#' responsibility mass in the bin exceeds `n_j * sqrt(.Machine$double.eps)`.
+#' Precision initialization from responsibilities measures random-walk roughness
+#' over these bins only, integrating empty bins out of the intrinsic prior. With
+#' `ridge = 0`, a trajectory update whose data occupy too few bins to identify
+#' the prior's null space (fewer than `rw_order` bins) is singular and stops
+#' with an error, with or without missing values. This occurs when positions
+#' collapse onto one bin or when a feature has very few observations; a
+#' positive `ridge` gives a proper prior. With many missing values, the
+#' adaptive position prior can concentrate an ordering's positions in one bin;
+#' `position_prior = "fixed"` avoids this, and the error message suggests it.
+#' For a specified `intrinsic_dim >= 2`, similarity initialization reports a
+#' one-feature cluster with a message, because an ordering initialized from a
+#' single feature is weakly identified; a smaller `intrinsic_dim` or another
+#' `similarity_metric` changes the cut.
+#' Missing-data updates also require a reciprocal 1-norm condition number
+#' greater than `1e-12`; no ridge is added automatically.
+#'
 #' Smoothness uses RW2 by default, with feature-specific empirical-Bayes
 #' precision updates. Use `control = mpcurve_control(rw_order = 3)` for RW3,
 #' or `control = mpcurve_control(lambda_init = 5, fix_lambda = TRUE)` to fix
@@ -386,8 +424,7 @@ mpcurve_init_control <- function(
 #' \deqn{q(C)\prod_j q(Z_j)q(U_j\mid Z_j).}
 #' Noise variance is shared across candidate orderings for each feature.
 #' The result's `intrinsic_dim` is the actual number of orderings in the
-#' returned model. The compatibility field `model_intrinsic_dim` has the same
-#' value for current fits. The grid size is stored in `K`; see [mpcurve].
+#' returned model. The grid size is stored in `K`; see [mpcurve].
 #' @return One `mpcurve` fit. Use [summary()], [plot()], [fitted_prior()], and
 #'   [fitted_positions()], [fitted_trajectories()], [fitted_assignments()], and
 #'   [do_mpcurve()] to inspect, extract results, or continue it. Automatic initialization also
@@ -438,7 +475,7 @@ fit_mpcurve <- function(
   ctrl <- .mpcurve_interface_options(control, mpcurve_control, "control")
   helper <- switch(initial_method, PCA = PCA_ordering, fiedler = fiedler_ordering,
                    pcurve = pcurve_ordering, tSNE = tSNE_ordering,
-                   isomap = isomap_ordering, random = function() NULL)
+                   isomap = isomap_ordering, random = .random_ordering)
   unknown <- setdiff(names(init$method_args), setdiff(names(formals(helper)), "X"))
   if (length(unknown)) {
     stop("Unknown initialization argument(s) for ", initial_method, ": ",
@@ -501,11 +538,17 @@ fit_mpcurve <- function(
     }
     args$method_args <- init$method_args
   }
-  do.call(.fit_mpcurve, args)
+  tryCatch(do.call(.fit_mpcurve, args), error = function(e) {
+    if (anyNA(X) && identical(position_prior, "adaptive") &&
+        grepl("is singular", conditionMessage(e), fixed = TRUE)) {
+      stop(conditionMessage(e), " With many missing values, the adaptive position ",
+           "prior can concentrate an ordering's positions in one bin; consider ",
+           "position_prior = \"fixed\".", call. = FALSE)
+    }
+    stop(e)
+  })
 }
 
-# Stable names also support selector tests that replace the fitting function.
-.mpcurve_fit_argument_names <- names(formals(fit_mpcurve))
 
 #' Advanced continuation settings
 #'

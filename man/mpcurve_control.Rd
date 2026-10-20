@@ -91,7 +91,7 @@ Default: \code{1}. Partition annealing performs \code{anneal_steps * anneal_swee
 sweeps, in addition to initialization and the final \code{max_iter} budget.}
 
 \item{convergence}{Stopping-rule scale. Default: \code{"normalized"}, checking
-\code{abs(delta_ELBO) / (nrow(X) * ncol(X))} against the main \code{tol} argument.
+\code{abs(delta_ELBO) / sum(!is.na(X))} against the main \code{tol} argument.
 \code{"relative"} retains historical scaling by the previous ELBO magnitude
 plus the backend's numerical offset. Stored objective values are unchanged.}
 

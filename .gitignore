@@ -45,3 +45,6 @@ important_derivations/*
 # Never version the temporary Chinese derivation reference PDF.
 MPCurve - 推导讲解-关于 replace potential trajectories.pdf
 .positai
+
+# Local agent planning notes
+plan/

@@ -35,7 +35,7 @@ along an inferred trajectory; its direction can be reversed.
 
 \section{Single-ordering objects}{
 
-For \code{model_intrinsic_dim = 1}, \code{$params$pi} is a length-\code{K}
+For \code{intrinsic_dim = 1}, \code{$params$pi} is a length-\code{K}
 position-prior vector, \code{$params$mu} is a \code{d x K} posterior-mean
 trajectory matrix, \code{$params$sigma2} is a length-\code{d} estimated
 variance vector (or \code{NULL} when measurement standard deviations are
@@ -48,7 +48,7 @@ form or its \code{n x d} observation-level form.
 
 \section{Multiple orderings and feature assignments}{
 
-For \code{model_intrinsic_dim = M >= 2}, the variational family is
+For \code{intrinsic_dim = M >= 2}, the variational family is
 \deqn{q(C)\prod_{j=1}^d q(Z_j)q(U_j\mid Z_j).}
 Here \eqn{C} represents sample positions, \eqn{Z_j} the ordering followed
 by feature \eqn{j}, and \eqn{U_j} its trajectory. The object contains:
@@ -92,8 +92,7 @@ these probabilities.
 \code{$fits} provides derived per-ordering views for inspection; continue
 the complete model with \code{do_mpcurve(object)}.
 \code{$intrinsic_dim} is the actual number of orderings in the returned model.
-The compatibility field \code{$model_intrinsic_dim} has the same value for
-current fits. An explicitly specified dimension is retained. With
+An explicitly specified dimension is retained. With
 \code{intrinsic_dim = "auto"} and an adaptive partition prior, orderings
 whose estimated prior weight \eqn{\hat{\omega}_m} is at or below
 \code{control$effective_count_tol / P} are removed. The tolerance defaults

@@ -1,18 +1,3 @@
-mpcurve_active_dim <- function(fit) {
-  if (!inherits(fit$fit, "soft_partition_cavi")) {
-    return(1L)
-  }
-  active <- fit$fit$active_orderings
-  if (is.null(active)) {
-    M <- fit$fit$M
-    if (is.null(M)) {
-      M <- length(fit$fit$fits)
-    }
-    return(as.integer(M))
-  }
-  as.integer(sum(active))
-}
-
 test_that("fit_mpcurve defaults to cavi and returns a valid mpcurve object", {
   sim <- simulate_mpcurve(
     n = 100,
@@ -238,12 +223,5 @@ test_that("legacy wrapper controls are rejected cleanly", {
     adaptive = "ml"
   ),
     "unused argument"
-  )
-
-  legacy_raw <- initialize_csmoothEM(sim$X, method = "PCA", K = 4, num_iter = 1)
-  legacy_mp <- as_mpcurve(legacy_raw)
-  expect_error(
-    do_mpcurve(legacy_mp, max_iter = 1),
-    "Only CAVI fits"
   )
 })

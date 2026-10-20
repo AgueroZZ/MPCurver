@@ -20,7 +20,6 @@ ignored for structural partition summaries.}
 \value{
 An object of class \code{summary.mpcurve}. Every result contains
   \code{$algorithm}, \code{$modelName}, \code{$intrinsic_dim},
-  \code{$model_intrinsic_dim},
   \code{$dimension_selection} when returned by
   \code{select_mpcurve_dimension()},
   \code{$dimension_initialization} when \code{intrinsic_dim = "auto"} was

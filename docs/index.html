@@ -23,7 +23,7 @@
 
     <a class="navbar-brand me-2" href="index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -88,7 +88,7 @@
 </h2>
 <p>Install <code>MPCurver</code> from GitHub:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/pak/man/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"AgueroZZ/MPCurver"</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu">pak</span><span class="op">(</span><span class="st">"AgueroZZ/MPCurver"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
@@ -135,7 +135,8 @@ Figure 1. Sample observations colored by posterior-mean pseudotime, with the fit
 <div class="section level3">
 <h3 id="your-data">Your data<a class="anchor" aria-label="anchor" href="#your-data"></a>
 </h3>
-<p>Supply a numeric matrix or all-numeric data frame, with samples in rows and features in columns. Sample and feature names are retained; <code>plot(fit, dims = "gene_name")</code> selects a named feature. Values must be finite: handle missing values before fitting. MPCurver does not impute or standardize the fitting data. Optional measurement SDs <code>S</code> must be finite and nonnegative, in the same units and positional order as <code>X</code>, as a feature vector or a matrix matching <code>X</code>. Names do not trigger reordering. See <code><a href="reference/fit_mpcurve.html">?fit_mpcurve</a></code> for details.</p>
+<p>Supply a numeric matrix or all-numeric data frame, with samples in rows and features in columns. Sample and feature names are retained; <code>plot(fit, dims = "gene_name")</code> selects a named feature. Use <code>NA</code> for missing entries. Every row and column must contain an observed value; <code>NaN</code> and infinities are rejected. MPCurver fits the observed entries under an ignorable missingness assumption, using each feature’s own observed count to estimate its noise variance. Feature-mean filling is used only to initialize orderings; feature grouping uses pairwise-complete observations, and the fitted likelihood uses the original data, without standardization.</p>
+<p>Optional measurement SDs <code>S</code> must be finite and nonnegative at observed entries, in the same units and positional order as <code>X</code>, as a feature vector or a matrix matching <code>X</code>. A matrix <code>S</code> may contain <code>NA</code> where <code>X</code> is missing. Names do not trigger reordering. The fit retains <code>X</code> and reports counts in <code>$observations</code>. See <code><a href="reference/fit_mpcurve.html">?fit_mpcurve</a></code> for details.</p>
 </div>
 </div>
 <div class="section level2">

@@ -482,31 +482,6 @@ test_that("known feature-sd vector and repeated matrix inputs are equivalent", {
   expect_equal(fit_vec$elbo_trace, fit_mat$elbo_trace, tolerance = 1e-10)
 })
 
-test_that("pi_init remains as a deprecated alias for position_prior_init", {
-  sim <- simulate_mpcurve(
-    n = 40,
-    d = 4,
-    num_bins = 4,
-    seed = 142,
-    control = list(rw_order = 2)
-  )
-  gamma_init <- matrix(0, nrow = nrow(sim$X), ncol = 4)
-  gamma_init[cbind(seq_len(nrow(sim$X)), sim$z)] <- 1
-
-  expect_warning(
-    fit <- cavi(
-      sim$X,
-      K = 4,
-      responsibilities_init = gamma_init,
-      pi_init = colMeans(gamma_init),
-      max_iter = 0,
-      verbose = FALSE
-    ),
-    "deprecated"
-  )
-  expect_equal(fit$params$pi, colMeans(gamma_init), tolerance = 1e-10)
-})
-
 test_that("do_cavi reuses known observation-level measurement sd", {
   sim <- simulate_mpcurve(
     n = 50,
@@ -560,10 +535,9 @@ test_that("cavi reports detailed diagnostics when known-sd precision loses posit
       verbose = FALSE
     ),
     regexp = paste(
-      "posterior precision update failed",
-      "not numerically positive definite",
-      "effective components=1/5",
-      "ridge = 1e-6",
+      "Trajectory precision for every feature is singular",
+      "the data occupy 1 position bin",
+      "proper prior",
       sep = ".*"
     )
   )

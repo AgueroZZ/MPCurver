@@ -25,19 +25,6 @@ test_that("structural conditional trajectory update is unweighted and analytical
     expect_equal(got$m_mat[j, ], as.numeric(solve(A, b)), tolerance = 1e-9)
   }
 
-  single_ordering <- .cavi_update_q_u_weighted(
-    X = X,
-    R = R,
-    sigma2 = sigma2,
-    lambda_vec = lambda,
-    Q_K = Q,
-    measurement_sd = NULL,
-    feature_weights = rep(1, ncol(X)),
-    rw_q = 2
-  )
-  expect_equal(got$m_mat, single_ordering$m_mat, tolerance = 1e-10)
-  expect_equal(got$S_list, single_ordering$S_list, tolerance = 1e-10)
-
   # q(U_j | Z_j = m) has no w_jm argument, so exact zero assignment mass
   # cannot alter its precision or posterior moments.
   got_again <- .structural_partition_q_u(
@@ -140,9 +127,7 @@ test_that("structural local blocks, assignment update, and objective match formu
   weights0 <- matrix(0.5, nrow = ncol(X), ncol = 2)
   control <- list(
     partition_prior = "fixed",
-    partition_prior_init = NULL,
-    assignment_prior = NULL,
-    ordering_alpha = NA_real_
+    partition_prior_init = NULL
   )
   T_now <- 1.5
   update <- .structural_partition_update_weights(local, weights0, T_now, control)
@@ -182,7 +167,7 @@ test_that("fixed-M structural fits use canonical shared state with intrinsic rid
   ))
   expect_s3_class(fit2, "mpcurve")
   expect_identical(fit2$variational_family, "structured")
-  expect_equal(fit2$model_intrinsic_dim, 2L)
+  expect_equal(fit2$intrinsic_dim, 2L)
   expect_equal(length(fit2$params$sigma2), ncol(X))
   expect_equal(dim(fit2$lambda_mat), c(ncol(X), 2L))
   expect_equal(dim(fit2$partition$pi_weights), c(ncol(X), 2L))
@@ -208,7 +193,7 @@ test_that("fixed-M structural fits use canonical shared state with intrinsic rid
     control = mpcurve_control(ridge = 0, anneal_start = 1, anneal_steps = 1),
     init_control = mpcurve_init_control()
   ))
-  expect_equal(fit3$model_intrinsic_dim, 3L)
+  expect_equal(fit3$intrinsic_dim, 3L)
   expect_equal(dim(fit3$partition$pi_weights), c(ncol(X), 3L))
   expect_equal(length(fit3$conditional_posterior$mean), 3L)
 })

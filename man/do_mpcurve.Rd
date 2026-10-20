@@ -7,8 +7,7 @@
 do_mpcurve(object, max_iter = 1L, tol = NULL, verbose = FALSE, control = NULL)
 }
 \arguments{
-\item{object}{An \code{mpcurve} object returned by \code{\link[=fit_mpcurve]{fit_mpcurve()}}. Legacy
-augmented partition fits are read-only and require refitting.}
+\item{object}{An \code{mpcurve} object returned by \code{\link[=fit_mpcurve]{fit_mpcurve()}}.}
 
 \item{max_iter}{Positive integer maximum number of additional CAVI sweeps.}
 

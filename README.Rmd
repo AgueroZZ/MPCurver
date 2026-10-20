@@ -82,11 +82,19 @@ Use `fitted_positions(fit_small, "sd")` or
 
 Supply a numeric matrix or all-numeric data frame, with samples in rows and
 features in columns. Sample and feature names are retained; `plot(fit, dims =
-"gene_name")` selects a named feature. Values must be finite: handle missing
-values before fitting. MPCurver does not impute or standardize the fitting data.
-Optional measurement SDs `S` must be finite and nonnegative, in the same units
-and positional order as `X`, as a feature vector or a matrix matching `X`.
-Names do not trigger reordering. See `?fit_mpcurve` for details.
+"gene_name")` selects a named feature. Use `NA` for missing entries. Every row
+and column must contain an observed value; `NaN` and infinities are rejected.
+MPCurver fits the observed entries under an ignorable missingness assumption,
+using each feature's own observed count to estimate its noise variance.
+Feature-mean filling is used only to initialize orderings; feature grouping uses
+pairwise-complete observations, and the fitted likelihood uses the original
+data, without standardization.
+
+Optional measurement SDs `S` must be finite and nonnegative at observed entries,
+in the same units and positional order as `X`, as a feature vector or a matrix
+matching `X`. A matrix `S` may contain `NA` where `X` is missing. Names do not
+trigger reordering. The fit retains `X` and reports counts in `$observations`.
+See `?fit_mpcurve` for details.
 
 ## Worked spiral example
 

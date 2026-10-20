@@ -212,7 +212,7 @@ test_that("minimum cluster size does not change an explicit numeric M", {
     init_control = mpcurve_init_control(min_cluster_size = 2L, similarity_metric = "spline_r2", spline_r2_df = 3L)
   ))
 
-  expect_identical(fit$model_intrinsic_dim, 3L)
+  expect_identical(fit$intrinsic_dim, 3L)
   expect_null(fit$dimension_initialization)
   expect_equal(
     sort(unname(fit$similarity_init$cluster_sizes)),
@@ -242,7 +242,7 @@ test_that("fit_mpcurve auto dimension uses cluster-size adaptive initialization"
   ))
 
   expect_s3_class(fit, "mpcurve")
-  expect_identical(fit$model_intrinsic_dim, 2L)
+  expect_identical(fit$intrinsic_dim, 2L)
   expect_true(is.list(fit$dimension_initialization))
 
   dimension_init <- fit$dimension_initialization

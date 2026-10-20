@@ -21,12 +21,14 @@ fit_mpcurve(
 }
 \arguments{
 \item{X}{Numeric sample-by-feature matrix or all-numeric data frame, with
-finite values only. Rows are samples and columns are features. Handle
-missing values before fitting; the function does not impute or standardize.
+finite values or \code{NA}. Rows are samples and columns are features. Each
+row and column must contain an observed value; \code{NaN} and infinities are
+rejected. Fitting uses only observed entries and does not standardize.
 Sample and feature names are retained in public results.}
 
 \item{S}{Optional known measurement standard deviations, as a length-d feature
-vector or matrix matching \code{X}. Values must be finite and nonnegative, in
+vector or matrix matching \code{X}. Values must be finite and nonnegative at
+observed entries. A matrix may have \code{NA} only where \code{X} is \code{NA}. SDs are in
 the same units and positional order as \code{X}; names do not trigger reordering.
 Zero SDs are floored at \code{sqrt(.Machine$double.eps)} for computation. Otherwise
 feature noise variances are estimated.}
@@ -44,9 +46,12 @@ orderings with estimated prior weight at or below
 An integer retains the specified dimension.}
 
 \item{initial_method}{One initialization method: \code{"PCA"}, \code{"fiedler"},
-\code{"pcurve"}, \code{"tSNE"}, \code{"random"}, or \code{"isomap"}. Under similarity
-grouping this method is applied independently within each feature
-block. The default PCA uses each block's own PC1. Method vectors are rejected.}
+\code{"pcurve"}, \code{"tSNE"}, \code{"random"}, or \code{"isomap"}. The method's ordering
+score is cut into position bins by \code{init_control$discretization}.
+\code{"random"} scores a random permutation of the samples; use \code{\link[=set.seed]{set.seed()}}
+for a reproducible start. Under similarity grouping this method is applied
+independently within each feature block. The default PCA uses each
+block's own PC1. Method vectors are rejected.}
 
 \item{position_prior}{Estimate position probabilities (\code{"adaptive"}) or keep
 them fixed (\code{"fixed"}, uniform unless custom control weights are supplied).}
@@ -60,7 +65,7 @@ enabling it adds \code{anneal_steps * anneal_sweeps} sweeps before this phase,
 configured through \code{\link[=mpcurve_control]{mpcurve_control()}}. Zero skips this fitting phase.}
 
 \item{tol}{Shared ELBO-change stopping tolerance. The default rule uses
-\code{abs(delta_ELBO) / (nrow(X) * ncol(X))}; partition stopping is checked
+\code{abs(delta_ELBO) / sum(!is.na(X))}; partition stopping is checked
 at temperature 1, after any optional annealing. Existing numerical decrease
 checks apply.
 Zero disables early stopping. A small increment does not bound the
@@ -93,6 +98,39 @@ orderings, structural inference jointly estimates sample positions,
 conditional trajectories, and soft feature assignments.
 }
 \details{
+Missing entries are integrated out of the observation likelihood, assuming
+an ignorable missingness mechanism. Each feature's noise variance uses its
+own observed count. The original data and mask are retained for continuation;
+\verb{$observations} records observed and missing counts and counts by sample and
+feature. Entirely missing rows or columns are rejected before initialization.
+
+Ordering initialization uses feature means to fill missing entries
+temporarily. Feature similarities for multi-ordering and automatic
+initialization use each pair's jointly observed samples; smooth-fit evidence
+gains are expressed per observation. Generated position starts mix 1 percent
+uniform mass into their initial probabilities when the input contains missing
+values. Supplied responsibilities are retained after normalization. Fitted
+likelihoods, trajectory precision matrices, and objective values use the
+original observed entries only.
+
+A position bin carries data for a feature when that feature's observed
+responsibility mass in the bin exceeds \code{n_j * sqrt(.Machine$double.eps)}.
+Precision initialization from responsibilities measures random-walk roughness
+over these bins only, integrating empty bins out of the intrinsic prior. With
+\code{ridge = 0}, a trajectory update whose data occupy too few bins to identify
+the prior's null space (fewer than \code{rw_order} bins) is singular and stops
+with an error, with or without missing values. This occurs when positions
+collapse onto one bin or when a feature has very few observations; a
+positive \code{ridge} gives a proper prior. With many missing values, the
+adaptive position prior can concentrate an ordering's positions in one bin;
+\code{position_prior = "fixed"} avoids this, and the error message suggests it.
+For a specified \code{intrinsic_dim >= 2}, similarity initialization reports a
+one-feature cluster with a message, because an ordering initialized from a
+single feature is weakly identified; a smaller \code{intrinsic_dim} or another
+\code{similarity_metric} changes the cut.
+Missing-data updates also require a reciprocal 1-norm condition number
+greater than \code{1e-12}; no ridge is added automatically.
+
 Smoothness uses RW2 by default, with feature-specific empirical-Bayes
 precision updates. Use \code{control = mpcurve_control(rw_order = 3)} for RW3,
 or \code{control = mpcurve_control(lambda_init = 5, fix_lambda = TRUE)} to fix
@@ -102,8 +140,7 @@ The partition variational family is
 \deqn{q(C)\prod_j q(Z_j)q(U_j\mid Z_j).}
 Noise variance is shared across candidate orderings for each feature.
 The result's \code{intrinsic_dim} is the actual number of orderings in the
-returned model. The compatibility field \code{model_intrinsic_dim} has the same
-value for current fits. The grid size is stored in \code{K}; see \link{mpcurve}.
+returned model. The grid size is stored in \code{K}; see \link{mpcurve}.
 }
 \examples{
 sim <- simulate_mpcurve(n = 40, d = 4, num_bins = 5, seed = 1)

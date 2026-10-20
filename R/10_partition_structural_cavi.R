@@ -7,46 +7,6 @@
 # trajectories. New fits and continuation use only the top-level state below;
 # `$fits` is generated as a read-only compatibility view.
 
-.structural_partition_warn_legacy_controls <- function(
-    freeze_unused_ordering = NULL,
-    freeze_unused_ordering_threshold = NULL,
-    freeze_feature = NULL,
-    freeze_feature_weight_threshold = NULL,
-    drop_unused_ordering = NULL,
-    caller = "soft_partition_cavi()") {
-  supplied <- c(
-    freeze_unused_ordering = !is.null(freeze_unused_ordering),
-    freeze_unused_ordering_threshold = !is.null(freeze_unused_ordering_threshold),
-    freeze_feature = !is.null(freeze_feature),
-    freeze_feature_weight_threshold = !is.null(freeze_feature_weight_threshold),
-    drop_unused_ordering = !is.null(drop_unused_ordering)
-  )
-  if (any(supplied)) {
-    warning(
-      caller,
-      ": ",
-      paste(names(supplied)[supplied], collapse = ", "),
-      " are deprecated and ignored. Structural VI does not use active, ",
-      "freeze, or drop states.",
-      call. = FALSE
-    )
-  }
-  invisible(NULL)
-}
-
-.structural_partition_validate_weights <- function(weights, d, M) {
-  weights <- as.matrix(weights)
-  if (!all(dim(weights) == c(d, M)) || any(!is.finite(weights)) ||
-      any(weights < 0)) {
-    stop("pi_weights must be a finite nonnegative d x M matrix.", call. = FALSE)
-  }
-  rs <- rowSums(weights)
-  if (any(rs <= 0)) {
-    stop("Every row of pi_weights must have positive mass.", call. = FALSE)
-  }
-  weights / rs
-}
-
 .structural_partition_stabilize_gamma <- function(R) {
   # Exact categorical coordinate updates are strictly positive for finite
   # logits. Floating-point softmax can nevertheless underflow to exact zeros,
@@ -102,7 +62,7 @@
     return(NULL)
   }
   if (is.null(sigma2_init)) {
-    sigma2 <- apply(X, 2, stats::var)
+    sigma2 <- if (anyNA(X)) .mpcurve_observed_variance(X) else apply(X, 2, stats::var)
   } else {
     sigma2 <- as.numeric(sigma2_init)
     if (length(sigma2) == 1L) sigma2 <- rep(sigma2, d)
@@ -136,8 +96,12 @@
   if (!known_noise && (length(sigma2) != d || any(!is.finite(sigma2)) || any(sigma2 <= 0))) {
     stop("sigma2 must be a finite positive vector of length ncol(X).", call. = FALSE)
   }
+  if (anyNA(X)) return(.cavi_observed_q_u(
+    X, R, sigma2, lambda_vec, Q_K, noise_info$var_mat, ordering_label))
 
   Nk <- colSums(R)
+  .cavi_check_precision_support(.cavi_occupied_bins(Nk, n), Q_K,
+                                ordering_label = ordering_label)
   GX <- if (known_noise) NULL else t(X) %*% R
   m_mat <- matrix(0, nrow = d, ncol = K)
   sdiag_mat <- matrix(0, nrow = d, ncol = K)
@@ -206,6 +170,13 @@
     caller = ".structural_partition_update_gamma()"
   )
   known_noise <- !is.null(noise_info$measurement_sd)
+  if (anyNA(X)) {
+    logits <- sweep(.cavi_observed_logdensity(
+      X, q_u, sigma2, noise_info$var_mat, weights),
+      2L, log(pmax(pi_vec, .Machine$double.eps)), "+")
+    return(.structural_partition_stabilize_gamma(
+      exp(logits - matrixStats::rowLogSumExps(logits))))
+  }
   log_r <- matrix(0, nrow = n, ncol = K)
   if (!known_noise) {
     inv_var_weight <- matrix(weights / sigma2, nrow = n, ncol = d, byrow = TRUE)
@@ -234,6 +205,7 @@
 }
 
 .structural_partition_expected_residuals <- function(X, R, q_u) {
+  if (anyNA(X)) return(.cavi_observed_residuals(X, R, q_u))
   X <- as.matrix(X)
   R <- as.matrix(R)
   n <- nrow(X)
@@ -260,7 +232,8 @@
   residuals <- vapply(seq_len(M), function(m) {
     .structural_partition_expected_residuals(X, gamma[[m]], q_u[[m]])
   }, numeric(d))
-  sigma2 <- rowSums(weights * residuals) / nrow(X)
+  counts <- if (anyNA(X)) colSums(!is.na(X)) else nrow(X)
+  sigma2 <- rowSums(weights * residuals) / counts
   list(
     sigma2 = pmin(pmax(sigma2, sigma_min), sigma_max),
     residuals = residuals
@@ -293,17 +266,11 @@
 }
 
 .structural_partition_assignment_info <- function(weights, T_now, control) {
-  M <- ncol(weights)
   .cavi_partition_assignment_info(
     weights = weights,
     T_now = T_now,
     partition_prior = control$partition_prior,
     partition_prior_init = control$partition_prior_init,
-    assignment_M = M,
-    active_orderings = rep(TRUE, M),
-    active_feature_pairs = matrix(TRUE, nrow(weights), M),
-    drop_unused_ordering = FALSE,
-    partition_prior_missing = FALSE,
     caller = ".structural_partition_assignment_info()"
   )
 }
@@ -540,7 +507,7 @@
 
   stored_S <- fits[[1]]$measurement_sd %||% NULL
   S_use <- if (is.null(S)) stored_S else S
-  if (!is.null(stored_S) && !.cavi_same_measurement_sd(stored_S, S_use)) {
+  if (!is.null(stored_S) && !.cavi_same_measurement_sd(stored_S, S_use, X)) {
     stop("Supplied S does not match measurement_sd in fits_init.", call. = FALSE)
   }
   noise_info <- .cavi_resolve_measurement_sd(
@@ -559,7 +526,6 @@
     partition_prior = partition_prior,
     partition_prior_init = partition_prior_init,
     M = M,
-    partition_prior_missing = FALSE,
     caller = "soft_partition_cavi()"
   )
 
@@ -634,8 +600,6 @@
     position_prior = position_ctl$position_prior,
     partition_prior = assignment_ctl$partition_prior,
     partition_prior_init = assignment_ctl$partition_prior_init,
-    assignment_prior = NULL,
-    ordering_alpha = NULL,
     fix_lambda = isTRUE(fix_lambda),
     lambda_sd_prior_rate = lambda_sd_prior_rate,
     lambda_min = lambda_min,
@@ -781,7 +745,6 @@
       pi_weights = state$pi_weights,
       assign = labels[max.col(state$pi_weights, ties.method = "first")],
       local_blocks = state$local_blocks,
-      assignment_posterior = .cavi_partition_assignment_state(state$assignment_info),
       objective_terms = state$objective_terms,
       objective_history = histories$objective,
       temperature_history = histories$temperature,
@@ -878,24 +841,10 @@
     position_prior_init = NULL,
     partition_prior = c("adaptive", "fixed"),
     partition_prior_init = NULL,
-
-    freeze_unused_ordering = NULL,
-    freeze_unused_ordering_threshold = NULL,
-    freeze_feature = NULL,
-    freeze_feature_weight_threshold = NULL,
-    drop_unused_ordering = NULL,
     verbose = TRUE,
     convergence = c("normalized", "relative")) {
-  .structural_partition_warn_legacy_controls(
-    freeze_unused_ordering = freeze_unused_ordering,
-    freeze_unused_ordering_threshold = freeze_unused_ordering_threshold,
-    freeze_feature = freeze_feature,
-    freeze_feature_weight_threshold = freeze_feature_weight_threshold,
-    drop_unused_ordering = drop_unused_ordering,
-    caller = "soft_partition_cavi()"
-  )
   convergence <- match.arg(convergence)
-  X <- as.matrix(X)
+  X <- .mpcurve_validate_data(as.matrix(X), S)
   M <- as.integer(M)
   n_outer <- as.integer(n_outer)
   inner_iter <- as.integer(inner_iter)
@@ -1025,7 +974,8 @@
       current <- state$objective
       delta <- current - previous
       scaled_delta <- .mpcurve_elbo_change(
-        delta, previous, state$n, state$d, convergence, relative_offset = 1e-12
+        delta, previous, state$n, state$d, convergence, relative_offset = 1e-12,
+        n_observed = sum(!is.na(state$data))
       )
       if (delta < -1e-7 * (abs(previous) + 1)) {
         warning(
@@ -1041,7 +991,6 @@
       previous <- current
     }
   }
-
 
 
   .structural_partition_finalize(state, histories, converged)
@@ -1121,7 +1070,7 @@
   old_lambda <- state$lambda_mat
   old_rate <- state$control$lambda_sd_prior_rate
   old_sigma2 <- state$sigma2
-  if (!is.null(S) && !.cavi_same_measurement_sd(S, state$measurement_sd)) {
+  if (!is.null(S) && !.cavi_same_measurement_sd(S, state$measurement_sd, state$data)) {
     stop("Supplied S does not match measurement_sd stored on the fit.", call. = FALSE)
   }
   if (!is.null(lambda)) {
@@ -1150,7 +1099,7 @@
                          state$control$sigma_max)
   }
   state$control$convergence <- match.arg(
-    convergence %||% state$control$convergence %||% "relative",
+    convergence %||% state$control$convergence,
     c("normalized", "relative")
   )
   state$control$tol_outer <- tol_outer %||% state$control$tol_outer
@@ -1189,7 +1138,7 @@
     delta <- state$objective - previous
     scaled_delta <- .mpcurve_elbo_change(
       delta, previous, state$n, state$d, state$control$convergence,
-      relative_offset = 1e-12
+      relative_offset = 1e-12, n_observed = sum(!is.na(state$data))
     )
     if (delta < -1e-7 * (abs(previous) + 1)) {
       warning(
@@ -1211,7 +1160,5 @@
   .structural_partition_finalize(state, histories, converged)
 }
 
-# Internal fixed-M partition entry point used by fit_mpcurve() and the
-# two-ordering compatibility wrapper. The legacy augmented implementation has
-# a distinct archival name in 10_partition_cavi.R.
+# Internal fixed-M partition entry point used by fit_mpcurve().
 soft_partition_cavi <- .structural_partition_cavi

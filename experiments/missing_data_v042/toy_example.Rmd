@@ -1,0 +1,107 @@
+---
+title: "MPCurver: a toy example with missing values"
+output:
+  html_document:
+    self_contained: true
+    toc: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+                     fig.width = 7, fig.height = 4.5, dpi = 140)
+library(MPCurver)
+stopifnot(packageVersion("MPCurver") == "0.4.2")
+```
+
+This example fits one ordering to 60 samples and four features after removing
+35 of the 240 observations. It uses the local MPCurver 0.4.2 development build.
+Only observed entries contribute to the fitting likelihood; the original
+missing values remain in the fitted object.
+
+## Create incomplete data
+
+```{r data}
+library(MPCurver)
+sim <- simulate_mpcurve(n = 60, d = 4, num_bins = 8, seed = 1)
+X <- sim$X
+colnames(X) <- paste("Feature", 1:4)
+
+X[seq(1, 60, by = 3), 1] <- NA
+X[seq(2, 60, by = 4), 3] <- NA
+head(X)
+```
+
+The mask is deterministic and leaves at least one observed entry in every
+sample and feature. Table 1 shows the resulting coverage.
+
+```{r coverage, echo=FALSE}
+knitr::kable(data.frame(
+  Feature = colnames(X), Observed = colSums(!is.na(X)),
+  Missing = colSums(is.na(X)), row.names = NULL),
+  caption = "Table 1. Observed and missing entries in each simulated feature.")
+stopifnot(sum(is.na(X)) == 35, all(rowSums(!is.na(X)) > 0),
+          all(colSums(!is.na(X)) > 0))
+```
+
+## Fit and extract results
+
+```{r fit}
+set.seed(1)
+fit <- fit_mpcurve(X, num_bins = 8, max_iter = 100)
+fit
+
+positions <- fitted_positions(fit)
+trajectories <- fitted_trajectories(fit)
+trajectory_sd <- fitted_trajectories(fit, "sd")
+
+dim(positions)      # samples x orderings
+dim(trajectories)   # features x bins x orderings
+head(positions)
+
+c(observed = fit$observations$n_observed,
+  missing = fit$observations$n_missing)
+```
+
+Every sample receives an inferred position using its available features.
+`trajectory_sd` has the same dimensions as `trajectories` and contains
+variational posterior standard deviations. Fitting does not replace the
+missing observations with trajectory estimates.
+
+```{r checks}
+stopifnot(identical(fit$data, X),
+          all(is.finite(positions)),
+          all(is.finite(trajectories)),
+          all(is.finite(trajectory_sd)))
+```
+
+## Inspect the fit
+
+Figure 1 shows the fitted trajectory in the first two feature coordinates.
+
+```{r fitted-curve, fig.cap="Figure 1. Observed Feature 1 and Feature 2 pairs, colored by inferred pseudotime, with the posterior-mean trajectory in orange. The 20 samples missing Feature 1 are omitted from this plot but remain in the fit through their other observed features."}
+plot(fit, dims = c(1, 2))
+```
+
+Figure 2 shows the fitting objective and plug-in likelihood. This example uses the default intrinsic
+RW2 fitting prior and its fixed-convention variational objective.
+
+```{r objective, fig.cap="Figure 2. CAVI traces on the observed entries: solid, variational objective under the default intrinsic-prior convention; dashed, plug-in observed-data log likelihood evaluated at the posterior-mean trajectories."}
+plot(fit, plot_type = "elbo")
+```
+
+<details>
+<summary>Reproduction details</summary>
+
+The simulation and fitting seeds are both 1, with an eight-bin RW2 generator, generator ridge
+0.001, smoothness range 0.5--3, noise SD range 0.08--0.18, and uniform position
+probabilities. Fitting uses eight bins, PCA initialization, adaptive position
+probabilities, estimated feature noise, and at most 100 sweeps; other settings
+are the 0.4.2 defaults. The version was developed from commit
+`4f8b583d7549d4068d0e810e93f90653cbcb2ed9`; the adjacent
+`source-sha256.txt` identifies the tested source.
+
+```{r session, echo=FALSE}
+sessionInfo()
+```
+
+</details>

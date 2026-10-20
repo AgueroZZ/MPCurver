@@ -1,7 +1,7 @@
 Package: MPCurver
 Type: Package
 Title: Fit and Explore MPCurve Trajectory Models in R
-Version: 0.4.1
+Version: 0.4.2
 Authors@R: c(
     person(
       "Ziang", "Zhang",
@@ -35,9 +35,7 @@ Imports:
     RSpectra,
     Rtsne,
     splines,
-    matrixStats,
-    mclust,
-    parallel
+    matrixStats
 RoxygenNote: 7.3.3
 Suggests:
     devtools,

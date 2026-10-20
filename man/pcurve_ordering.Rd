@@ -13,7 +13,9 @@ pcurve_ordering(
 )
 }
 \arguments{
-\item{X}{Numeric sample-by-feature matrix.}
+\item{X}{Numeric sample-by-feature matrix. Ordering helpers require complete
+data; missing values are filled with each feature's observed mean, with a
+warning.}
 
 \item{smoother}{One of \code{"smooth_spline"}, \code{"lowess"}, \code{"periodic_lowess"}.}
 

@@ -77,7 +77,7 @@ test_that("automatic fits expose the same result contract after pruning", {
 
 test_that("invalid data are rejected before initialization or candidate fitting", {
   X <- named_interface_data()
-  for (bad in c(NA_real_, NaN, Inf, -Inf)) {
+  for (bad in c(NaN, Inf, -Inf)) {
     Y <- X
     Y[7, 3] <- bad
     expect_error(fit_mpcurve(Y, initial_method = "random"),

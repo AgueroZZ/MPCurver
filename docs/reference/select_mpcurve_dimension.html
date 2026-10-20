@@ -17,7 +17,7 @@ and applying the selected initial_method independently within each group."></hea
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -103,7 +103,8 @@ and applying the selected <code>initial_method</code> independently within each 
 
 <dt id="arg-s">S<a class="anchor" aria-label="anchor" href="#arg-s"></a></dt>
 <dd><p>Optional known measurement standard deviations, as a length-d feature
-vector or matrix matching <code>X</code>. Values must be finite and nonnegative, in
+vector or matrix matching <code>X</code>. Values must be finite and nonnegative at
+observed entries. A matrix may have <code>NA</code> only where <code>X</code> is <code>NA</code>. SDs are in
 the same units and positional order as <code>X</code>; names do not trigger reordering.
 Zero SDs are floored at <code>sqrt(.Machine$double.eps)</code> for computation. Otherwise
 feature noise variances are estimated.</p></dd>
@@ -118,9 +119,12 @@ reduce the realized count in a single-ordering fit.</p></dd>
 
 <dt id="arg-initial-method">initial_method<a class="anchor" aria-label="anchor" href="#arg-initial-method"></a></dt>
 <dd><p>One initialization method: <code>"PCA"</code>, <code>"fiedler"</code>,
-<code>"pcurve"</code>, <code>"tSNE"</code>, <code>"random"</code>, or <code>"isomap"</code>. Under similarity
-grouping this method is applied independently within each feature
-block. The default PCA uses each block's own PC1. Method vectors are rejected.</p></dd>
+<code>"pcurve"</code>, <code>"tSNE"</code>, <code>"random"</code>, or <code>"isomap"</code>. The method's ordering
+score is cut into position bins by <code>init_control$discretization</code>.
+<code>"random"</code> scores a random permutation of the samples; use <code><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed()</a></code>
+for a reproducible start. Under similarity grouping this method is applied
+independently within each feature block. The default PCA uses each
+block's own PC1. Method vectors are rejected.</p></dd>
 
 
 <dt id="arg-position-prior">position_prior<a class="anchor" aria-label="anchor" href="#arg-position-prior"></a></dt>
@@ -137,7 +141,7 @@ configured through <code><a href="mpcurve_control.html">mpcurve_control()</a></c
 
 <dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>
 <dd><p>Shared ELBO-change stopping tolerance. The default rule uses
-<code>abs(delta_ELBO) / (nrow(X) * ncol(X))</code>; partition stopping is checked
+<code>abs(delta_ELBO) / sum(!is.na(X))</code>; partition stopping is checked
 at temperature 1, after any optional annealing. Existing numerical decrease
 checks apply.
 Zero disables early stopping. A small increment does not bound the

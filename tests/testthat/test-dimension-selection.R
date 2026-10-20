@@ -90,8 +90,8 @@ test_that("uniform-prior dimension selection records both greedy directions", {
   expect_equal(continued$dimension_selection$selected_M,
                forward$dimension_selection$selected_M)
   expect_true(continued$dimension_selection$continued_after_selection)
-  expect_equal(continued$model_intrinsic_dim,
-               continued$intrinsic_dim)
+  expect_equal(continued$intrinsic_dim,
+               forward$dimension_selection$selected_M)
 
   direct2_similarity$dimension_selection <- list(
     direction = "backward",

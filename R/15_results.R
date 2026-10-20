@@ -1,5 +1,5 @@
 # Public data and result contracts, independent of the number of orderings.
-.mpcurve_validate_data <- function(X, S = NULL) {
+.mpcurve_validate_data <- function(X, S = NULL, allow_empty_rows = FALSE) {
   if (!is.matrix(X) && !is.data.frame(X)) {
     stop("X must be a numeric sample-by-feature matrix or data frame.", call. = FALSE)
   }
@@ -19,19 +19,31 @@
   if (nrow(X) < 2L || ncol(X) < 1L) {
     stop("X must have at least two samples and one feature.", call. = FALSE)
   }
-  bad <- which(!is.finite(X), arr.ind = TRUE)
+  bad <- which(is.nan(X) | is.infinite(X), arr.ind = TRUE)
   if (nrow(bad)) {
     i <- bad[1L, 1L]
     j <- bad[1L, 2L]
     label <- function(index, labels) {
       if (is.null(labels)) as.character(index) else sprintf("%d ('%s')", index, labels[index])
     }
-    stop(sprintf(paste0("X must contain only finite values; sample %s, feature %s ",
-                        "contains NA, NaN, or Inf. Handle missing values before fitting."),
+    stop(sprintf(paste0("X must contain only finite values or NA; sample %s, feature %s ",
+                        "contains NaN or Inf. Use NA for missing observations."),
                  label(i, rownames(X)), label(j, colnames(X))), call. = FALSE)
   }
+  observed <- !is.na(X)
+  if (any(colSums(observed) == 0L)) {
+    stop("X contains an entirely missing feature (column ",
+         which(colSums(observed) == 0L)[1L], "). Every feature needs an observed value.",
+         call. = FALSE)
+  }
+  if (!allow_empty_rows && any(rowSums(observed) == 0L)) {
+    stop("X contains an entirely missing sample (row ",
+         which(rowSums(observed) == 0L)[1L], "). Remove samples with no observed features.",
+         call. = FALSE)
+  }
   if (!is.null(S)) {
-    if (!is.numeric(S) || is.complex(S) || any(!is.finite(S)) || any(S < 0)) {
+    if (!is.numeric(S) || is.complex(S) || any(is.nan(S) | is.infinite(S)) ||
+        any(S < 0, na.rm = TRUE)) {
       stop("S must contain only finite nonnegative numeric standard deviations.", call. = FALSE)
     }
     valid_shape <- if (is.matrix(S)) identical(dim(S), dim(X)) else
@@ -39,6 +51,10 @@
     if (!valid_shape) {
       stop("S must be NULL, a length-d feature vector, or an n x d matrix matching X.",
            call. = FALSE)
+    }
+    if (anyNA(if (is.matrix(S)) S[observed] else S)) {
+      stop("S must contain finite nonnegative standard deviations at observed X entries; ",
+           "NA in matrix S is allowed only where X is NA.", call. = FALSE)
     }
   }
   X
@@ -81,6 +97,7 @@
 }
 
 .mpcurve_label_results <- function(x) {
+  if (!is.null(x$data)) x$observations <- .mpcurve_observation_summary(x$data)
   samples <- rownames(x$data)
   features <- colnames(x$data)
   label_gamma <- function(gamma) {

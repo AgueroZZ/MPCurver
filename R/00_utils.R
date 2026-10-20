@@ -101,8 +101,9 @@ generalized_logdet <- function(Q, eigen_tol = NULL, rank_deficiency = 0) {
 
 #' Normalize the optional exponential rate for the lambda SD prior
 #'
-#' Public APIs use \code{NULL} to mean "no lambda prior penalty". For backward
-#' compatibility, an explicit numeric \code{0} is treated the same way.
+#' Public APIs use \code{NULL} to mean "no lambda prior penalty". An explicit
+#' numeric \code{0} means the same; continuation controls use it to remove an
+#' inherited penalty.
 #'
 #' @param rate Optional non-negative scalar.
 #' @param arg_name Argument name used in error messages.
@@ -242,85 +243,4 @@ generalized_logdet <- function(Q, eigen_tol = NULL, rank_deficiency = 0) {
   }
 
   vapply(eq_quad, solve_one, numeric(1))
-}
-
-
-#' Numerically stable log-sum-exp
-#'
-#' @param x Numeric vector.
-#' @return log(sum(exp(x))) computed stably.
-#' @noRd
-logsumexp <- function(x) {
-  if (!length(x)) return(-Inf)
-  m <- max(x)
-  if (!is.finite(m)) return(m)  # handles all -Inf, or Inf present
-  m + log(sum(exp(x - m)))
-}
-
-
-#' Cache covariance inverses and log-determinants
-#'
-#' Adds \code{invSigma} and \code{logdet} to a parameter list.
-#'
-#' @param params A list with at least \code{pi} and \code{sigma}, where
-#'   \code{sigma} is a list of covariance matrices.
-#' @param jitter Nonnegative diagonal jitter added if Cholesky fails.
-#' @return Updated params list with \code{invSigma} and \code{logdet}.
-#' @noRd
-init_cov_cache_fast <- function(params, jitter = 0) {
-  K <- length(params$pi)
-  if (is.null(params$sigma) || length(params$sigma) != K) {
-    stop("params$sigma must be a list of length length(params$pi).")
-  }
-  if (jitter < 0) stop("jitter must be >= 0.")
-
-  invSigma <- vector("list", K)
-  logdet   <- numeric(K)
-
-  for (k in seq_len(K)) {
-    S <- as.matrix(params$sigma[[k]])
-
-    # Add jitter if requested
-    if (jitter > 0) {
-      S <- S + diag(jitter, nrow(S))
-    }
-
-    # Cholesky (with a clear error if not PD)
-    L <- tryCatch(chol(S), error = function(e) {
-      stop("Cholesky failed for sigma[[", k, "]] (matrix not PD). Consider adding jitter.")
-    })
-
-    invSigma[[k]] <- chol2inv(L)
-    logdet[k]     <- 2 * sum(log(diag(L)))
-  }
-
-  params$invSigma <- invSigma
-  params$logdet   <- logdet
-  params
-}
-
-
-#' Cache inverse-sigma2 and log-determinant for csmooth_em (diagonal covariance)
-#'
-#' For \code{csmooth_em} the covariance is diagonal, so no Cholesky is needed.
-#' Stores \code{invsig2} and \code{logdet} into \code{params} so that
-#' \code{ESTEP_csmooth()} can skip recomputing them on every call.
-#'
-#' @param params A \code{csmooth_em} parameter list with a \code{sigma2} field.
-#' @param modelName One of \code{"homoskedastic"} or \code{"heteroskedastic"}.
-#' @return Updated \code{params} with \code{$invsig2} and \code{$logdet}.
-#' @noRd
-cache_csmooth_params <- function(params,
-    modelName = c("homoskedastic", "heteroskedastic")) {
-  modelName <- match.arg(modelName)
-  if (modelName == "homoskedastic") {
-    s2 <- pmax(as.numeric(params$sigma2), .Machine$double.eps)
-    params$invsig2 <- 1 / s2          # d-vector
-    params$logdet  <- sum(log(s2))    # scalar
-  } else {
-    s2 <- pmax(as.matrix(params$sigma2), .Machine$double.eps)
-    params$invsig2 <- 1 / s2          # d x K matrix
-    params$logdet  <- colSums(log(s2)) # K-vector
-  }
-  params
 }

@@ -13,7 +13,9 @@ isomap_ordering(
 )
 }
 \arguments{
-\item{X}{Numeric sample-by-feature matrix.}
+\item{X}{Numeric sample-by-feature matrix. Ordering helpers require complete
+data; missing values are filled with each feature's observed mean, with a
+warning.}
 
 \item{num_neighbors}{Integer nearest-neighbor count between 1 and
 \code{nrow(X)-1}. The default \code{NULL} selects \code{k_min}, the smallest count for

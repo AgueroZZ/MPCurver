@@ -1,30 +1,3 @@
-test_that("soft_two_trajectory_cavi returns a stable A/B interface", {
-  sim <- simulate_dual_trajectory(
-    n = 100,
-    d1 = 5,
-    d2 = 5,
-    d_noise = 0,
-    noise_sd = 0.1,
-    seed = 2
-  )
-
-  res <- soft_two_trajectory_cavi(
-    sim$X,
-    K = 10,
-    n_outer = 4,
-    max_converge_iter = 6,
-    inner_iter = 1L,
-    verbose = FALSE
-  )
-
-  expect_equal(dim(res$pi_weights), c(ncol(sim$X), 2L))
-  expect_identical(colnames(res$pi_weights), c("A", "B"))
-  expect_true(all(res$assign %in% c("A", "B")))
-  expect_true(all(is.finite(res$objective_history)))
-  expect_true(all(diff(res$objective_history) >= -1e-8))
-  expect_gte(evaluate_partition(list(assign = res$assign), sim$true_assign)$accuracy, 0.8)
-})
-
 test_that("soft partition accepts full-data fits rebuilt from subset gamma starts", {
   sim <- simulate_dual_trajectory(
     n = 70,
@@ -325,8 +298,7 @@ test_that("fit_mpcurve can use similarity initialization for intrinsic_dim > 1",
 
   expect_s3_class(fit, "mpcurve")
   expect_equal(fit$algorithm, "cavi")
-  expect_equal(fit$model_intrinsic_dim, 3L)
-  expect_equal(fit$requested_intrinsic_dim, 3L)
+  expect_equal(fit$intrinsic_dim, 3L)
   expect_equal(fit$fit$control$partition_init, "similarity")
   expect_true(!is.null(fit$similarity_init))
   expect_true(is.matrix(fit$similarity_init$S))

@@ -56,7 +56,7 @@
 .mpcurve_validate_ordering_args <- function(X, method, method_args = list()) {
   helper <- switch(method, PCA = PCA_ordering, fiedler = fiedler_ordering,
     pcurve = pcurve_ordering, tSNE = tSNE_ordering, isomap = isomap_ordering,
-    random = function() NULL)
+    random = .random_ordering)
   if (!is.list(method_args) || (length(method_args) &&
       (is.null(names(method_args)) || any(!nzchar(names(method_args))) ||
        anyDuplicated(names(method_args))))) {
@@ -111,7 +111,9 @@
 #' Fiedler ordering from a nearest-neighbor graph
 #'
 #' Order samples by the second graph-Laplacian eigenvector.
-#' @param X Numeric sample-by-feature matrix.
+#' @param X Numeric sample-by-feature matrix. Ordering helpers require complete
+#'   data; missing values are filled with each feature's observed mean, with a
+#'   warning.
 #' @param num_neighbors Number of nearest neighbors, between 2 and `nrow(X)-1`.
 #'   `NULL` starts at `min(15, nrow(X)-1)` and increases the count until the
 #'   graph is connected. An explicit count is held fixed.
@@ -130,6 +132,7 @@
 #' @md
 #' @export
 fiedler_ordering <- function(X, num_neighbors = NULL, control = NULL) {
+  X <- .mpcurve_ordering_input(X, "fiedler_ordering")
   opts <- .mpcurve_ordering_options("fiedler", control)
   if (!is.null(num_neighbors)) {
     opts$k <- .mpcurve_integer_setting(num_neighbors, "num_neighbors", 2L)
@@ -157,6 +160,7 @@ fiedler_ordering <- function(X, num_neighbors = NULL, control = NULL) {
 #' @export
 tSNE_ordering <- function(X, component = 1L, perplexity = 10,
                           max_iter = 500L, seed = NULL, control = NULL) {
+  X <- .mpcurve_ordering_input(X, "tSNE_ordering")
   opts <- .mpcurve_ordering_options("tSNE", control)
   component <- .mpcurve_integer_setting(component, "component")
   max_iter <- .mpcurve_integer_setting(max_iter, "max_iter")
@@ -187,6 +191,7 @@ tSNE_ordering <- function(X, component = 1L, perplexity = 10,
 #' @export
 pcurve_ordering <- function(X, smoother = c("smooth_spline", "lowess", "periodic_lowess"),
                             max_iter = 10L, tol = 0.001, control = NULL) {
+  X <- .mpcurve_ordering_input(X, "pcurve_ordering")
   smoother <- match.arg(smoother)
   max_iter <- .mpcurve_integer_setting(max_iter, "max_iter")
   .mpcurve_positive_setting(tol, "tol")
@@ -230,6 +235,7 @@ pcurve_ordering <- function(X, smoother = c("smooth_spline", "lowess", "periodic
 #' @export
 isomap_ordering <- function(X, num_neighbors = NULL, component = 1L,
                             seed = NULL, control = NULL) {
+  X <- .mpcurve_ordering_input(X, "isomap_ordering")
   opts <- .mpcurve_ordering_options("isomap", control)
   opts$ndim <- opts$embedding_dims
   opts$landmark <- opts$num_landmarks

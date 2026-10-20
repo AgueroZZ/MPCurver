@@ -7,7 +7,9 @@
 fiedler_ordering(X, num_neighbors = NULL, control = NULL)
 }
 \arguments{
-\item{X}{Numeric sample-by-feature matrix.}
+\item{X}{Numeric sample-by-feature matrix. Ordering helpers require complete
+data; missing values are filled with each feature's observed mean, with a
+warning.}
 
 \item{num_neighbors}{Number of nearest neighbors, between 2 and \code{nrow(X)-1}.
 \code{NULL} starts at \code{min(15, nrow(X)-1)} and increases the count until the

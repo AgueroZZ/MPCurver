@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -47,6 +47,26 @@
       <small>Source: <a href="https://github.com/AgueroZZ/MPCurver/blob/HEAD/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.4.2" id="mpcurver-042">MPCurver 0.4.2<a class="anchor" aria-label="anchor" href="#mpcurver-042"></a></h2>
+<ul><li>Accept partial <code>NA</code> observations in single- and multi-ordering CAVI, known measurement-noise fits, continuation, and dimension selection. Entirely missing samples/features, <code>NaN</code>, and infinite observations are rejected.</li>
+<li>Evaluate trajectory updates, position updates, feature assignments, noise estimates, and objectives on observed entries. Feature-specific observation counts replace the complete sample count in variance updates; normalized stopping uses the total number of observed entries.</li>
+<li>Confine feature-mean filling to ordering initialization and retain original missing values in fitted objects. Feature similarities use pairwise-complete observations. <code>$observations</code> reports coverage. Matrix measurement SDs may be missing only where the corresponding observation is missing.</li>
+<li>Initialize trajectory precision from random-walk roughness over the position bins that carry data. Empty bins are integrated out of the intrinsic prior rather than entering as zero means.</li>
+<li>Stop with an error when an intrinsic trajectory update is singular because the data occupy too few position bins, in complete-data as well as missing-data fits. Complete-data fits previously continued with a numerical occupancy floor.</li>
+<li>Single-ordering missing-data position updates use the exact softmax without a probability floor, so they reduce to the complete-data update and agree with treating missing entries as infinitely noisy observations.</li>
+<li>Exported ordering helpers (<code><a href="../reference/PCA_ordering.html">PCA_ordering()</a></code>, <code><a href="../reference/fiedler_ordering.html">fiedler_ordering()</a></code>, <code><a href="../reference/isomap_ordering.html">isomap_ordering()</a></code>, <code><a href="../reference/pcurve_ordering.html">pcurve_ordering()</a></code>, <code><a href="../reference/tSNE_ordering.html">tSNE_ordering()</a></code>) fill missing values with feature means and warn; <code><a href="../reference/fit_mpcurve.html">fit_mpcurve()</a></code> fills before calling them.</li>
+<li>A singular trajectory update in a fit with missing values and an adaptive position prior suggests <code>position_prior = "fixed"</code>, which avoids collapsing an ordering’s positions into one bin.</li>
+<li>Similarity initialization for a specified number of orderings reports one-feature clusters with a message suggesting a smaller <code>intrinsic_dim</code> or another <code>similarity_metric</code>. The cut itself is unchanged.</li>
+<li>
+<code>initial_method = "random"</code> now orders the samples by a random permutation and cuts it into position bins like any other ordering score, so quantile bins start with equal sample counts. Previously every sample started in the first bin.</li>
+<li>Removed the unused SmoothEM and csmoothEM code: EM fitting, kriging and progressive refinement, csmoothEM feature partitioning, the annealed soft two-trajectory EM, and their priors, plots, and <code>as_mpcurve()</code> converters. All fitting already used CAVI. <code>mclust</code> and <code>parallel</code> are no longer imported.</li>
+<li>Removed unreachable internal code from earlier CAVI partition versions: the augmented two-trajectory partition and its weighted updates, freeze rules, and wrapper, and the greedy forward/backward search over the number of orderings. Public fitting, <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>, <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, and <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> are unchanged.</li>
+<li>Dropped compatibility with objects saved by earlier versions (augmented and Dirichlet-prior partition fits, pre-0.4 dimension fields, and the pre-0.3.2 default stopping rule) and with removed internal arguments (<code>pi_init</code>, <code>assignment_prior</code>, <code>ordering_alpha</code>, and the freeze/drop controls). Fits no longer store the empty <code>assignment_prior</code>, <code>ordering_alpha</code>, and <code>intrinsic_dim_semantics</code> fields, and summaries omit <code>greedy_selection</code> and <code>ordering_events</code>.</li>
+<li>Fitted objects and summaries no longer carry the constant fields <code>model_intrinsic_dim</code>, <code>requested_intrinsic_dim</code>, <code>active_intrinsic_dim</code>, and <code>displayed_intrinsic_dim</code>; use <code>intrinsic_dim</code>. The partition prior returned by <code>fitted_prior(type = "partition")</code> no longer includes <code>active_idx</code>, and internal assignment records drop the always-constant <code>assignment_mode</code>, <code>assignment_M</code>, <code>posterior_alpha</code>, and <code>kl_q_p</code> entries.</li>
+<li>Report severely ill-conditioned missing-data trajectory updates explicitly, without automatically changing the trajectory prior.</li>
+<li>Complete-data results are otherwise unchanged. Add scalar-density and Gaussian algebra checks, missing-pattern and noise-mode integration tests, and continuation, input-contract, and complete-data regression checks.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.4.1" id="mpcurver-041">MPCurver 0.4.1<a class="anchor" aria-label="anchor" href="#mpcurver-041"></a></h2>
 <ul><li>Isomap now defaults to <code>num_neighbors = NULL</code>, selecting the smallest neighbor count that connects the full undirected graph (<code>k_min</code>) separately within each feature group. Explicit counts remain fixed; counts of one are supported. Ordering results and fit initialization metadata record <code>k_used</code>. Neighbor queries exclude each sample itself and break distance ties by row index, keeping graphs nested during the connectivity search.</li>

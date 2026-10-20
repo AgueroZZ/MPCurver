@@ -37,7 +37,6 @@
   )
   estimation$intrinsic_dim <- as.integer(length(keep))
   estimation$effective_count_tol <- tol
-  fit$control$intrinsic_dim_semantics <- "model"
   if (length(keep) == M) {
     estimation$expected_feature_counts <- counts
     fit$dimension_estimation <- estimation

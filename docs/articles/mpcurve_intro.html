@@ -21,7 +21,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -173,13 +173,26 @@ latent position.
 <h2 id="fit-the-model">Fit the model<a class="anchor" aria-label="anchor" href="#fit-the-model"></a>
 </h2>
 <p>For your own data, supply a numeric matrix or data frame with samples
-in rows and features in columns. Values must be finite: handle missing
-values before fitting. MPCurver does not impute or standardize the
-fitting data. Optional measurement standard deviations <code>S</code>
-use the same units and positional order as <code>X</code>, as a feature
-vector or a matrix of the same dimensions. See <code><a href="../reference/fit_mpcurve.html">?fit_mpcurve</a></code>
-for the complete input contract.</p>
+in rows and features in columns. Missing entries can be <code>NA</code>,
+provided every row and column has an observed value. The likelihood uses
+only observed entries under an ignorable missingness assumption;
+feature-mean filling is confined to ordering initialization, and feature
+similarities use pairwise-complete observations. Fitting does not
+standardize the data. Optional measurement standard deviations
+<code>S</code> use the same units and positional order as
+<code>X</code>, as a feature vector or a matrix of the same dimensions.
+Matrix SDs may be <code>NA</code> where <code>X</code> is missing, and
+must be finite and nonnegative at observed entries. See
+<code><a href="../reference/fit_mpcurve.html">?fit_mpcurve</a></code> for the complete input contract.</p>
+<p>For example, an incomplete matrix can be passed directly to the
+fitter:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">X_missing</span> <span class="op">&lt;-</span> <span class="va">X</span></span>
+<span><span class="va">X_missing</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">X_missing</span><span class="op">)</span>, by <span class="op">=</span> <span class="fl">7</span><span class="op">)</span>, <span class="fl">1</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="cn">NA_real_</span></span>
+<span><span class="va">fit_missing</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span><span class="va">X_missing</span>, num_bins <span class="op">=</span> <span class="fl">20</span>, max_iter <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">fit_missing</span><span class="op">$</span><span class="va">data</span>, <span class="va">X_missing</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="va">fit_missing</span><span class="op">$</span><span class="va">observations</span><span class="op">$</span><span class="va">n_observed</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">X_missing</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_mpcurve.html">fit_mpcurve</a></span><span class="op">(</span></span>
 <span>    <span class="va">X</span>,</span>
 <span>    initial_method <span class="op">=</span> <span class="st">"fiedler"</span>,</span>
@@ -199,7 +212,7 @@ for the complete input contract.</p>
 <span><span class="co">#&gt;   Iterations     : 54</span></span>
 <span><span class="co">#&gt;   Converged      : yes</span></span>
 <span><span class="co">#&gt;   ELBO (last)    : -4793.168899</span></span></code></pre></div>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="co">#&gt; MPCurve Model Summary</span></span>
 <span><span class="co">#&gt; Algorithm : cavi  |  Model : homoskedastic  |  n=1000  d=2  K=60</span></span>
@@ -229,7 +242,7 @@ for the complete input contract.</p>
 </h2>
 <p>First, check whether the variational objective increases throughout
 fitting.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diff.html" class="external-link">diff</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">elbo_trace</span><span class="op">)</span> <span class="op">&gt;=</span> <span class="op">-</span><span class="fl">1e-8</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"ELBO monotone:"</span>, <span class="cn">TRUE</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; ELBO monotone: TRUE</span></span>
@@ -238,7 +251,7 @@ fitting.</p>
 <p>We can also compare the inferred ordering to the true latent
 parameter using the posterior-mean pseudotime on the normalized
 grid.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pseudotime_hat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fitted_positions.html">fitted_positions</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span></span>
 <span><span class="va">rho_t</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span><span class="va">pseudotime_hat</span>, <span class="va">t_true</span>, method <span class="op">=</span> <span class="st">"spearman"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
@@ -250,7 +263,7 @@ grid.</p>
 </h2>
 <p>Figure 2 shows true pseudotime (left) and inferred CAVI pseudotime
 (right).</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">col_fit</span> <span class="op">&lt;-</span> <span class="va">pal</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/cut.html" class="external-link">cut</a></span><span class="op">(</span><span class="va">pseudotime_hat</span>, breaks <span class="op">=</span> <span class="fl">256</span>, labels <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">]</span></span>
 <span></span>
 <span><span class="va">op</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">3.5</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
@@ -263,13 +276,13 @@ grid.</p>
 Figure 2. True pseudotime (left) and inferred CAVI pseudotime (right).
 </p>
 </div>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span><span class="va">op</span><span class="op">)</span></span></code></pre></div>
 <p>The fitted object also provides plots of the objective and posterior
 mean trajectory.</p>
 <p>Figure 3 shows the CAVI trace plot from the fitted mpcurve
 object.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, plot_type <span class="op">=</span> <span class="st">"elbo"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
 <img src="mpcurve_intro_files/figure-html/plot-trace-1.png" class="r-plt" alt="Figure 3. CAVI trace plot from the fitted mpcurve object." width="672"><p class="caption">
@@ -277,7 +290,7 @@ Figure 3. CAVI trace plot from the fitted mpcurve object.
 </p>
 </div>
 <p>Figure 4 shows posterior mean trajectories across the K bins.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, plot_type <span class="op">=</span> <span class="st">"mu"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
 <img src="mpcurve_intro_files/figure-html/plot-mu-1.png" class="r-plt" alt="Figure 4. Posterior mean trajectories across the K bins." width="672"><p class="caption">
@@ -296,7 +309,7 @@ direction and assess whether nearby samples have similar feature
 profiles.</p>
 <p>The extraction functions use the same dimensions for one or multiple
 orderings:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">positions</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fitted_positions.html">fitted_positions</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>                 <span class="co"># samples x orderings</span></span>
 <span><span class="va">trajectories</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fitted_trajectories.html">fitted_trajectories</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>            <span class="co"># features x bins x orderings</span></span>
 <span><span class="va">trajectory_sd</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fitted_trajectories.html">fitted_trajectories</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"sd"</span><span class="op">)</span></span>

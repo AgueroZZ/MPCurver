@@ -11,7 +11,7 @@ their defaults. The returned settings are checked again at fitting time."></head
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -178,7 +178,7 @@ sweeps, in addition to initialization and the final <code>max_iter</code> budget
 
 <dt id="arg-convergence">convergence<a class="anchor" aria-label="anchor" href="#arg-convergence"></a></dt>
 <dd><p>Stopping-rule scale. Default: <code>"normalized"</code>, checking
-<code>abs(delta_ELBO) / (nrow(X) * ncol(X))</code> against the main <code>tol</code> argument.
+<code>abs(delta_ELBO) / sum(!is.na(X))</code> against the main <code>tol</code> argument.
 <code>"relative"</code> retains historical scaling by the previous ELBO magnitude
 plus the backend's numerical offset. Stored objective values are unchanged.</p></dd>
 

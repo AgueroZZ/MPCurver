@@ -113,11 +113,25 @@ plot(X, col = col_true, pch = 19, cex = 0.55,
 ## Fit the model
 
 For your own data, supply a numeric matrix or data frame with samples in rows
-and features in columns. Values must be finite: handle missing values before
-fitting. MPCurver does not impute or standardize the fitting data. Optional
-measurement standard deviations `S` use the same units and positional order
-as `X`, as a feature vector or a matrix of the same dimensions. See
+and features in columns. Missing entries can be `NA`, provided every row and
+column has an observed value. The likelihood uses only observed entries under
+an ignorable missingness assumption; feature-mean filling is confined to
+ordering initialization, and feature similarities use pairwise-complete
+observations. Fitting does not standardize the data. Optional measurement
+standard deviations `S` use the same units and positional order as `X`, as a
+feature vector or a matrix of the same dimensions. Matrix SDs may be `NA` where
+`X` is missing, and must be finite and nonnegative at observed entries. See
 `?fit_mpcurve` for the complete input contract.
+
+For example, an incomplete matrix can be passed directly to the fitter:
+
+```{r missing-data-example}
+X_missing <- X
+X_missing[seq(1, nrow(X_missing), by = 7), 1] <- NA_real_
+fit_missing <- fit_mpcurve(X_missing, num_bins = 20, max_iter = 5)
+stopifnot(identical(fit_missing$data, X_missing))
+stopifnot(fit_missing$observations$n_observed == sum(!is.na(X_missing)))
+```
 
 ```{r fit-cavi}
 fit <- fit_mpcurve(

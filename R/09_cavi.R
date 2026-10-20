@@ -30,7 +30,22 @@
   R <- as.matrix(R)
   n <- nrow(X)
   d <- ncol(X)
+  if (anyNA(X)) {
+    observed <- !is.na(X)
+    X0 <- X
+    X0[!observed] <- 0
+    mass <- crossprod(observed * 1, R)
+    GX <- crossprod(X0, R)
+    mu_raw <- GX / pmax(mass, 1e-8)
+    residual <- rowSums(crossprod(X0^2, R) - 2 * mu_raw * GX + mu_raw^2 * mass)
+    # Raw means exist only where data fall; empty bins are left undefined.
+    mu_raw[!.cavi_occupied_bins(mass, colSums(observed))] <- NA_real_
+    return(list(mu_raw = mu_raw,
+                sigma2_raw = pmin(pmax(residual / colSums(observed), sigma_min), sigma_max),
+                Nk = colSums(R)))
+  }
   Nk <- colSums(R)
+  empty <- !.cavi_occupied_bins(Nk, n)
   Nk[Nk < 1e-8] <- 1e-8
 
   GX <- crossprod(X, R)
@@ -39,6 +54,7 @@
   mu2_Nk <- mu_raw^2 * rep(Nk, each = d)
   resid_term <- rowSums(GX2 - 2 * mu_raw * GX + mu2_Nk)
   sigma2_raw <- pmin(pmax(resid_term / n, sigma_min), sigma_max)
+  mu_raw[, empty] <- NA_real_
 
   list(
     mu_raw = mu_raw,
@@ -47,32 +63,106 @@
   )
 }
 
+# A position bin carries data for a feature when its responsibility mass over
+# that feature's observed samples exceeds n_j * sqrt(eps). The probability
+# floor applied to position updates contributes at most sqrt(eps) / K per
+# sample, so mass at or below this level carries no information from the data.
+.cavi_occupied_bins <- function(mass, n_observed) {
+  mass > as.numeric(n_observed) * sqrt(.Machine$double.eps)
+}
+
+.cavi_prior_null_basis <- function(Q_K) {
+  eig <- eigen(Q_K, symmetric = TRUE)
+  threshold <- ncol(Q_K) * max(abs(eig$values)) * .Machine$double.eps
+  eig$vectors[, eig$values <= threshold, drop = FALSE]
+}
+
+# lambda Q + D is singular exactly when a nonzero direction in null(Q) vanishes
+# on every bin that carries data. For RW order q this requires data in at least
+# q bins; any number of empty bins is allowed otherwise.
+.cavi_check_precision_support <- function(occupied, Q_K, feature = NA_integer_,
+                                          ordering_label = NULL, n_observed = NULL) {
+  if (all(occupied)) return(invisible(TRUE))
+  null_basis <- .cavi_prior_null_basis(Q_K)
+  if (!ncol(null_basis)) return(invisible(TRUE))
+  supported <- null_basis[occupied, , drop = FALSE]
+  if (nrow(supported) >= ncol(null_basis) &&
+      qr(supported)$rank >= ncol(null_basis)) {
+    return(invisible(TRUE))
+  }
+  stop(sprintf(paste0(
+    "Trajectory precision %s%s is singular: %s occupy %d position bin(s), which ",
+    "cannot identify the %d-dimensional null space of the intrinsic smoothness ",
+    "prior. Positions have collapsed onto too few bins or the feature has too few ",
+    "observations; use another initialization, more observations, or a proper ",
+    "prior (mpcurve_control(ridge = ...))."),
+    if (is.na(feature)) "for every feature" else sprintf("for feature %d", feature),
+    if (is.null(ordering_label)) "" else sprintf(" in ordering %s", ordering_label),
+    if (is.null(n_observed)) "the data" else sprintf("its %d observed value(s)", n_observed),
+    sum(occupied), ncol(null_basis)), call. = FALSE)
+}
+
+# RW roughness of the smoothest trajectory through the occupied bins' raw
+# means. Empty bins are integrated out of the intrinsic GMRF: the occupied
+# bins have marginal precision Q_OO - Q_OE Q_EE^{-1} Q_EO, whose rank replaces
+# rank(Q). Bins without data therefore contribute no curvature.
+.cavi_occupied_roughness <- function(mu, Q_K) {
+  occupied <- !is.na(mu)
+  if (all(occupied)) {
+    return(list(quad = as.numeric(crossprod(mu, Q_K %*% mu)), rank = NA_real_))
+  }
+  marginal <- tryCatch({
+    Q_oe <- Q_K[occupied, !occupied, drop = FALSE]
+    Q_K[occupied, occupied, drop = FALSE] -
+      Q_oe %*% solve(Q_K[!occupied, !occupied, drop = FALSE], t(Q_oe))
+  }, error = function(e) NULL)
+  if (is.null(marginal) || !any(occupied)) return(list(quad = NA_real_, rank = 0))
+  marginal <- 0.5 * (marginal + t(marginal))
+  threshold <- ncol(Q_K) * max(abs(eigen(Q_K, symmetric = TRUE,
+    only.values = TRUE)$values)) * .Machine$double.eps
+  values <- eigen(marginal, symmetric = TRUE, only.values = TRUE)$values
+  mu_o <- mu[occupied]
+  list(quad = as.numeric(crossprod(mu_o, marginal %*% mu_o)),
+       rank = sum(values > threshold))
+}
+
 .cavi_lambda_init_from_mu_raw <- function(mu_raw, Q_K, r_rank,
                                           lambda_sd_prior_rate = NULL,
                                           lambda_min = 1e-10,
                                           lambda_max = 1e10) {
   mu_raw <- as.matrix(mu_raw)
-  eq_quad_raw <- vapply(seq_len(nrow(mu_raw)), function(j) {
-    mj <- mu_raw[j, ]
-    as.numeric(crossprod(mj, Q_K %*% mj))
-  }, numeric(1))
-  denom <- pmax(eq_quad_raw, 1e-12)
   lambda_sd_prior_rate_val <- .lambda_sd_prior_rate_value(lambda_sd_prior_rate)
-
-  if (lambda_sd_prior_rate_val <= 0) {
-    return(pmin(pmax(r_rank / denom, lambda_min), lambda_max))
+  lambda_from <- function(eq_quad, rank) {
+    denom <- pmax(eq_quad, 1e-12)
+    if (lambda_sd_prior_rate_val <= 0) {
+      return(pmin(pmax(rank / denom, lambda_min), lambda_max))
+    }
+    .optimize_lambda_induced_exp(
+      eq_quad = denom,
+      r_rank = rank,
+      rate = lambda_sd_prior_rate_val,
+      lambda_min = lambda_min,
+      lambda_max = lambda_max
+    )
   }
-
-  .optimize_lambda_induced_exp(
-    eq_quad = denom,
-    r_rank = r_rank,
-    rate = lambda_sd_prior_rate_val,
-    lambda_min = lambda_min,
-    lambda_max = lambda_max
-  )
+  if (!anyNA(mu_raw)) {
+    eq_quad_raw <- vapply(seq_len(nrow(mu_raw)), function(j) {
+      mj <- mu_raw[j, ]
+      as.numeric(crossprod(mj, Q_K %*% mj))
+    }, numeric(1))
+    return(lambda_from(eq_quad_raw, r_rank))
+  }
+  # Empty bins are NA in mu_raw. Without remaining curvature information
+  # (marginal rank 0), start from precision 1; q(U) then checks support.
+  vapply(seq_len(nrow(mu_raw)), function(j) {
+    rough <- .cavi_occupied_roughness(mu_raw[j, ], Q_K)
+    rank <- if (is.na(rough$rank)) r_rank else rough$rank
+    if (rank <= 0) return(pmin(pmax(1, lambda_min), lambda_max))
+    lambda_from(rough$quad, rank)
+  }, numeric(1))
 }
 
-.cavi_same_measurement_sd <- function(a, b) {
+.cavi_same_measurement_sd <- function(a, b, X = NULL) {
   if (is.null(a) && is.null(b)) return(TRUE)
   if (is.null(a) || is.null(b)) return(FALSE)
 
@@ -80,6 +170,10 @@
   b_is_mat <- is.matrix(b)
   if (!identical(a_is_mat, b_is_mat)) return(FALSE)
   if (a_is_mat && !identical(dim(a), dim(b))) return(FALSE)
+  if (a_is_mat && !is.null(X) && anyNA(X)) {
+    a <- a[!is.na(X)]
+    b <- b[!is.na(X)]
+  }
   isTRUE(all.equal(as.numeric(a), as.numeric(b), tolerance = 0, check.attributes = FALSE))
 }
 
@@ -89,45 +183,11 @@
   if (length(rng) != 2L || !all(is.finite(rng))) c(NA_real_, NA_real_) else rng
 }
 
-.warn_pi_init_deprecated <- local({
-  warned <- FALSE
-  function(caller = NULL) {
-    if (isTRUE(warned)) return(invisible(NULL))
-    warned <<- TRUE
-    prefix <- if (is.null(caller) || !nzchar(caller)) "" else paste0(caller, ": ")
-    warning(
-      prefix,
-      "`pi_init` is deprecated; use `position_prior_init` instead.",
-      call. = FALSE
-    )
-    invisible(NULL)
-  }
-})
-
 .cavi_validate_position_prior <- function(position_prior = c("adaptive", "fixed"),
                                           position_prior_init = NULL,
-                                          pi_init = NULL,
                                           K,
                                           caller = "cavi()") {
   position_prior <- match.arg(position_prior)
-
-  if (!is.null(pi_init)) {
-    .warn_pi_init_deprecated(caller = caller)
-    if (is.null(position_prior_init)) {
-      position_prior_init <- pi_init
-    } else if (!isTRUE(all.equal(
-      as.numeric(position_prior_init),
-      as.numeric(pi_init),
-      tolerance = 0,
-      check.attributes = FALSE
-    ))) {
-      stop(
-        caller,
-        ": `position_prior_init` and deprecated `pi_init` disagree; supply only `position_prior_init`.",
-        call. = FALSE
-      )
-    }
-  }
 
   if (is.null(position_prior_init)) {
     return(list(
@@ -269,14 +329,17 @@
     if (!all(dim(S_mat) == c(n, d))) {
       stop(caller, ": matrix S must have the same dimensions as X (n x d).", call. = FALSE)
     }
-    if (any(!is.finite(S_mat)) || any(S_mat < 0)) {
+    if (any(is.nan(S_mat) | is.infinite(S_mat)) || any(S_mat < 0, na.rm = TRUE) ||
+        anyNA(S_mat[!is.na(X)])) {
       stop(caller, ": S must contain only finite nonnegative values.", call. = FALSE)
     }
     S_mat <- pmax(S_mat, sd_floor)
+    variance <- S_mat^2
+    variance[is.na(X)] <- 1
     return(list(
       measurement_sd = S_mat,
       sd_mat = S_mat,
-      var_mat = S_mat^2,
+      var_mat = variance,
       noise_model = "known_observation_sd"
     ))
   }
@@ -382,10 +445,9 @@
 #' \eqn{\lambda_j}. The latent trajectory for feature \eqn{j} is a length-\eqn{K}
 #' vector with a GMRF prior along the component axis.
 #'
-#' This function is now the main single-ordering MPCurver backend. In contrast
-#' to the legacy \code{csmooth_em} path, it keeps an explicit Gaussian
-#' posterior over feature trajectories, with posterior means \eqn{m_j} and
-#' covariances \eqn{S_j}.
+#' This function is the single-ordering MPCurver backend. It keeps an explicit
+#' Gaussian posterior over feature trajectories, with posterior means
+#' \eqn{m_j} and covariances \eqn{S_j}.
 #'
 #' @param X Numeric matrix (\eqn{n \times d}).
 #' @param K Number of components. If NULL, defaults to \code{max(2, min(50, floor(n/5)))}.
@@ -397,9 +459,7 @@
 #'   \code{"fixed"} keeps it constant throughout fitting.
 #' @param position_prior_init Optional length-\code{K} initial/fixed prior
 #'   vector for latent component positions. When omitted and
-#'   \code{position_prior = "fixed"}, a uniform prior is used. Deprecated
-#'   alias: \code{pi_init}.
-#' @param pi_init Deprecated alias for \code{position_prior_init}.
+#'   \code{position_prior = "fixed"}, a uniform prior is used.
 #' @param sigma2_init Optional initial feature-specific variances.
 #' @param S Optional known measurement standard deviations. If \code{NULL},
 #'   the current feature-specific variance inference is used. If a length-\code{d}
@@ -414,9 +474,8 @@
 #'   and keep \code{lambda_j} fixed at the initial values throughout fitting.
 #' @param lambda_sd_prior_rate Optional positive rate for an exponential prior
 #'   on \code{1 / sqrt(lambda_j)}. The default \code{NULL} means no lambda prior
-#'   penalty. For backward compatibility, an explicit \code{0} is treated the
-#'   same way; it is only an alias for "no penalty" and does not correspond to
-#'   a literal exponential prior with rate zero.
+#'   penalty; an explicit \code{0} also means no penalty rather than a literal
+#'   exponential prior with rate zero.
 #' @param lambda_min,lambda_max Bounds for \code{lambda_j}.
 #' @param sigma_min,sigma_max Bounds for \code{sigma_j^2}.
 #' @param max_iter Maximum number of CAVI sweeps. \code{0} returns the
@@ -445,7 +504,6 @@ cavi <- function(X,
                  init_on_failure = "pca",
                  position_prior = c("adaptive", "fixed"),
                  position_prior_init = NULL,
-                 pi_init = NULL,
                  sigma2_init = NULL,
                  S = NULL,
                  lambda_init = NULL,
@@ -467,7 +525,9 @@ cavi <- function(X,
   discretization <- match.arg(discretization)
   position_prior <- match.arg(position_prior)
 
-  X <- as.matrix(X)
+  X <- .mpcurve_validate_data(as.matrix(X), S, allow_empty_rows = TRUE)
+  has_missing <- anyNA(X)
+  n_observed <- sum(!is.na(X))
   n <- nrow(X)
   d <- ncol(X)
   if (n < 2L) stop("X must have at least two rows.")
@@ -510,14 +570,14 @@ cavi <- function(X,
   raw_init <- NULL
 
   if (is.null(responsibilities_init)) {
-    init <- do.call(initialize_ordering_csmooth, c(list(
-      X = X,
+    init <- .cavi_initialize_ordering(
+      X = .mpcurve_initialization_data(X),
       K = K,
       method = method,
       discretization = discretization,
-      modelName = "homoskedastic",
-      init_on_failure = init_on_failure
-    ), method_args))
+      init_on_failure = init_on_failure,
+      method_args = method_args
+    )
     params0 <- init$params
     K_init <- length(params0$pi)
     if (K_init != K) {
@@ -537,6 +597,7 @@ cavi <- function(X,
     R <- matrix(1 / K, nrow = n, ncol = K)
     R[keep_idx, ] <- 0
     R[cbind(keep_idx, cluster_rank)] <- 1
+    if (has_missing) R <- .mpcurve_missing_initial_responsibilities(R)
   } else {
     skip_raw_gamma_preinit <- isTRUE(attr(responsibilities_init, "cavi_skip_raw_preinit"))
     R <- .cavi_normalize_responsibilities(responsibilities_init, n = n, K = K)
@@ -555,7 +616,6 @@ cavi <- function(X,
   position_prior_ctl <- .cavi_validate_position_prior(
     position_prior = position_prior,
     position_prior_init = position_prior_init,
-    pi_init = pi_init,
     K = K,
     caller = "cavi()"
   )
@@ -577,6 +637,8 @@ cavi <- function(X,
       if (length(tmp) == 1L) tmp <- rep(tmp, d)
       if (length(tmp) != d) stop("sigma2_init must have length 1 or ncol(X).")
       pmin(pmax(tmp, sigma_min), sigma_max)
+    } else if (has_missing) {
+      pmin(pmax(.mpcurve_observed_variance(X), sigma_min), sigma_max)
     } else if (raw_gamma_preinit) {
       raw_init$sigma2_raw
     } else if (!is.null(params0)) {
@@ -624,7 +686,9 @@ cavi <- function(X,
   }
 
   .update_q_u <- function(R, sigma2, lambda_vec, iteration = 0L) {
+    if (has_missing) return(.cavi_observed_q_u(X, R, sigma2, lambda_vec, Q_K))
     Nk <- colSums(R)
+    .cavi_check_precision_support(.cavi_occupied_bins(Nk, n), Q_K)
     Nk[Nk < 1e-8] <- 1e-8
     GX <- t(X) %*% R
 
@@ -677,6 +741,8 @@ cavi <- function(X,
   }
 
   .update_q_u_known <- function(R, lambda_vec, var_mat, iteration = 0L) {
+    if (has_missing) return(.cavi_observed_q_u(X, R, NULL, lambda_vec, Q_K, var_mat))
+    .cavi_check_precision_support(.cavi_occupied_bins(colSums(R), n), Q_K)
     m_mat <- matrix(0, nrow = d, ncol = K)
     sdiag_mat <- matrix(0, nrow = d, ncol = K)
     S_list <- vector("list", d)
@@ -727,6 +793,11 @@ cavi <- function(X,
   }
 
   .update_r <- function(q_u, pi_vec, sigma2) {
+    if (has_missing) {
+      logits <- sweep(.cavi_observed_logdensity(X, q_u, sigma2),
+                      2L, log(pmax(pi_vec, 1e-300)), "+")
+      return(exp(logits - matrixStats::rowLogSumExps(logits)))
+    }
     m_mat     <- q_u$m_mat      # d x K
     sdiag_mat <- q_u$sdiag_mat  # d x K
     inv_s2    <- 1 / sigma2     # d-vector
@@ -747,6 +818,11 @@ cavi <- function(X,
   }
 
   .update_r_known <- function(q_u, pi_vec, var_mat) {
+    if (has_missing) {
+      logits <- sweep(.cavi_observed_logdensity(X, q_u, var_mat = var_mat),
+                      2L, log(pmax(pi_vec, 1e-300)), "+")
+      return(exp(logits - matrixStats::rowLogSumExps(logits)))
+    }
     m_mat <- q_u$m_mat
     sdiag_mat <- q_u$sdiag_mat
     inv_var_mat <- 1 / var_mat
@@ -765,6 +841,10 @@ cavi <- function(X,
   }
 
   .update_sigma2 <- function(R, q_u) {
+    if (has_missing) {
+      variance <- .cavi_observed_residuals(X, R, q_u) / colSums(!is.na(X))
+      return(pmin(pmax(variance, sigma_min), sigma_max))
+    }
     m_mat     <- q_u$m_mat      # d x K
     sdiag_mat <- q_u$sdiag_mat  # d x K
     Nk <- colSums(R)            # K-vec
@@ -796,6 +876,8 @@ cavi <- function(X,
   }
 
   .compute_elbo <- function(R, pi_vec, sigma2, lambda_vec, q_u) {
+    if (has_missing) return(.cavi_observed_elbo(
+      X, R, pi_vec, q_u, sigma2, NULL, lambda_vec, Q_K, rw_q, lambda_sd_prior_rate))
     m_mat     <- q_u$m_mat      # d x K
     sdiag_mat <- q_u$sdiag_mat  # d x K
     inv_s2    <- 1 / sigma2     # d-vector
@@ -829,6 +911,9 @@ cavi <- function(X,
   }
 
   .compute_elbo_known <- function(R, pi_vec, lambda_vec, q_u, var_mat) {
+    if (has_missing) return(.cavi_observed_elbo(
+      X, R, pi_vec, q_u, NULL, noise_info$measurement_sd,
+      lambda_vec, Q_K, rw_q, lambda_sd_prior_rate))
     m_mat <- q_u$m_mat
     sdiag_mat <- q_u$sdiag_mat
     inv_var_mat <- 1 / var_mat
@@ -860,6 +945,9 @@ cavi <- function(X,
   }
 
   .compute_observed_loglik <- function(q_u, pi_vec, sigma2) {
+    if (has_missing) return(sum(matrixStats::rowLogSumExps(sweep(
+      .cavi_observed_logdensity(X, q_u, sigma2, uncertainty = FALSE),
+      2L, log(pmax(pi_vec, 1e-300)), "+"))))
     m_mat  <- q_u$m_mat   # d x K
     inv_s2 <- 1 / sigma2  # d-vector
 
@@ -876,6 +964,9 @@ cavi <- function(X,
   }
 
   .compute_observed_loglik_known <- function(q_u, pi_vec, var_mat) {
+    if (has_missing) return(sum(matrixStats::rowLogSumExps(sweep(
+      .cavi_observed_logdensity(X, q_u, var_mat = var_mat, uncertainty = FALSE),
+      2L, log(pmax(pi_vec, 1e-300)), "+"))))
     m_mat <- q_u$m_mat
     inv_var_mat <- 1 / var_mat
     const_row <- rowSums(log(2 * base::pi * var_mat))
@@ -922,7 +1013,7 @@ cavi <- function(X,
         delta <- elbo_trace[length(elbo_trace)] - elbo_trace[length(elbo_trace) - 1L]
         scaled_delta <- .mpcurve_elbo_change(
           delta, elbo_trace[length(elbo_trace) - 1L], n, d, convergence,
-          relative_offset = 1
+          relative_offset = 1, n_observed = n_observed
         )
 
         if (verbose) {
@@ -972,7 +1063,7 @@ cavi <- function(X,
         delta <- elbo_trace[length(elbo_trace)] - elbo_trace[length(elbo_trace) - 1L]
         scaled_delta <- .mpcurve_elbo_change(
           delta, elbo_trace[length(elbo_trace) - 1L], n, d, convergence,
-          relative_offset = 1
+          relative_offset = 1, n_observed = n_observed
         )
 
         if (verbose) {
@@ -1062,6 +1153,7 @@ cavi <- function(X,
   )
   out$init_info <- if (is.null(responsibilities_init)) attr(init$ordering, "init_info") else NULL
   out$control$method <- out$init_info$method_used %||% method
+  out$observations <- .mpcurve_observation_summary(X)
   out$priors <- .mpcurve_priors_from_cavi_fit(out)
   out
 }
@@ -1071,8 +1163,7 @@ cavi <- function(X,
 #'
 #' @param object A \code{cavi} object.
 #' @param iter Integer maximum number of additional CAVI sweeps.
-#' @param convergence Optional stopping rule; NULL reuses the stored rule,
-#'   or relative stopping for objects saved before version 0.3.2.
+#' @param convergence Optional stopping rule; NULL reuses the stored rule.
 #' @param tol Optional convergence tolerance. If \code{NULL}, reuse the
 #'   original fit's tolerance.
 #' @param lambda Optional scalar or d-vector. If provided, overrides
@@ -1084,8 +1175,8 @@ cavi <- function(X,
 #' @param lambda_sd_prior_rate Optional positive rate for the induced
 #'   exponential prior on \code{1 / sqrt(lambda_j)}. If \code{NULL}, reuse the
 #'   value stored in the original fit's \code{$control}. An explicit \code{0}
-#'   is treated as "no penalty" for backward compatibility and does not
-#'   represent a literal exponential prior with rate zero.
+#'   removes the penalty; it does not represent a literal exponential prior
+#'   with rate zero.
 #' @param S Optional known measurement standard deviations. If omitted,
 #'   \code{do_cavi()} reuses the value stored on \code{object}. Supplying a new
 #'   \code{S} is only allowed when it exactly matches the stored specification.
@@ -1155,7 +1246,7 @@ do_cavi <- function(object,
       stop("This fit was created without S; refit with S instead of adding it in do_cavi().",
            call. = FALSE)
     }
-    if (!.cavi_same_measurement_sd(stored_S, S)) {
+    if (!.cavi_same_measurement_sd(stored_S, S, object$data)) {
       stop("Supplied S does not match the measurement_sd stored on object.", call. = FALSE)
     }
     S_use <- S
@@ -1187,7 +1278,7 @@ do_cavi <- function(object,
     sigma_max = smax_use,
     max_iter = iter,
     tol = tol_use,
-    convergence = convergence %||% object$control$convergence %||% "relative",
+    convergence = convergence %||% object$control$convergence,
     verbose = verbose
   )
 
@@ -1227,30 +1318,6 @@ do_cavi <- function(object,
   updated$priors <- NULL
   updated$priors <- .mpcurve_priors_from_cavi_fit(updated)
   updated
-}
-
-
-#' @noRd
-print.cavi <- function(x, ...) {
-  last_elbo <- if (length(x$elbo_trace)) tail(x$elbo_trace, 1L) else NA_real_
-  last_ll <- if (length(x$loglik_trace)) tail(x$loglik_trace, 1L) else NA_real_
-  noise_model <- x$control$noise_model %||% "estimated_feature_variance"
-  position_prior <- x$control$position_prior %||% "adaptive"
-  cat("cavi fit\n")
-  cat(sprintf("  n=%d, d=%d, K=%d\n", nrow(x$data), ncol(x$data), length(x$params$pi)))
-  cat(sprintf("  iter=%d, converged=%s\n", x$iter, if (isTRUE(x$converged)) "yes" else "no"))
-  cat(sprintf("  position prior=%s\n", position_prior))
-  cat(sprintf("  ELBO(last)=%.6f\n", last_elbo))
-  if (is.finite(last_ll)) cat(sprintf("  logLik(last)=%.6f\n", last_ll))
-  if (identical(noise_model, "estimated_feature_variance")) {
-    cat(sprintf("  sigma2 range=[%.3g, %.3g]\n", min(x$params$sigma2), max(x$params$sigma2)))
-  } else {
-    rng_sd <- .cavi_measurement_sd_range(x$measurement_sd)
-    cat(sprintf("  noise model=%s\n", noise_model))
-    cat(sprintf("  known sd range=[%.3g, %.3g]\n", rng_sd[1], rng_sd[2]))
-  }
-  cat(sprintf("  lambda range=[%.3g, %.3g]\n", min(x$lambda_vec), max(x$lambda_vec)))
-  invisible(x)
 }
 
 
@@ -1506,7 +1573,7 @@ plot.cavi <- function(
 
   if (length(dims) == 2L) {
     mu_list_dims <- lapply(seq_len(K), function(k) mu_mat[dims, k])
-    .mpcurve_plot_call(plot_EM_embedding2D, list(
+    .mpcurve_plot_call(.mpcurve_plot_embedding_2d, list(
       mu_list = mu_list_dims,
       X2 = data[, dims, drop = FALSE],
       t_vec = NULL,

@@ -127,16 +127,12 @@ test_that("print.mpcurve is shorter than summary for single and partition fits",
     "convergence_info",
     "sigma2",
     "measurement_sd",
-    "variational_family",
-    "greedy_selection"
+    "variational_family"
   ) %in% names(partition_summary_obj)))
   expect_false("underlying" %in% names(partition_summary_obj))
   expect_identical(partition_summary_obj$variational_family, "structured")
   expect_equal(partition_summary_obj$sigma2, fit_partition$params$sigma2)
-  expect_equal(partition_summary_obj$active_intrinsic_dim,
-               fit_partition$model_intrinsic_dim)
-  expect_equal(partition_summary_obj$displayed_intrinsic_dim,
-               fit_partition$model_intrinsic_dim)
+  expect_equal(partition_summary_obj$intrinsic_dim, fit_partition$intrinsic_dim)
   expect_match(partition_summary, "structural VI", fixed = TRUE)
   expect_match(partition_summary, "Shared sigma2 range", fixed = TRUE)
   expect_match(partition_summary, "fixed-M structural ELBO", fixed = TRUE)

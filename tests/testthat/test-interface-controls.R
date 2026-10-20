@@ -7,12 +7,12 @@ test_that("advanced controls set RW3 and fixed precision across fitting paths", 
       control = mpcurve_control(rw_order = 3, lambda_init = 5,
                                fix_lambda = TRUE, anneal_steps = 1))
     expect_equal(fit$fit$rw_q, 3L)
-    precision <- if (fit$model_intrinsic_dim == 1L) fit$fit$lambda_vec else fit$lambda_mat
-    expect_length(as.numeric(precision), ncol(X) * fit$model_intrinsic_dim)
+    precision <- if (fit$intrinsic_dim == 1L) fit$fit$lambda_vec else fit$lambda_mat
+    expect_length(as.numeric(precision), ncol(X) * fit$intrinsic_dim)
     expect_true(all(precision == 5))
     continued <- do_mpcurve(fit, max_iter = 2, tol = 0)
-    precision <- if (fit$model_intrinsic_dim == 1L) continued$fit$lambda_vec else continued$lambda_mat
-    expect_length(as.numeric(precision), ncol(X) * fit$model_intrinsic_dim)
+    precision <- if (fit$intrinsic_dim == 1L) continued$fit$lambda_vec else continued$lambda_mat
+    expect_length(as.numeric(precision), ncol(X) * fit$intrinsic_dim)
     expect_true(all(precision == 5))
   }
   estimated <- fit_mpcurve(X, num_bins = 6, max_iter = 2,

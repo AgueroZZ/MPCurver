@@ -1,0 +1,3 @@
+"case","result","objective_error"
+"intrinsic_single_observation","fit_mpcurve() failed while fitting cavi with method='PCA': Trajectory precision for feature 6 is singular: its 1 observed value(s) occupy 1 position bin(s), which cannot identify the 2-dimensional null space of the intrinsic smoothness prior. Positions have collapsed onto too few bins or the feature has too few observations; use another initialization, more observations, or a proper prior (mpcurve_control(ridge = ...)). With many missing values, the adaptive position prior can concentrate an ordering's positions in one bin; consider position_prior = ""fixed"".",NA
+"proper_single_observation","Finite monotone fit; scalar objective verified",5.6843418860808e-14

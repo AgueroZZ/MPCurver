@@ -1,3 +1,69 @@
+# MPCurver 0.4.2
+
+- Accept partial `NA` observations in single- and multi-ordering CAVI, known
+  measurement-noise fits, continuation, and dimension selection. Entirely
+  missing samples/features, `NaN`, and infinite observations are rejected.
+- Evaluate trajectory updates, position updates, feature assignments, noise
+  estimates, and objectives on observed entries. Feature-specific observation
+  counts replace the complete sample count in variance updates; normalized
+  stopping uses the total number of observed entries.
+- Confine feature-mean filling to ordering initialization and retain original
+  missing values in fitted objects. Feature similarities use pairwise-complete
+  observations. `$observations` reports coverage. Matrix measurement SDs may be
+  missing only where the corresponding observation is missing.
+- Initialize trajectory precision from random-walk roughness over the position
+  bins that carry data. Empty bins are integrated out of the intrinsic prior
+  rather than entering as zero means.
+- Stop with an error when an intrinsic trajectory update is singular because
+  the data occupy too few position bins, in complete-data as well as
+  missing-data fits. Complete-data fits previously continued with a numerical
+  occupancy floor.
+- Single-ordering missing-data position updates use the exact softmax without
+  a probability floor, so they reduce to the complete-data update and agree
+  with treating missing entries as infinitely noisy observations.
+- Exported ordering helpers (`PCA_ordering()`, `fiedler_ordering()`,
+  `isomap_ordering()`, `pcurve_ordering()`, `tSNE_ordering()`) fill missing
+  values with feature means and warn; `fit_mpcurve()` fills before calling
+  them.
+- A singular trajectory update in a fit with missing values and an adaptive
+  position prior suggests `position_prior = "fixed"`, which avoids collapsing
+  an ordering's positions into one bin.
+- Similarity initialization for a specified number of orderings reports
+  one-feature clusters with a message suggesting a smaller `intrinsic_dim` or
+  another `similarity_metric`. The cut itself is unchanged.
+- `initial_method = "random"` now orders the samples by a random permutation
+  and cuts it into position bins like any other ordering score, so quantile
+  bins start with equal sample counts. Previously every sample started in the
+  first bin.
+- Removed the unused SmoothEM and csmoothEM code: EM fitting, kriging and
+  progressive refinement, csmoothEM feature partitioning, the annealed soft
+  two-trajectory EM, and their priors, plots, and `as_mpcurve()` converters.
+  All fitting already used CAVI. `mclust` and `parallel` are no longer
+  imported.
+- Removed unreachable internal code from earlier CAVI partition versions: the
+  augmented two-trajectory partition and its weighted updates, freeze rules,
+  and wrapper, and the greedy forward/backward search over the number of
+  orderings. Public fitting, `print()`, `summary()`, and `plot()` are
+  unchanged.
+- Dropped compatibility with objects saved by earlier versions (augmented and
+  Dirichlet-prior partition fits, pre-0.4 dimension fields, and the pre-0.3.2
+  default stopping rule) and with removed internal arguments (`pi_init`,
+  `assignment_prior`, `ordering_alpha`, and the freeze/drop controls). Fits no
+  longer store the empty `assignment_prior`, `ordering_alpha`, and
+  `intrinsic_dim_semantics` fields, and summaries omit `greedy_selection` and
+  `ordering_events`.
+- Fitted objects and summaries no longer carry the constant fields
+  `model_intrinsic_dim`, `requested_intrinsic_dim`, `active_intrinsic_dim`,
+  and `displayed_intrinsic_dim`; use `intrinsic_dim`. The partition prior
+  returned by `fitted_prior(type = "partition")` no longer includes
+  `active_idx`, and internal assignment records drop the always-constant
+  `assignment_mode`, `assignment_M`, `posterior_alpha`, and `kl_q_p` entries.
+- Report severely ill-conditioned missing-data trajectory updates explicitly,
+  without automatically changing the trajectory prior.
+- Complete-data results are otherwise unchanged. Add scalar-density and
+  Gaussian algebra checks, missing-pattern and noise-mode integration tests,
+  and continuation, input-contract, and complete-data regression checks.
+
 # MPCurver 0.4.1
 
 - Isomap now defaults to `num_neighbors = NULL`, selecting the smallest

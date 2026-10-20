@@ -125,7 +125,7 @@ test_that("partition stopping uses the full matrix and only post-annealing incre
   }
 })
 
-test_that("continuation inherits, overrides, and migrates stopping rules", {
+test_that("continuation inherits and overrides stopping rules", {
   X <- convergence_data()
   for (M in 1:2) {
     for (rule in c("normalized", "relative")) {
@@ -142,10 +142,6 @@ test_that("continuation inherits, overrides, and migrates stopping rules", {
       expect_equal(head(continued$elbo_trace, length(fit$elbo_trace)), fit$elbo_trace)
       override <- do_mpcurve(fit, max_iter = 3, control = mpcurve_continue_control(convergence = "normalized"))
       expect_identical(override$fit$control$convergence, "normalized")
-      fit$fit$control$convergence <- NULL
-      legacy <- do_mpcurve(fit, max_iter = 3)
-      expect_identical(legacy$fit$control$convergence, "relative")
-      expect_equal(legacy$elbo_trace, continued$elbo_trace, tolerance = 1e-10)
       expect_error(do_mpcurve(fit, control = mpcurve_continue_control(convergence = "invalid")), "arg")
     }
   }
@@ -159,8 +155,8 @@ test_that("public fitting validates the rule and shares the default tolerance", 
   ), "arg")
   expect_equal(formals(fit_mpcurve)$tol, 1e-6)
   expect_false("tol_outer" %in% names(formals(fit_mpcurve)))
-  fit <- soft_two_trajectory_cavi(X, K = 6, n_outer = 1,
-                                 max_converge_iter = 1, verbose = FALSE)
+  fit <- soft_partition_cavi(X, M = 2, K = 6, n_outer = 1,
+                             max_converge_iter = 1, verbose = FALSE)
   expect_identical(fit$control$convergence, "normalized")
 })
 

@@ -1,0 +1,218 @@
+---
+title: "Observed-entry CAVI for MPCurver 0.4.2"
+output:
+  html_document:
+    toc: true
+    mathjax: default
+---
+
+This note extends the single-ordering and structural multi-ordering updates to
+partially observed sample-by-feature matrices. Missingness is assumed ignorable:
+the missingness pattern contributes no additional information about the model
+parameters or latent variables after conditioning on the observed information.
+The fitting likelihood integrates missing entries out, rather than treating
+filled values as observations.
+
+## Observation likelihood
+
+Let $\mathcal O_j=\{i:x_{ij}\text{ is observed}\}$,
+$\mathcal J_i=\{j:x_{ij}\text{ is observed}\}$, and
+$n_j=|\mathcal O_j|$. For ordering $m$, position $k$, and feature assignment
+$Z_j=m$, the observation model is
+
+\[
+x_{ij}\mid C_i^{(m)}=k,Z_j=m,U_j\sim N(U_{jk},v_{ij}),
+\]
+
+where $v_{ij}=\sigma_j^2$ for estimated feature variance or $v_{ij}=s_{ij}^2$
+for known measurement variance. A missing Gaussian observation integrates to
+one. Consequently only $(i,j)$ with $i\in\mathcal O_j$ enter the likelihood.
+
+The structural variational family remains
+
+\[
+q(C,Z,U)=\prod_{m,i}q(C_i^{(m)})\prod_jq(Z_j)q(U_j\mid Z_j).
+\]
+
+Write $r_{imk}=q(C_i^{(m)}=k)$, $w_{jm}=q(Z_j=m)$, and
+$q(U_j\mid Z_j=m)=N(\mu_{jm},V_{jm})$. The single-ordering case sets $M=1$
+and $w_{j1}=1$.
+
+## Conditional Gaussian coordinate
+
+Set $\tau_{ij}=v_{ij}^{-1}$ on observed entries. Completing the square gives
+
+\[
+D_{jm,kk}=\sum_{i\in\mathcal O_j}r_{imk}\tau_{ij},\qquad
+b_{jm,k}=\sum_{i\in\mathcal O_j}r_{imk}\tau_{ij}x_{ij},
+\]
+
+\[
+P_{jm}=\lambda_{jm}Q+D_{jm},\qquad
+P_{jm}\mu_{jm}=b_{jm},\qquad V_{jm}=P_{jm}^{-1}.
+\]
+
+For a positive assignment probability, the complete conditional objective is
+multiplied by $w_{jm}$, including the Gaussian entropy. This common factor
+cancels from the conditional optimum. No assignment weight multiplies
+$D_{jm}$ or $b_{jm}$. The same continuous branch convention as in the existing
+implementation is used at zero assignment probability.
+
+For estimated variance, occupancy becomes feature-specific:
+$N_{jmk}^{\mathrm{obs}}=\sum_{i\in\mathcal O_j}r_{imk}$. Replacing only the
+data cross-product while retaining complete-data occupancy would incorrectly
+add precision from missing entries.
+
+## Position and feature-assignment coordinates
+
+Define $e_{ijmk}=(x_{ij}-\mu_{jmk})^2+V_{jm,kk}$. Position logits are
+
+\[
+\ell_{imk}=\log\pi_k^{(m)}-
+\frac12\sum_{j\in\mathcal J_i}w_{jm}
+\{\log(2\pi v_{ij})+e_{ijmk}/v_{ij}\},\qquad
+r_{imk}=\operatorname{softmax}_k(\ell_{imk}).
+\]
+
+There is no division by the number of observed features in a row. Such a
+division would change the likelihood's weight relative to the position prior.
+
+The observed conditional data score is
+
+\[
+\mathcal D_{jm}^{\mathrm{obs}}=-\frac12
+\sum_{i\in\mathcal O_j}\sum_k r_{imk}
+\{\log(2\pi v_{ij})+e_{ijmk}/v_{ij}\}.
+\]
+
+All observed Gaussian constants and posterior-variance corrections remain in
+this score. Define
+$B_{jm}=\mathcal D_{jm}^{\mathrm{obs}}+\mathcal P_{jm}+\mathcal H_{jm}
++g(\lambda_{jm})$, using the unchanged conditional prior, entropy, and optional
+scale-prior terms. At assignment temperature $T$,
+
+\[
+w_{jm}=\operatorname{softmax}_m\{(B_{jm}+\log\omega_m)/T\}.
+\]
+
+## Point parameters and objective
+
+For estimated variance, define
+$E_{jm}^{\mathrm{obs}}=\sum_{i\in\mathcal O_j,k}r_{imk}e_{ijmk}$.
+The variance-dependent objective is
+
+\[
+-\frac{n_j}{2}\log\sigma_j^2-
+\frac{\sum_m w_{jm}E_{jm}^{\mathrm{obs}}}{2\sigma_j^2},
+\qquad
+\sigma_j^2=\frac{\sum_m w_{jm}E_{jm}^{\mathrm{obs}}}{n_j}.
+\]
+
+The denominator is $n_j$, because both $\sum_mw_{jm}=1$ and
+$\sum_kr_{imk}=1$. Known-noise fits omit this parameter update.
+Existing bounds on noise variance and precision remain in effect.
+
+Let $A_{jm}=\mu_{jm}^\top Q\mu_{jm}+\operatorname{tr}(QV_{jm})$ and
+$r_Q=\operatorname{rank}(Q)$. Without the optional scale prior,
+$\lambda_{jm}=r_Q/A_{jm}$; with that prior the existing scalar optimization is
+unchanged. Adaptive position and assignment priors remain
+
+\[
+\pi_k^{(m)}=n^{-1}\sum_i r_{imk},\qquad
+\omega_m=d^{-1}\sum_jw_{jm}.
+\]
+
+The complete objective retains its structural form,
+
+\[
+\mathcal L_T=\sum_m\mathcal C_m+\sum_{j,m}w_{jm}B_{jm}
++\sum_{j,m}w_{jm}\log\omega_m+T H\{q(Z)\}.
+\]
+
+Only the likelihood is restricted to observed entries. At $T=1$, this is an
+ELBO for proper trajectory priors; for intrinsic priors it retains the
+project's fixed-convention pseudo-ELBO interpretation. Normalized stopping
+uses $|\Delta\mathcal L|/N_{\mathrm{obs}}$, where
+$N_{\mathrm{obs}}=\sum_jn_j$. Stored objectives are not divided by this count.
+
+## Initialization, numerical rank, and input policy
+
+Public fits reject entirely missing rows and columns, NaN, and infinite
+observations. Feature subsets used internally for initialization can contain
+empty rows; their positions receive only prior information in that subset.
+An SD matrix may have NA only at missing observations. Its unused values cannot
+affect the likelihood or initialization scores.
+
+Feature means fill missing entries only when constructing ordering
+initializations. Feature similarities use each pair's jointly observed
+samples: correlations are pairwise-complete, spline $R^2$ orders the jointly
+observed samples by the predictor, and smooth-fit evidence gains are fitted on
+the same samples and multiplied by $n/m$ for $m$ joint observations, which
+leaves complete-data similarities unchanged. Generated initial responsibilities mix
+1 percent uniform mass into the discretized ordering. User-supplied starts
+are normalized without this mixing. Fitting retains the original matrix and
+uses the observed-entry statistics above throughout, including continuation.
+Single-ordering position updates use the exact softmax, as in the
+complete-data path, so a missing entry is equivalent to an observation with
+infinite measurement variance. The structural path keeps its existing
+probability floor in both cases. No likelihood precision floor or ridge is
+added to missing-data Gaussian systems.
+
+For a positive semidefinite intrinsic $Q$, a Gaussian update is proper exactly
+when $\operatorname{null}(Q)\cap\operatorname{null}(D_{jm})=\{0\}$. For RW
+order $q$, $\operatorname{null}(Q)$ consists of polynomials of degree below $q$
+in the bin index, so the update is proper exactly when data occupy at least $q$
+bins; any number of empty bins is otherwise allowed. Bin $k$ is treated as
+occupied for feature $j$ when $\sum_{i\in\mathcal O_j}r_{imk}>n_j\sqrt{\epsilon}$,
+where $\epsilon$ is machine precision; the probability floor contributes at
+most $\sqrt{\epsilon}/K$ per sample. Before every Cholesky factorization, in
+complete-data and missing-data fits alike, the implementation checks that the
+occupied bins span the prior null space and otherwise stops. It uses the same
+eigenvalue threshold as prior metadata and R's default QR rank tolerance. After
+factorization of a missing-data system, the reciprocal 1-norm condition
+number is computed as $1/(\|P\|_1\|P^{-1}\|_1)$. Values at or below
+`1e-12` produce an explicit error: fewer than roughly four significant digits
+of double precision may remain in such systems. This numerical
+criterion does not change the prior. A feature with a single observation can
+pass the algebraic rank condition yet become numerically unidentified during
+intrinsic-prior fitting; more observations or an explicitly chosen proper prior
+may be needed.
+
+Precision initialization from responsibilities uses the same occupancy rule.
+Raw bin means are defined only for occupied bins $\mathcal B$. Integrating the
+empty bins $\mathcal E$ out of the intrinsic Gaussian prior gives the marginal
+precision $Q_{\mathcal B\mathcal B}-Q_{\mathcal B\mathcal E}
+Q_{\mathcal E\mathcal E}^{-1}Q_{\mathcal E\mathcal B}$ on the occupied bins.
+Its quadratic form is the roughness of the smoothest trajectory through the
+raw means, and its rank replaces $r_Q$ in $\lambda=r/A$. When this rank is
+zero, the initial precision is 1.
+
+These checks establish the Gaussian coordinate's validity, not propriety of
+the exact latent-integrated intrinsic model; see
+`ordering_count_normalization.Rmd` in the original research checkout for the
+separate audit. An all-missing column has $D_{jm}=0$, and therefore cannot be
+fitted under the unrestricted intrinsic prior.
+
+## Computation
+
+Every sum over observed entries above is a masked matrix product. Let
+$T=(o_{ij}\tau_{ij})$, where $o_{ij}=1$ for an observed entry and $0$
+otherwise, and let $X_0$ equal $X$ with missing entries set to zero. Then
+$D_m=T^\top R^{(m)}$ and $b_m=(T\circ X_0)^\top R^{(m)}$, with
+$R^{(m)}=(r_{imk})$. Position logits, residual sums, and observed data scores
+expand $e_{ijmk}$ into products of the same masked matrices with $\mu_{jm}$ and
+$\mu_{jm}^2+\operatorname{diag}V_{jm}$. Before squares are expanded, each
+feature is centered at its observed mean. A common shift of data and trajectory
+means leaves every residual unchanged, and centering avoids cancellation when a
+feature has a large offset. Only the $K\times K$ Gaussian factorizations remain
+feature by feature, as in the complete-data path.
+
+## Reproducible verification
+
+`tests/testthat/test-missing-data.R` checks scalar Gaussian expected densities,
+posterior precision systems, complete conditional scores, variance derivatives,
+complete-data reduction, intrinsic rank failures, and the public fitting paths.
+The scalar reference uses individual observed entries and `dnorm`, rather than
+the implementation's likelihood helpers. Existing complete-data tests remain
+part of the full suite. The branch's verification log records current package
+checks and comparison with the frozen 0.4.1 source.

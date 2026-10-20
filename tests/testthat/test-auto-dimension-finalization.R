@@ -22,7 +22,7 @@ test_that("automatic finalization removes numerical residue without refitting", 
     fit <- getFromNamespace("as_mpcurve", "MPCurver")(reduced)
     expect_identical(raw, original)
     expect_identical(fit$intrinsic_dim, 2L)
-    expect_identical(fit$model_intrinsic_dim, 2L)
+    expect_identical(fit$intrinsic_dim, 2L)
     expect_identical(reduced$ordering_labels, c("B", "C"))
     expect_identical(reduced$gamma, raw$gamma[2:3])
     expect_identical(reduced$conditional_posterior$mean,

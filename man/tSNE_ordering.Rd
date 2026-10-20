@@ -14,7 +14,9 @@ tSNE_ordering(
 )
 }
 \arguments{
-\item{X}{Numeric sample-by-feature matrix.}
+\item{X}{Numeric sample-by-feature matrix. Ordering helpers require complete
+data; missing values are filled with each feature's observed mean, with a
+warning.}
 
 \item{component}{Positive embedding-coordinate index; default 1.}
 

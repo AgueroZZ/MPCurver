@@ -7,7 +7,8 @@
 PCA_ordering(X, center = TRUE, scale = FALSE, scale01 = TRUE, component = 1L)
 }
 \arguments{
-\item{X}{numeric matrix (n x D).}
+\item{X}{Numeric matrix (n x D). Missing values are filled with each
+feature's observed mean, with a warning.}
 
 \item{center}{logical.}
 

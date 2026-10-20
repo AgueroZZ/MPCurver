@@ -16,7 +16,8 @@ Either \code{NULL} (penalty off) or a strictly positive numeric
   scalar.
 }
 \description{
-Public APIs use \code{NULL} to mean "no lambda prior penalty". For backward
-compatibility, an explicit numeric \code{0} is treated the same way.
+Public APIs use \code{NULL} to mean "no lambda prior penalty". An explicit
+numeric \code{0} means the same; continuation controls use it to remove an
+inherited penalty.
 }
 \keyword{internal}

@@ -13,7 +13,7 @@ conditional trajectories, and soft feature assignments."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -85,14 +85,16 @@ conditional trajectories, and soft feature assignments.</p>
 
 <dl><dt id="arg-x">X<a class="anchor" aria-label="anchor" href="#arg-x"></a></dt>
 <dd><p>Numeric sample-by-feature matrix or all-numeric data frame, with
-finite values only. Rows are samples and columns are features. Handle
-missing values before fitting; the function does not impute or standardize.
+finite values or <code>NA</code>. Rows are samples and columns are features. Each
+row and column must contain an observed value; <code>NaN</code> and infinities are
+rejected. Fitting uses only observed entries and does not standardize.
 Sample and feature names are retained in public results.</p></dd>
 
 
 <dt id="arg-s">S<a class="anchor" aria-label="anchor" href="#arg-s"></a></dt>
 <dd><p>Optional known measurement standard deviations, as a length-d feature
-vector or matrix matching <code>X</code>. Values must be finite and nonnegative, in
+vector or matrix matching <code>X</code>. Values must be finite and nonnegative at
+observed entries. A matrix may have <code>NA</code> only where <code>X</code> is <code>NA</code>. SDs are in
 the same units and positional order as <code>X</code>; names do not trigger reordering.
 Zero SDs are floored at <code>sqrt(.Machine$double.eps)</code> for computation. Otherwise
 feature noise variances are estimated.</p></dd>
@@ -116,9 +118,12 @@ An integer retains the specified dimension.</p></dd>
 
 <dt id="arg-initial-method">initial_method<a class="anchor" aria-label="anchor" href="#arg-initial-method"></a></dt>
 <dd><p>One initialization method: <code>"PCA"</code>, <code>"fiedler"</code>,
-<code>"pcurve"</code>, <code>"tSNE"</code>, <code>"random"</code>, or <code>"isomap"</code>. Under similarity
-grouping this method is applied independently within each feature
-block. The default PCA uses each block's own PC1. Method vectors are rejected.</p></dd>
+<code>"pcurve"</code>, <code>"tSNE"</code>, <code>"random"</code>, or <code>"isomap"</code>. The method's ordering
+score is cut into position bins by <code>init_control$discretization</code>.
+<code>"random"</code> scores a random permutation of the samples; use <code><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed()</a></code>
+for a reproducible start. Under similarity grouping this method is applied
+independently within each feature block. The default PCA uses each
+block's own PC1. Method vectors are rejected.</p></dd>
 
 
 <dt id="arg-position-prior">position_prior<a class="anchor" aria-label="anchor" href="#arg-position-prior"></a></dt>
@@ -140,7 +145,7 @@ configured through <code><a href="mpcurve_control.html">mpcurve_control()</a></c
 
 <dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>
 <dd><p>Shared ELBO-change stopping tolerance. The default rule uses
-<code>abs(delta_ELBO) / (nrow(X) * ncol(X))</code>; partition stopping is checked
+<code>abs(delta_ELBO) / sum(!is.na(X))</code>; partition stopping is checked
 at temperature 1, after any optional annealing. Existing numerical decrease
 checks apply.
 Zero disables early stopping. A small increment does not bound the
@@ -176,7 +181,37 @@ objective trace starts at its recomputed final objective.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Smoothness uses RW2 by default, with feature-specific empirical-Bayes
+    <p>Missing entries are integrated out of the observation likelihood, assuming
+an ignorable missingness mechanism. Each feature's noise variance uses its
+own observed count. The original data and mask are retained for continuation;
+<code>$observations</code> records observed and missing counts and counts by sample and
+feature. Entirely missing rows or columns are rejected before initialization.</p>
+<p>Ordering initialization uses feature means to fill missing entries
+temporarily. Feature similarities for multi-ordering and automatic
+initialization use each pair's jointly observed samples; smooth-fit evidence
+gains are expressed per observation. Generated position starts mix 1 percent
+uniform mass into their initial probabilities when the input contains missing
+values. Supplied responsibilities are retained after normalization. Fitted
+likelihoods, trajectory precision matrices, and objective values use the
+original observed entries only.</p>
+<p>A position bin carries data for a feature when that feature's observed
+responsibility mass in the bin exceeds <code>n_j * sqrt(.Machine$double.eps)</code>.
+Precision initialization from responsibilities measures random-walk roughness
+over these bins only, integrating empty bins out of the intrinsic prior. With
+<code>ridge = 0</code>, a trajectory update whose data occupy too few bins to identify
+the prior's null space (fewer than <code>rw_order</code> bins) is singular and stops
+with an error, with or without missing values. This occurs when positions
+collapse onto one bin or when a feature has very few observations; a
+positive <code>ridge</code> gives a proper prior. With many missing values, the
+adaptive position prior can concentrate an ordering's positions in one bin;
+<code>position_prior = "fixed"</code> avoids this, and the error message suggests it.
+For a specified <code>intrinsic_dim &gt;= 2</code>, similarity initialization reports a
+one-feature cluster with a message, because an ordering initialized from a
+single feature is weakly identified; a smaller <code>intrinsic_dim</code> or another
+<code>similarity_metric</code> changes the cut.
+Missing-data updates also require a reciprocal 1-norm condition number
+greater than <code>1e-12</code>; no ridge is added automatically.</p>
+<p>Smoothness uses RW2 by default, with feature-specific empirical-Bayes
 precision updates. Use <code>control = mpcurve_control(rw_order = 3)</code> for RW3,
 or <code>control = mpcurve_control(lambda_init = 5, fix_lambda = TRUE)</code> to fix
 precision at 5. Setting a positive ridge changes the smoothness prior.</p>
@@ -184,8 +219,7 @@ precision at 5. Setting a positive ridge changes the smoothness prior.</p>
 $$q(C)\prod_j q(Z_j)q(U_j\mid Z_j).$$
 Noise variance is shared across candidate orderings for each feature.
 The result's <code>intrinsic_dim</code> is the actual number of orderings in the
-returned model. The compatibility field <code>model_intrinsic_dim</code> has the same
-value for current fits. The grid size is stored in <code>K</code>; see <a href="mpcurve.html">mpcurve</a>.</p>
+returned model. The grid size is stored in <code>K</code>; see <a href="mpcurve.html">mpcurve</a>.</p>
     </div>
 
     <div class="section level2">

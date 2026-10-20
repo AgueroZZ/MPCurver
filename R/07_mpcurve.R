@@ -1,9 +1,8 @@
 # ============================================================
 # mpcurve S3 class - unified model object for MPCurve fits
 # ============================================================
-# MPCurve is the statistical model (GMM + GMRF prior on trajectories).
-# The public fitting path is CAVI. csmooth_em and smooth_em remain available
-# only for internal normalization, compatibility, and benchmarking.
+# MPCurve is the statistical model (GMM + GMRF prior on trajectories), fitted
+# by coordinate-ascent variational inference (CAVI).
 #
 # as_mpcurve()   - convert a raw algorithm fit to an mpcurve object
 # fit_mpcurve()  - run the full pipeline and return an mpcurve
@@ -121,18 +120,7 @@
 }
 
 .mpcurve_partition_prior_mode <- function(control = NULL) {
-  ctl <- control %||% list()
-  if (identical(ctl$assignment_mode %||% NULL, "legacy_dirichlet") ||
-      identical(ctl$assignment_prior %||% NULL, "dirichlet")) {
-    return("legacy_dirichlet")
-  }
-  if (!is.null(ctl$partition_prior)) {
-    return(as.character(ctl$partition_prior)[1])
-  }
-  if (identical(ctl$assignment_prior %||% NULL, "uniform")) {
-    return("fixed")
-  }
-  "adaptive"
+  as.character((control %||% list())$partition_prior %||% "adaptive")[1]
 }
 
 .mpcurve_partition_prior_init <- function(control = NULL, M = NULL) {
@@ -148,7 +136,6 @@
 .mpcurve_partition_prior_bundle <- function(mode,
                                             omega,
                                             init = NULL,
-                                            active_idx = NULL,
                                             ordering_labels = NULL) {
   ordering_labels <- as.character(ordering_labels %||% names(omega) %||% seq_along(omega))
   omega <- as.numeric(omega)
@@ -165,7 +152,6 @@
     mode = as.character(mode)[1],
     omega = omega,
     init = init,
-    active_idx = as.integer(active_idx %||% integer(0)),
     ordering_labels = ordering_labels
   )
 }
@@ -186,46 +172,17 @@
 }
 
 .mpcurve_effective_count_tol <- function(fit, M, num_features) {
-  ctl <- fit$control %||% list()
-  # Preserve the meaning of explicit fraction thresholds in older saved fits.
-  tol <- ctl$effective_count_tol %||%
-    if (!is.null(ctl$effective_weight_tol)) {
-      num_features * ctl$effective_weight_tol
-    } else 1e-8
+  tol <- (fit$control %||% list())$effective_count_tol %||% 1e-8
   .mpcurve_validate_effective_count_tol(tol, M, num_features)
-}
-
-.mpcurve_effective_intrinsic_dim <- function(priors, M, tol, feature_counts) {
-  if (is.null(priors$partition) ||
-      !identical(priors$partition$mode, "adaptive")) {
-    return(as.integer(M))
-  }
-  if (!is.numeric(feature_counts) || length(feature_counts) != M ||
-      any(!is.finite(feature_counts)) || any(feature_counts < 0)) {
-    stop("The fitted partition has invalid expected feature counts.", call. = FALSE)
-  }
-  as.integer(sum(feature_counts > tol))
 }
 
 .mpcurve_partition_assignment_info_from_fit <- function(fit) {
   ctl <- fit$control %||% list()
-  partition_prior <- ctl$partition_prior %||%
-    if (identical(ctl$assignment_prior %||% NULL, "uniform")) "fixed" else "adaptive"
-  assignment_prior <- ctl$assignment_prior %||% NULL
-  if (!is.null(assignment_prior) && !assignment_prior %in% c("uniform", "dirichlet")) {
-    assignment_prior <- NULL
-  }
   .cavi_partition_assignment_info(
     weights = fit$pi_weights,
     T_now = 1,
-    partition_prior = partition_prior,
-    partition_prior_init = ctl$partition_prior_init %||% NULL,
-    assignment_prior = assignment_prior,
-
-    assignment_M = fit$M %||% length(fit$fits),
-    active_orderings = fit$active_orderings,
-    active_feature_pairs = fit$active_feature_pairs,
-    drop_unused_ordering = isTRUE(ctl$drop_unused_ordering)
+    partition_prior = ctl$partition_prior %||% "adaptive",
+    partition_prior_init = ctl$partition_prior_init %||% NULL
   )
 }
 
@@ -240,12 +197,6 @@
   )
 }
 
-.mpcurve_priors_from_legacy_fit <- function(fit) {
-  list(
-    position = .mpcurve_single_fit_position_priors(fit, default_mode = "estimated"),
-    partition = NULL
-  )
-}
 
 .mpcurve_priors_from_partition_fit <- function(fit) {
   priors <- fit$priors %||% list()
@@ -265,47 +216,21 @@
       default_mode = "adaptive"
     ),
     partition = .mpcurve_partition_prior_bundle(
-      mode = if (identical(partition_mode, "legacy_dirichlet")) {
-        "legacy_dirichlet"
-      } else {
-        partition_mode
-      },
+      mode = partition_mode,
       omega = assignment_info$omega,
       init = .mpcurve_partition_prior_init(fit$control %||% list(), M = M),
-      active_idx = assignment_info$active_idx,
       ordering_labels = ordering_labels
     )
   )
 }
 
 .mpcurve_get_priors <- function(x) {
-  if (inherits(x, "mpcurve")) {
-    if (!is.null(x$priors)) return(x$priors)
-    if (.mpcurve_is_partition(x)) {
-      return(.mpcurve_priors_from_partition_fit(x$fit))
-    }
-    if (inherits(x$fit, "cavi")) {
-      return(.mpcurve_priors_from_cavi_fit(x$fit))
-    }
-    return(.mpcurve_priors_from_legacy_fit(x$fit))
-  }
+  if (inherits(x, "mpcurve")) return(x$priors)
   if (inherits(x, "soft_partition_cavi")) return(.mpcurve_priors_from_partition_fit(x))
   if (inherits(x, "cavi")) return(.mpcurve_priors_from_cavi_fit(x))
-  if (inherits(x, c("csmooth_em", "smooth_em"))) return(.mpcurve_priors_from_legacy_fit(x))
   NULL
 }
 
-.mpcurve_partition_param_bundle <- function(fits, ordering_labels) {
-  list(
-    pi = stats::setNames(lapply(fits, function(fit) fit$params$pi), ordering_labels),
-    mu = stats::setNames(lapply(fits, function(fit) fit$params$mu), ordering_labels),
-    sigma2 = stats::setNames(lapply(fits, function(fit) fit$params$sigma2), ordering_labels)
-  )
-}
-
-.mpcurve_partition_trace_bundle <- function(fits, field, ordering_labels) {
-  stats::setNames(lapply(fits, `[[`, field), ordering_labels)
-}
 
 .mpcurve_resolve_ordering <- function(ordering, ordering_labels, caller = "fitted_prior()") {
   if (is.null(ordering)) return(NULL)
@@ -366,820 +291,6 @@
   as.numeric(omega[match(selected, ordering_labels)])
 }
 
-.mpcurve_greedy_provenance_fields <- c(
-  "similarity_init",
-  "init_info",
-  "ordering_similarity"
-)
-
-.mpcurve_check_legacy_public_args <- function(dots,
-                                              caller = "fit_mpcurve()") {
-  # Reject removed arguments before the ellipsis can forward them to a backend.
-  removed_args <- c(
-    "algorithm",
-    "freeze_unused_ordering",
-    "freeze_unused_ordering_threshold",
-    "freeze_feature",
-    "freeze_feature_weight_threshold",
-    "drop_unused_ordering"
-  )
-  removed <- intersect(names(dots), removed_args)
-  if (length(removed)) {
-    stop(
-      caller, " no longer accepts: ",
-      paste(sprintf("`%s`", removed), collapse = ", "),
-      ". Omit these arguments; fitting uses CAVI and structural VI has no ",
-      "freeze/drop controls.",
-      call. = FALSE
-    )
-  }
-
-  legacy_args <- c(
-    "relative_lambda",
-    "adaptive",
-    "sigma_update",
-    "check_decrease",
-    "tol_decrease"
-  )
-  bad <- intersect(names(dots), legacy_args)
-  if (!length(bad)) return(invisible(NULL))
-
-  stop(
-    caller,
-    " is now a CAVI-only public wrapper. Legacy smoothEM/csmoothEM controls ",
-    "are no longer supported here: ",
-    paste(sprintf("`%s`", bad), collapse = ", "),
-    ". Use the lower-level legacy functions directly if you need those paths.",
-    call. = FALSE
-  )
-}
-
-.mpcurve_update_named_list <- function(x, updates) {
-  if (!length(updates)) return(x)
-  for (nm in names(updates)) x[[nm]] <- updates[[nm]]
-  x
-}
-
-.mpcurve_last_objective <- function(x) {
-  obj <- if (inherits(x, "mpcurve")) {
-    if (!is.null(x$partition) || inherits(x$fit, "soft_partition_cavi")) {
-      x$objective_history %||% numeric(0)
-    } else {
-      x$elbo_trace %||% numeric(0)
-    }
-  } else if (inherits(x, "soft_partition_cavi")) {
-    x$objective_history %||% numeric(0)
-  } else if (inherits(x, "cavi")) {
-    x$elbo_trace %||% numeric(0)
-  } else {
-    numeric(0)
-  }
-  if (!length(obj)) -Inf else as.numeric(tail(obj, 1L))
-}
-
-.mpcurve_greedy_method_for_dim <- function(method,
-                                           target_dim,
-                                           method_missing = FALSE) {
-  target_dim <- as.integer(target_dim)[1]
-  if (target_dim <= 1L) {
-    if (isTRUE(method_missing)) return("PCA")
-    return(method[[1L]])
-  }
-  if (isTRUE(method_missing)) return("PCA")
-  if (length(method) == 1L) return(method)
-  if (length(method) >= target_dim) return(method[seq_len(target_dim)])
-  method
-}
-
-.mpcurve_fit_once <- function(fit_args,
-                              dots = list(),
-                              fit_overrides = list(),
-                              dot_overrides = list()) {
-  fit_args_use <- .mpcurve_update_named_list(fit_args, fit_overrides)
-  dots_use <- .mpcurve_update_named_list(dots, dot_overrides)
-  do.call(
-    fit_mpcurve,
-    c(fit_args_use, dots_use, list(greedy = "none"))
-  )
-}
-
-# Stored ordering slots determine array sizes, independently of the reported
-# intrinsic dimension. Fall back to the old schema for saved pre-0.4 objects.
-.mpcurve_model_intrinsic_dim <- function(x) {
-  if (inherits(x, "soft_partition_cavi")) {
-    return(as.integer(x$M %||% length(x$fits)))
-  }
-  as.integer(x$model_intrinsic_dim %||% x$num_orderings %||% x$fit$M %||%
-               x$requested_intrinsic_dim %||% x$intrinsic_dim %||% 1L)
-}
-
-.mpcurve_reported_intrinsic_dim <- function(x) {
-  as.integer(x$effective_intrinsic_dim %||% x$intrinsic_dim %||% 1L)
-}
-
-.mpcurve_requested_intrinsic_dim <- function(x) {
-  .mpcurve_model_intrinsic_dim(x)
-}
-
-.mpcurve_active_intrinsic_dim <- function(x) {
-  if (inherits(x, "mpcurve") && !is.null(x$active_intrinsic_dim)) {
-    return(as.integer(x$active_intrinsic_dim))
-  }
-  if (inherits(x, "mpcurve") && !is.null(x$fit)) {
-    x <- x$fit
-  }
-  if (inherits(x, "soft_partition_cavi")) {
-    M <- x$M %||% length(x$fits)
-    return(as.integer(sum(x$active_orderings %||% rep(TRUE, M))))
-  }
-  1L
-}
-
-.mpcurve_extract_greedy_provenance <- function(x) {
-  out <- setNames(vector("list", length(.mpcurve_greedy_provenance_fields)),
-                  .mpcurve_greedy_provenance_fields)
-  sources <- list(x)
-  if (inherits(x, "mpcurve") && !is.null(x$fit)) {
-    sources[[length(sources) + 1L]] <- x$fit
-  }
-
-  for (source in sources) {
-    source_items <- list(source)
-    source_provenance <- source$greedy_provenance %||% NULL
-    if (!is.null(source_provenance)) {
-      source_items[[length(source_items) + 1L]] <- source_provenance
-    }
-    for (item in source_items) {
-      for (nm in .mpcurve_greedy_provenance_fields) {
-        if (is.null(out[[nm]]) && !is.null(item[[nm]])) {
-          out[[nm]] <- item[[nm]]
-        }
-      }
-    }
-  }
-
-  out[!vapply(out, is.null, logical(1))]
-}
-
-.mpcurve_merge_greedy_provenance <- function(existing = NULL, x = NULL) {
-  out <- existing %||% list()
-  if (is.null(x)) return(out)
-
-  incoming <- .mpcurve_extract_greedy_provenance(x)
-  for (nm in names(incoming)) {
-    if (is.null(out[[nm]]) && !is.null(incoming[[nm]])) {
-      out[[nm]] <- incoming[[nm]]
-    }
-  }
-  out
-}
-
-.mpcurve_apply_greedy_provenance_raw <- function(raw_fit, provenance = NULL) {
-  if (is.null(raw_fit) || !length(provenance %||% list())) {
-    return(raw_fit)
-  }
-  for (nm in names(provenance)) {
-    raw_fit[[nm]] <- provenance[[nm]]
-  }
-  raw_fit$greedy_provenance <- provenance
-  raw_fit
-}
-
-.mpcurve_apply_greedy_provenance <- function(x, provenance = NULL) {
-  if (!length(provenance %||% list())) {
-    return(x)
-  }
-  for (nm in names(provenance)) {
-    x[[nm]] <- provenance[[nm]]
-  }
-  x$greedy_provenance <- provenance
-  if (inherits(x, "mpcurve") && !is.null(x$fit)) {
-    x$fit <- .mpcurve_apply_greedy_provenance_raw(x$fit, provenance)
-  }
-  x
-}
-
-.mpcurve_partition_active_idx <- function(raw_fit) {
-  M <- raw_fit$M %||% length(raw_fit$fits)
-  which(raw_fit$active_orderings %||% rep(TRUE, M))
-}
-
-.mpcurve_partition_ordering_contributions <- function(raw_fit) {
-  if (!inherits(raw_fit, "soft_partition_cavi")) {
-    stop("raw_fit must inherit from 'soft_partition_cavi'.")
-  }
-  X <- raw_fit$fits[[1]]$data
-  ctl <- raw_fit$control %||% list()
-  partition_prior <- ctl$partition_prior %||% if (identical(ctl$assignment_prior %||% NULL, "uniform")) "fixed" else "adaptive"
-  partition_prior_init <- ctl$partition_prior_init %||% NULL
-  assignment_prior <- ctl$assignment_prior %||% NULL
-  if (!is.null(assignment_prior) && !assignment_prior %in% c("uniform", "dirichlet")) {
-    assignment_prior <- NULL
-  }
-  ordering_alpha <- ctl$ordering_alpha %||% NULL
-  obj_terms <- .cavi_partition_objective_from_fits(
-    fits = raw_fit$fits,
-    X = X,
-    weights = raw_fit$pi_weights,
-    T_now = 1,
-    active_orderings = raw_fit$active_orderings,
-    active_feature_pairs = raw_fit$active_feature_pairs,
-    partition_prior = partition_prior,
-    partition_prior_init = partition_prior_init,
-    assignment_prior = assignment_prior,
-    ordering_alpha = ordering_alpha,
-    drop_unused_ordering = FALSE
-  )
-  contrib <- colSums(raw_fit$pi_weights * obj_terms$like_mat) +
-    colSums(obj_terms$prior_entropy_mat) +
-    obj_terms$cell_terms_by_fit
-  ord_labels <- colnames(raw_fit$pi_weights) %||%
-    .mpcurve_ordering_labels(length(contrib))
-  stats::setNames(as.numeric(contrib), ord_labels)
-}
-
-.mpcurve_partition_gamma_correlation <- function(raw_fit) {
-  active_idx <- .mpcurve_partition_active_idx(raw_fit)
-  if (length(active_idx) < 2L) {
-    return(list(
-      active_idx = active_idx,
-      corr_mat = matrix(NA_real_, nrow = length(active_idx), ncol = length(active_idx))
-    ))
-  }
-  gamma_vecs <- lapply(raw_fit$fits[active_idx], function(fit) as.numeric(fit$gamma))
-  corr_mat <- matrix(NA_real_, nrow = length(active_idx), ncol = length(active_idx))
-  diag(corr_mat) <- 1
-  for (i in seq_along(active_idx)) {
-    for (j in seq_len(i - 1L)) {
-      cij <- suppressWarnings(stats::cor(gamma_vecs[[i]], gamma_vecs[[j]]))
-      if (!is.finite(cij)) cij <- 0
-      corr_mat[i, j] <- abs(cij)
-      corr_mat[j, i] <- abs(cij)
-    }
-  }
-  list(active_idx = active_idx, corr_mat = corr_mat)
-}
-
-.mpcurve_partition_backward_drop <- function(raw_fit) {
-  corr_info <- .mpcurve_partition_gamma_correlation(raw_fit)
-  active_idx <- corr_info$active_idx
-  if (length(active_idx) < 2L) return(NULL)
-
-  corr_mat <- corr_info$corr_mat
-  diag(corr_mat) <- -Inf
-  max_corr <- max(corr_mat, na.rm = TRUE)
-  if (!is.finite(max_corr)) return(NULL)
-
-  pair_rows <- which(corr_mat == max_corr, arr.ind = TRUE)
-  pair_rows <- pair_rows[pair_rows[, 1] < pair_rows[, 2], , drop = FALSE]
-  if (!nrow(pair_rows)) return(NULL)
-
-  contrib <- .mpcurve_partition_ordering_contributions(raw_fit)
-  ord_labels <- names(contrib)
-  pair_tbl <- data.frame(
-    i = integer(0),
-    j = integer(0),
-    drop_idx = integer(0),
-    drop_contrib = numeric(0),
-    stringsAsFactors = FALSE
-  )
-  for (r in seq_len(nrow(pair_rows))) {
-    i_loc <- pair_rows[r, 1]
-    j_loc <- pair_rows[r, 2]
-    i_idx <- active_idx[i_loc]
-    j_idx <- active_idx[j_loc]
-    ci <- contrib[[ord_labels[i_idx]]]
-    cj <- contrib[[ord_labels[j_idx]]]
-    drop_idx <- if (ci <= cj) i_idx else j_idx
-    drop_contrib <- min(ci, cj)
-    pair_tbl <- rbind(
-      pair_tbl,
-      data.frame(
-        i = i_idx,
-        j = j_idx,
-        drop_idx = drop_idx,
-        drop_contrib = drop_contrib,
-        stringsAsFactors = FALSE
-      )
-    )
-  }
-  best <- pair_tbl[order(pair_tbl$drop_contrib, pair_tbl$drop_idx), , drop = FALSE][1L, , drop = FALSE]
-  keep_idx <- setdiff(active_idx, best$drop_idx)
-  list(
-    drop_idx = as.integer(best$drop_idx),
-    drop_label = ord_labels[best$drop_idx],
-    pair_idx = c(as.integer(best$i), as.integer(best$j)),
-    pair_label = paste(ord_labels[c(best$i, best$j)], collapse = " vs "),
-    corr = as.numeric(max_corr),
-    keep_idx = keep_idx,
-    contributions = contrib
-  )
-}
-
-.mpcurve_compact_partition_fit <- function(current_fit,
-                                           fit_args,
-                                           dots,
-                                           method_missing = FALSE,
-                                           drop_unused_ordering = FALSE) {
-  raw_fit <- current_fit$fit
-  active_idx <- .mpcurve_partition_active_idx(raw_fit)
-  active_dim <- length(active_idx)
-  current_requested <- current_fit$requested_intrinsic_dim %||% current_fit$intrinsic_dim
-
-  if (!inherits(raw_fit, "soft_partition_cavi") ||
-      active_dim == current_requested ||
-      active_dim < 1L) {
-    return(list(fit = current_fit, compacted = FALSE, active_dim = active_dim))
-  }
-
-  if (active_dim == 1L) {
-    compact_fit <- as_mpcurve(raw_fit$fits[[active_idx]])
-    return(list(fit = compact_fit, compacted = TRUE, active_dim = 1L))
-  }
-
-  compact_fit <- .mpcurve_fit_once(
-    fit_args = fit_args,
-    dots = dots,
-    fit_overrides = list(
-      intrinsic_dim = active_dim,
-      method = .mpcurve_greedy_method_for_dim(
-        fit_args$method,
-        active_dim,
-        method_missing = method_missing
-      ),
-      drop_unused_ordering = isTRUE(drop_unused_ordering)
-    ),
-    dot_overrides = list(
-      fits_init = raw_fit$fits[active_idx]
-    )
-  )
-  list(fit = compact_fit, compacted = TRUE, active_dim = active_dim)
-}
-
-.mpcurve_prepare_greedy_fit <- function(fit,
-                                        fit_args,
-                                        dots,
-                                        method_missing = FALSE,
-                                        greedy_provenance = NULL,
-                                        drop_unused_ordering = FALSE) {
-  requested_dim <- .mpcurve_requested_intrinsic_dim(fit)
-  greedy_provenance <- .mpcurve_merge_greedy_provenance(greedy_provenance, fit)
-  compact_info <- .mpcurve_compact_partition_fit(
-    current_fit = fit,
-    fit_args = fit_args,
-    dots = dots,
-    method_missing = method_missing,
-    drop_unused_ordering = drop_unused_ordering
-  )
-  normalized_fit <- .mpcurve_apply_greedy_provenance(
-    compact_info$fit,
-    greedy_provenance
-  )
-  list(
-    fit = normalized_fit,
-    requested_dim = as.integer(requested_dim),
-    active_dim = .mpcurve_active_intrinsic_dim(normalized_fit),
-    compacted = isTRUE(compact_info$compacted),
-    greedy_provenance = greedy_provenance
-  )
-}
-
-.mpcurve_empty_greedy_history <- function() {
-  data.frame(
-    step = integer(0),
-    direction = character(0),
-    current_M = integer(0),
-    candidate_M = integer(0),
-    current_requested_M = integer(0),
-    current_active_M = integer(0),
-    candidate_requested_M = integer(0),
-    candidate_active_M = integer(0),
-    current_objective = numeric(0),
-    candidate_objective = numeric(0),
-    accepted = logical(0),
-    current_compacted = logical(0),
-    candidate_compacted = logical(0),
-    candidate_collapsed = logical(0),
-    dropped_label = character(0),
-    pair_label = character(0),
-    comparison_basis = character(0),
-    note = character(0),
-    stringsAsFactors = FALSE
-  )
-}
-
-.mpcurve_greedy_compare_candidate <- function(direction,
-                                              step,
-                                              current_info,
-                                              candidate_info,
-                                              current_objective,
-                                              candidate_objective,
-                                              dropped_label = NA_character_,
-                                              pair_label = NA_character_) {
-  direction <- match.arg(direction, c("forward", "backward"))
-  candidate_collapsed <- candidate_info$active_dim < candidate_info$requested_dim
-
-  improves_dimension <- switch(
-    direction,
-    forward = candidate_info$active_dim > current_info$active_dim,
-    backward = candidate_info$active_dim < current_info$active_dim
-  )
-  objective_improves <- is.finite(candidate_objective) &&
-    candidate_objective > current_objective
-  accepted <- improves_dimension && objective_improves
-
-  note <- switch(
-    direction,
-    forward = if (accepted) {
-      if (candidate_collapsed) "larger_model_preferred_after_compaction" else "larger_model_preferred"
-    } else if (!improves_dimension) {
-      "candidate_not_larger_after_compaction"
-    } else {
-      "smaller_model_preferred"
-    },
-    backward = if (accepted) {
-      if (candidate_collapsed) "smaller_model_preferred_after_compaction" else "smaller_model_preferred"
-    } else if (!improves_dimension) {
-      "candidate_not_smaller_after_compaction"
-    } else {
-      "larger_model_preferred"
-    }
-  )
-
-  stop_reason <- switch(
-    direction,
-    forward = if (accepted) "" else if (!improves_dimension) {
-      "candidate_not_larger_after_compaction"
-    } else {
-      "smaller_model_preferred"
-    },
-    backward = if (accepted) "" else if (!improves_dimension) {
-      "candidate_not_smaller_after_compaction"
-    } else {
-      "larger_model_preferred"
-    }
-  )
-
-  history_row <- data.frame(
-    step = as.integer(step),
-    direction = as.character(direction),
-    current_M = as.integer(current_info$active_dim),
-    candidate_M = as.integer(candidate_info$active_dim),
-    current_requested_M = as.integer(current_info$requested_dim),
-    current_active_M = as.integer(current_info$active_dim),
-    candidate_requested_M = as.integer(candidate_info$requested_dim),
-    candidate_active_M = as.integer(candidate_info$active_dim),
-    current_objective = as.numeric(current_objective),
-    candidate_objective = as.numeric(candidate_objective),
-    accepted = isTRUE(accepted),
-    current_compacted = isTRUE(current_info$compacted),
-    candidate_compacted = isTRUE(candidate_info$compacted),
-    candidate_collapsed = isTRUE(candidate_collapsed),
-    dropped_label = as.character(dropped_label),
-    pair_label = as.character(pair_label),
-    comparison_basis = "active_intrinsic_dim",
-    note = note,
-    stringsAsFactors = FALSE
-  )
-
-  list(
-    accepted = accepted,
-    note = note,
-    stop_reason = stop_reason,
-    candidate_collapsed = candidate_collapsed,
-    history_row = history_row
-  )
-}
-
-.mpcurve_finalize_greedy_return <- function(selected_fit,
-                                            fit_args,
-                                            dots,
-                                            method_missing = FALSE,
-                                            greedy_info = NULL,
-                                            greedy_provenance = NULL) {
-  want_drop <- isTRUE(fit_args$drop_unused_ordering)
-  final_fit <- selected_fit
-
-  if (want_drop && inherits(selected_fit$fit, "soft_partition_cavi")) {
-    selected_requested <- selected_fit$requested_intrinsic_dim %||% selected_fit$intrinsic_dim
-    final_fit <- .mpcurve_fit_once(
-      fit_args = fit_args,
-      dots = dots,
-      fit_overrides = list(
-        intrinsic_dim = selected_requested,
-        method = .mpcurve_greedy_method_for_dim(
-          fit_args$method,
-          selected_requested,
-          method_missing = method_missing
-        ),
-        drop_unused_ordering = TRUE
-      ),
-      dot_overrides = list(
-        fits_init = selected_fit$fit$fits
-      )
-    )
-  }
-
-  final_compact <- .mpcurve_prepare_greedy_fit(
-    fit = final_fit,
-    fit_args = fit_args,
-    dots = dots,
-    method_missing = method_missing,
-    greedy_provenance = greedy_provenance,
-    drop_unused_ordering = want_drop
-  )
-  final_fit <- final_compact$fit
-  if (!is.null(greedy_info)) {
-    greedy_info$selected_intrinsic_dim <- as.integer(final_compact$active_dim)
-  }
-  final_fit$requested_intrinsic_dim <- as.integer(final_fit$intrinsic_dim %||% final_compact$active_dim)
-  final_fit$greedy_selection <- greedy_info
-  final_fit
-}
-
-.mpcurve_greedy_forward <- function(fit_args, dots, method_missing = FALSE) {
-  upper_bound <- as.integer(fit_args$intrinsic_dim)[1]
-  history <- .mpcurve_empty_greedy_history()
-
-  current_fit <- .mpcurve_fit_once(
-    fit_args = fit_args,
-    dots = dots,
-    fit_overrides = list(
-      intrinsic_dim = 1L,
-      method = .mpcurve_greedy_method_for_dim(
-        fit_args$method,
-        1L,
-        method_missing = method_missing
-      ),
-      num_cores = 1L,
-      drop_unused_ordering = FALSE
-    )
-  )
-  greedy_provenance <- .mpcurve_extract_greedy_provenance(current_fit)
-  current_info <- .mpcurve_prepare_greedy_fit(
-    fit = current_fit,
-    fit_args = fit_args,
-    dots = dots,
-    method_missing = method_missing,
-    greedy_provenance = greedy_provenance,
-    drop_unused_ordering = FALSE
-  )
-  greedy_provenance <- current_info$greedy_provenance
-  current_fit <- current_info$fit
-  current_obj <- .mpcurve_last_objective(current_fit)
-  current_M <- current_info$active_dim
-  stop_reason <- if (upper_bound <= 1L) "reached_upper_bound" else "smaller_model_preferred"
-
-  if (upper_bound >= 2L) {
-    step_id <- 0L
-    while (current_M < upper_bound) {
-      candidate_requested_M <- current_M + 1L
-      candidate_fit <- .mpcurve_fit_once(
-        fit_args = fit_args,
-        dots = dots,
-        fit_overrides = list(
-          intrinsic_dim = candidate_requested_M,
-          method = .mpcurve_greedy_method_for_dim(
-            fit_args$method,
-            candidate_requested_M,
-            method_missing = method_missing
-          ),
-          drop_unused_ordering = FALSE
-        )
-      )
-      candidate_info <- .mpcurve_prepare_greedy_fit(
-        fit = candidate_fit,
-        fit_args = fit_args,
-        dots = dots,
-        method_missing = method_missing,
-        greedy_provenance = greedy_provenance,
-        drop_unused_ordering = FALSE
-      )
-      greedy_provenance <- candidate_info$greedy_provenance
-      candidate_fit <- candidate_info$fit
-      candidate_obj <- .mpcurve_last_objective(candidate_fit)
-      step_id <- step_id + 1L
-      decision <- .mpcurve_greedy_compare_candidate(
-        direction = "forward",
-        step = step_id,
-        current_info = current_info,
-        candidate_info = candidate_info,
-        current_objective = current_obj,
-        candidate_objective = candidate_obj
-      )
-      history <- rbind(history, decision$history_row)
-      if (!decision$accepted) {
-        stop_reason <- decision$stop_reason
-        break
-      }
-      current_fit <- candidate_fit
-      current_info <- candidate_info
-      current_obj <- candidate_obj
-      current_M <- current_info$active_dim
-      stop_reason <- if (current_M >= upper_bound) "reached_upper_bound" else "smaller_model_preferred"
-    }
-  }
-
-  greedy_info <- list(
-    mode = "forward",
-    requested_upper_bound = upper_bound,
-    selected_intrinsic_dim = current_M,
-    stop_reason = stop_reason,
-    history = history
-  )
-  .mpcurve_finalize_greedy_return(
-    selected_fit = current_fit,
-    fit_args = fit_args,
-    dots = dots,
-    method_missing = method_missing,
-    greedy_info = greedy_info,
-    greedy_provenance = greedy_provenance
-  )
-}
-
-.mpcurve_greedy_backward <- function(fit_args, dots, method_missing = FALSE) {
-  upper_bound <- as.integer(fit_args$intrinsic_dim)[1]
-  if (upper_bound <= 1L) {
-    fit1 <- .mpcurve_fit_once(
-      fit_args = fit_args,
-      dots = dots,
-      fit_overrides = list(
-        intrinsic_dim = 1L,
-        method = .mpcurve_greedy_method_for_dim(
-          fit_args$method,
-          1L,
-          method_missing = method_missing
-        ),
-        num_cores = 1L,
-        drop_unused_ordering = FALSE
-      )
-    )
-    greedy_info <- list(
-      mode = "backward",
-      requested_upper_bound = upper_bound,
-      selected_intrinsic_dim = 1L,
-      starting_active_intrinsic_dim = 1L,
-      stop_reason = "reached_dimension_1",
-      history = .mpcurve_empty_greedy_history()
-    )
-    return(.mpcurve_finalize_greedy_return(
-      selected_fit = fit1,
-      fit_args = fit_args,
-      dots = dots,
-      method_missing = method_missing,
-      greedy_info = greedy_info,
-      greedy_provenance = .mpcurve_extract_greedy_provenance(fit1)
-    ))
-  }
-
-  history <- .mpcurve_empty_greedy_history()
-
-  current_fit <- .mpcurve_fit_once(
-    fit_args = fit_args,
-    dots = dots,
-    fit_overrides = list(
-      intrinsic_dim = upper_bound,
-      method = .mpcurve_greedy_method_for_dim(
-        fit_args$method,
-        upper_bound,
-        method_missing = method_missing
-      ),
-      drop_unused_ordering = FALSE
-    )
-  )
-  greedy_provenance <- .mpcurve_extract_greedy_provenance(current_fit)
-  start_active_dim <- if (inherits(current_fit$fit, "soft_partition_cavi")) {
-    length(.mpcurve_partition_active_idx(current_fit$fit))
-  } else {
-    1L
-  }
-  current_info <- .mpcurve_prepare_greedy_fit(
-    fit = current_fit,
-    fit_args = fit_args,
-    dots = dots,
-    method_missing = method_missing,
-    greedy_provenance = greedy_provenance,
-    drop_unused_ordering = FALSE
-  )
-  greedy_provenance <- current_info$greedy_provenance
-  current_fit <- current_info$fit
-  current_obj <- .mpcurve_last_objective(current_fit)
-  current_M <- current_info$active_dim
-  stop_reason <- if (current_M <= 1L) "reached_dimension_1" else "larger_model_preferred"
-
-  step_id <- 0L
-  while (current_M > 1L && inherits(current_fit$fit, "soft_partition_cavi")) {
-    current_info <- .mpcurve_prepare_greedy_fit(
-      fit = current_fit,
-      fit_args = fit_args,
-      dots = dots,
-      method_missing = method_missing,
-      greedy_provenance = greedy_provenance,
-      drop_unused_ordering = FALSE
-    )
-    greedy_provenance <- current_info$greedy_provenance
-    current_fit <- current_info$fit
-    current_obj <- .mpcurve_last_objective(current_fit)
-    current_M <- current_info$active_dim
-    if (!inherits(current_fit$fit, "soft_partition_cavi") || current_M <= 1L) {
-      stop_reason <- "reached_dimension_1"
-      break
-    }
-
-    drop_info <- .mpcurve_partition_backward_drop(current_fit$fit)
-    if (is.null(drop_info)) {
-      stop_reason <- "reached_dimension_1"
-      break
-    }
-
-    candidate_requested_M <- current_M - 1L
-    if (candidate_requested_M <= 1L) {
-      candidate_fit <- .mpcurve_fit_once(
-        fit_args = fit_args,
-        dots = dots,
-        fit_overrides = list(
-          intrinsic_dim = 1L,
-          method = .mpcurve_greedy_method_for_dim(
-            fit_args$method,
-            1L,
-            method_missing = method_missing
-          ),
-          num_cores = 1L,
-          drop_unused_ordering = FALSE
-        ),
-        dot_overrides = list(
-          responsibilities_init = current_fit$fit$fits[[drop_info$keep_idx]]$gamma
-        )
-      )
-    } else {
-      candidate_fit <- .mpcurve_fit_once(
-        fit_args = fit_args,
-        dots = dots,
-        fit_overrides = list(
-          intrinsic_dim = candidate_requested_M,
-          method = .mpcurve_greedy_method_for_dim(
-            fit_args$method,
-            candidate_requested_M,
-            method_missing = method_missing
-          ),
-          drop_unused_ordering = FALSE
-        ),
-        dot_overrides = list(
-          fits_init = current_fit$fit$fits[drop_info$keep_idx]
-        )
-      )
-    }
-    candidate_info <- .mpcurve_prepare_greedy_fit(
-      fit = candidate_fit,
-      fit_args = fit_args,
-      dots = dots,
-      method_missing = method_missing,
-      greedy_provenance = greedy_provenance,
-      drop_unused_ordering = FALSE
-    )
-    greedy_provenance <- candidate_info$greedy_provenance
-    candidate_fit <- candidate_info$fit
-    candidate_obj <- .mpcurve_last_objective(candidate_fit)
-    step_id <- step_id + 1L
-    decision <- .mpcurve_greedy_compare_candidate(
-      direction = "backward",
-      step = step_id,
-      current_info = current_info,
-      candidate_info = candidate_info,
-      current_objective = current_obj,
-      candidate_objective = candidate_obj,
-      dropped_label = drop_info$drop_label,
-      pair_label = drop_info$pair_label
-    )
-    history <- rbind(history, decision$history_row)
-    if (!decision$accepted) {
-      stop_reason <- decision$stop_reason
-      break
-    }
-    current_fit <- candidate_fit
-    current_info <- candidate_info
-    current_obj <- candidate_obj
-    current_M <- current_info$active_dim
-    stop_reason <- if (current_M <= 1L) "reached_dimension_1" else "larger_model_preferred"
-  }
-
-  greedy_info <- list(
-    mode = "backward",
-    requested_upper_bound = upper_bound,
-    selected_intrinsic_dim = current_M,
-    starting_active_intrinsic_dim = start_active_dim,
-    stop_reason = stop_reason,
-    history = history
-  )
-  .mpcurve_finalize_greedy_return(
-    selected_fit = current_fit,
-    fit_args = fit_args,
-    dots = dots,
-    method_missing = method_missing,
-    greedy_info = greedy_info,
-    greedy_provenance = greedy_provenance
-  )
-}
 
 .mpcurve_locations_from_gamma <- function(gamma) {
   if (is.null(gamma)) return(NULL)
@@ -1213,7 +324,7 @@
 
 #' Convert an algorithm fit object to an \code{mpcurve} model object
 #'
-#' @param x A \code{cavi}, \code{smooth_em}, or \code{csmooth_em} object.
+#' @param x A \code{cavi} or \code{soft_partition_cavi} fit object.
 #' @param ... Ignored.
 #' @return An object of class \code{"mpcurve"}.
 #'
@@ -1227,11 +338,10 @@
 #'   \item \code{$locations$map$pseudotime}: pseudotime corresponding to the MAP component
 #' }
 #'
-#' For partition fits (\code{model_intrinsic_dim >= 2}), \code{$locations} is a named
-#' list with one such location object per ordering. All current fits store
-#' their actual model dimension in \code{$intrinsic_dim}. Automatic adaptive
-#' fits remove empty orderings before conversion. Legacy objects can retain
-#' an effective count distinct from their stored model slots.
+#' For partition fits (\code{intrinsic_dim >= 2}), \code{$locations} is a named
+#' list with one such location object per ordering. Fits store their model
+#' dimension in \code{$intrinsic_dim}; automatic adaptive fits remove empty
+#' orderings before conversion.
 #' @noRd
 as_mpcurve <- function(x, ...) {
   ns <- asNamespace("MPCurver")
@@ -1342,56 +452,6 @@ fitted_prior.soft_partition_cavi <- function(x,
 
 
 #' @noRd
-as_mpcurve.csmooth_em <- function(x, ...) {
-  params <- x$params
-
-  # Unified mu: d x K matrix
-  mu_mat <- do.call(cbind, params$mu)
-
-  K <- length(params$pi)
-  n <- if (!is.null(x$data)) nrow(x$data) else
-    if (!is.null(x$gamma)) nrow(x$gamma) else NA_integer_
-  d <- nrow(mu_mat)
-
-  modelName <- x$control$modelName %||% "homoskedastic"
-
-  structure(
-    list(
-      data = x$data %||% NULL,
-      params = list(
-        pi     = as.numeric(params$pi),
-        mu     = mu_mat,
-        sigma2 = params$sigma2   # d-vec (homo) or d x K matrix (hetero)
-      ),
-      gamma        = x$gamma,
-      measurement_sd = NULL,
-      locations    = .mpcurve_locations_from_gamma(x$gamma),
-      elbo_trace   = x$elbo_trace   %||% numeric(0),
-      loglik_trace = x$loglik_trace %||% numeric(0),
-      lambda_trace = x$lambda_trace %||% list(),
-      iter         = as.integer(x$iter %||% length(x$elbo_trace %||% numeric(0))),
-      K            = as.integer(K),
-      n            = as.integer(n),
-      d            = as.integer(d),
-      algorithm      = "csmooth_em",
-      modelName      = modelName,
-      intrinsic_dim  = 1L,
-      model_intrinsic_dim = 1L,
-      requested_intrinsic_dim = 1L,
-      active_intrinsic_dim = 1L,
-      displayed_intrinsic_dim = 1L,
-      priors         = .mpcurve_priors_from_legacy_fit(x),
-      converged      = x$converged %||% NULL,
-      convergence_info = x$convergence_info %||% NULL,
-      control        = x$control %||% list(),
-      fit            = x
-    ),
-    class = "mpcurve"
-  )
-}
-
-
-#' @noRd
 as_mpcurve.cavi <- function(x, ...) {
   params <- x$params
   mu_mat <- x$posterior$mean
@@ -1422,10 +482,6 @@ as_mpcurve.cavi <- function(x, ...) {
       algorithm      = "cavi",
       modelName      = x$control$modelName %||% "homoskedastic",
       intrinsic_dim  = 1L,
-      model_intrinsic_dim = 1L,
-      requested_intrinsic_dim = 1L,
-      active_intrinsic_dim = 1L,
-      displayed_intrinsic_dim = 1L,
       priors        = .mpcurve_priors_from_cavi_fit(x),
       init_info     = x$init_info %||% NULL,
       ordering_similarity = x$ordering_similarity %||% NULL,
@@ -1443,206 +499,59 @@ as_mpcurve.cavi <- function(x, ...) {
 
 
 #' @noRd
-as_mpcurve.smooth_em <- function(x, ...) {
-  params <- x$params
-
-  # Unified mu: d x K matrix
-  mu_mat <- do.call(cbind, params$mu)
-
-  K <- length(params$pi)
-  n <- if (!is.null(x$data)) nrow(x$data) else
-    if (!is.null(x$gamma)) nrow(x$gamma) else NA_integer_
-  d <- nrow(mu_mat)
-
-  # Extract sigma2: diagonal of each sigma[[k]] -> d x K matrix
-  sigma2_mat <- if (!is.null(params$sigma) && length(params$sigma) == K) {
-    vapply(params$sigma, function(S) diag(as.matrix(S)), numeric(d))
-  } else {
-    matrix(NA_real_, d, K)
-  }
-
-  modelName <- x$control$modelName %||% (x$modelName %||% "unknown")
-
-  structure(
-    list(
-      data = x$data %||% NULL,
-      params = list(
-        pi     = as.numeric(params$pi),
-        mu     = mu_mat,
-        sigma2 = sigma2_mat   # d x K  (one column per cluster)
-      ),
-      gamma        = x$gamma,
-      measurement_sd = NULL,
-      locations    = .mpcurve_locations_from_gamma(x$gamma),
-      elbo_trace   = x$elbo_trace   %||% numeric(0),
-      loglik_trace = x$loglik_trace %||% numeric(0),
-      lambda_trace = x$lambda_trace %||% list(),
-      iter         = as.integer(x$iter %||% length(x$elbo_trace %||% numeric(0))),
-      K            = as.integer(K),
-      n            = as.integer(n),
-      d            = as.integer(d),
-      algorithm      = "smooth_em",
-      modelName      = modelName,
-      intrinsic_dim  = 1L,
-      model_intrinsic_dim = 1L,
-      requested_intrinsic_dim = 1L,
-      active_intrinsic_dim = 1L,
-      displayed_intrinsic_dim = 1L,
-      priors         = .mpcurve_priors_from_legacy_fit(x),
-      converged      = x$converged %||% NULL,
-      convergence_info = x$convergence_info %||% NULL,
-      control        = x$control %||% list(),
-      fit            = x
-    ),
-    class = "mpcurve"
-  )
-}
-
-
-#' @noRd
 as_mpcurve.soft_partition_cavi <- function(x, ...) {
-  if (identical(x$variational_family %||% (x$control %||% list())$variational_family,
-                "structured")) {
-    M <- as.integer(x$M)
-    ord_labels <- x$ordering_labels %||% colnames(x$pi_weights) %||%
-      .mpcurve_ordering_labels(M)
-    fits_mp <- stats::setNames(lapply(x$fits, as_mpcurve), ord_labels)
-    locations <- stats::setNames(lapply(fits_mp, `[[`, "locations"), ord_labels)
-    priors <- .mpcurve_priors_from_partition_fit(x)
-    effective_count_tol <- .mpcurve_effective_count_tol(x, M, x$d)
-    return(structure(
-      list(
-        data = x$data,
-        params = list(
-          pi = stats::setNames(x$position_pi, ord_labels),
-          mu = stats::setNames(x$params$mu, ord_labels),
-          sigma2 = x$params$sigma2
-        ),
-        gamma = stats::setNames(x$gamma, ord_labels),
-        conditional_posterior = x$conditional_posterior,
-        posterior = x$conditional_posterior,
-        lambda_mat = x$lambda_mat,
-        fits = fits_mp,
-        measurement_sd = x$measurement_sd,
-        locations = locations,
-        elbo_trace = x$objective_history,
-        loglik_trace = numeric(0),
-        lambda_trace = x$lambda_trace,
-        sigma2_trace = x$sigma2_trace,
-        partition = list(
-          pi_weights = x$pi_weights,
-          assign = x$assign,
-          variational_family = "structured"
-        ),
-        objective_history = x$objective_history,
-        temperature_history = x$temperature_history,
-        iter = x$iter,
-        K = x$K,
-        n = x$n,
-        d = x$d,
-        algorithm = "cavi",
-        modelName = "partition_cavi_structured",
-        model_intrinsic_dim = M,
-        requested_intrinsic_dim = M,
-        active_intrinsic_dim = M,
-        displayed_intrinsic_dim = M,
-        intrinsic_dim = if (identical(x$control$intrinsic_dim_semantics, "model")) M else
-          .mpcurve_effective_intrinsic_dim(
-            priors, M, effective_count_tol, colSums(x$pi_weights)),
-        effective_count_tol = effective_count_tol,
-        variational_family = "structured",
-        priors = priors,
-        init_info = x$init_info,
-        ordering_similarity = x$ordering_similarity,
-        similarity_init = x$similarity_init,
-        dimension_initialization = x$dimension_initialization %||% NULL,
-        dimension_estimation = x$dimension_estimation %||% NULL,
-        converged = x$converged,
-        convergence_info = x$convergence_info,
-        control = x$control,
-        fit = x
-      ),
-      class = "mpcurve"
-    ))
-  }
-  M <- x$M %||% 2L
-  ord_labels_full <- colnames(x$pi_weights) %||% .mpcurve_ordering_labels(M)
-  active_full <- x$active_orderings %||% rep(TRUE, M)
-  frozen_full <- x$frozen_orderings %||% !active_full
-  drop_view <- isTRUE((x$control %||% list())$drop_unused_ordering)
-  keep_idx <- if (drop_view) which(active_full) else seq_len(M)
-  if (!length(keep_idx)) {
-    keep_idx <- which.max(ifelse(active_full, 1, 0))
-  }
-  ord_labels <- ord_labels_full[keep_idx]
-
-  # Support unified $fits list
-  raw_fits <- x$fits
-  if (is.null(raw_fits)) {
-    # Legacy fallback (should not happen with new code)
-    raw_fits <- list(x$fit1, x$fit2)
-  }
-
-  all_fits_mp <- lapply(raw_fits, as_mpcurve)
-  fits_mp <- all_fits_mp[keep_idx]
-  ref <- all_fits_mp[[keep_idx[1L]]]
-  visible_weights <- x$pi_weights[, keep_idx, drop = FALSE]
-  colnames(visible_weights) <- ord_labels
-  visible_active <- if (drop_view) rep(TRUE, length(keep_idx)) else active_full[keep_idx]
-  visible_frozen <- if (drop_view) rep(FALSE, length(keep_idx)) else frozen_full[keep_idx]
+  M <- as.integer(x$M)
+  ord_labels <- x$ordering_labels %||% colnames(x$pi_weights) %||%
+    .mpcurve_ordering_labels(M)
+  fits_mp <- stats::setNames(lapply(x$fits, as_mpcurve), ord_labels)
+  locations <- stats::setNames(lapply(fits_mp, `[[`, "locations"), ord_labels)
   priors <- .mpcurve_priors_from_partition_fit(x)
-  effective_count_tol <- .mpcurve_effective_count_tol(x, M, ref$d)
-
+  effective_count_tol <- .mpcurve_effective_count_tol(x, M, x$d)
   structure(
     list(
-      data = ref$data %||% x$data %||% raw_fits[[1]]$data %||% NULL,
-      params = .mpcurve_partition_param_bundle(all_fits_mp, ord_labels_full),
-      gamma = stats::setNames(lapply(all_fits_mp, `[[`, "gamma"), ord_labels_full),
-      fits      = fits_mp,
-      measurement_sd = ref$measurement_sd %||% NULL,
-      locations = stats::setNames(lapply(all_fits_mp, `[[`, "locations"), ord_labels_full),
-      elbo_trace = .mpcurve_partition_trace_bundle(all_fits_mp, "elbo_trace", ord_labels_full),
-      loglik_trace = .mpcurve_partition_trace_bundle(all_fits_mp, "loglik_trace", ord_labels_full),
-      lambda_trace = .mpcurve_partition_trace_bundle(all_fits_mp, "lambda_trace", ord_labels_full),
+      data = x$data,
+      params = list(
+        pi = stats::setNames(x$position_pi, ord_labels),
+        mu = stats::setNames(x$params$mu, ord_labels),
+        sigma2 = x$params$sigma2
+      ),
+      gamma = stats::setNames(x$gamma, ord_labels),
+      conditional_posterior = x$conditional_posterior,
+      posterior = x$conditional_posterior,
+      lambda_mat = x$lambda_mat,
+      fits = fits_mp,
+      measurement_sd = x$measurement_sd,
+      locations = locations,
+      elbo_trace = x$objective_history,
+      loglik_trace = numeric(0),
+      lambda_trace = x$lambda_trace,
+      sigma2_trace = x$sigma2_trace,
       partition = list(
-        pi_weights = visible_weights,
-        assign     = x$assign,
-        active_orderings = visible_active,
-        frozen_orderings = visible_frozen,
-        frozen_labels = ord_labels_full[frozen_full],
-        ordering_events = x$ordering_events %||% list(),
-        assignment_posterior = x$assignment_posterior,
-        requested_intrinsic_dim = as.integer(M),
-        active_intrinsic_dim = as.integer(sum(active_full)),
-        displayed_intrinsic_dim = as.integer(length(keep_idx)),
-        dropped_labels = if (drop_view) ord_labels_full[frozen_full] else character(0),
-        kept_labels = ord_labels,
-        compacted = drop_view
+        pi_weights = x$pi_weights,
+        assign = x$assign,
+        variational_family = "structured"
       ),
-      objective_history = x$objective_history %||% numeric(0),
-      iter          = length(x$objective_history %||% numeric(0)),
-      K             = ref$K,
-      n             = ref$n,
-      d             = ref$d,
-      algorithm     = "cavi",
-      modelName     = "partition_cavi",
-      model_intrinsic_dim = as.integer(M),
-      requested_intrinsic_dim = as.integer(M),
-      active_intrinsic_dim = as.integer(sum(active_full)),
-      displayed_intrinsic_dim = as.integer(length(keep_idx)),
-      intrinsic_dim = .mpcurve_effective_intrinsic_dim(
-        priors, M, effective_count_tol, colSums(x$pi_weights)
-      ),
+      objective_history = x$objective_history,
+      temperature_history = x$temperature_history,
+      iter = x$iter,
+      K = x$K,
+      n = x$n,
+      d = x$d,
+      algorithm = "cavi",
+      modelName = "partition_cavi_structured",
+      intrinsic_dim = M,
       effective_count_tol = effective_count_tol,
-      priors        = priors,
-      init_info     = x$init_info,
+      variational_family = "structured",
+      priors = priors,
+      init_info = x$init_info,
       ordering_similarity = x$ordering_similarity,
-      similarity_init = x$similarity_init %||% NULL,
-      converged     = x$converged,
+      similarity_init = x$similarity_init,
+      dimension_initialization = x$dimension_initialization %||% NULL,
+      dimension_estimation = x$dimension_estimation %||% NULL,
+      converged = x$converged,
       convergence_info = x$convergence_info,
-      ordering_events = x$ordering_events %||% list(),
-      control       = x$control %||% list(),
-      fit           = x
+      control = x$control,
+      fit = x
     ),
     class = "mpcurve"
   )
@@ -1665,52 +574,37 @@ as_mpcurve.soft_partition_cavi <- function(x, ...) {
 #' @return Invisibly returns \code{x}.
 #' @export
 print.mpcurve <- function(x, ...) {
-  idim <- .mpcurve_reported_intrinsic_dim(x)
-  M <- .mpcurve_model_intrinsic_dim(x)
-  active_dim <- x$active_intrinsic_dim %||% .mpcurve_active_intrinsic_dim(x)
-  displayed_dim <- x$displayed_intrinsic_dim %||% if (.mpcurve_is_partition(x)) length(x$fits %||% list()) else 1L
+  idim <- as.integer(x$intrinsic_dim)
   is_partition <- .mpcurve_is_partition(x)
+  selection_info <- x$dimension_selection %||% NULL
+  initialization_info <- x$dimension_initialization %||% NULL
 
   if (is_partition) {
-    structured <- identical(
-      x$variational_family %||% (x$control %||% list())$variational_family,
-      "structured"
-    )
     cat("MPCurve partition fit\n")
     cat(sprintf("  Backend        : %s\n", x$algorithm))
-    if (structured) cat("  Variational    : structural q(C) q(Z) q(U | Z)\n")
-    selection_info <- x$dimension_selection %||% NULL
-    if (!is.null(selection_info)) {
-      cat(sprintf(
-        "  M selection   : %s (upper bound %d -> selected %d)\n",
-        selection_info$direction,
-        (selection_info$max_intrinsic_dim %||% selection_info$max_num_orderings),
-        selection_info$selected_M
-      ))
-    }
-    initialization_info <- x$dimension_initialization %||% NULL
-    if (!is.null(initialization_info) && is.null(x$dimension_estimation)) {
-      cat(sprintf(
-        "  Auto M init    : mean silhouette (upper bound %d -> selected %d; min size %d)\n",
-        initialization_info$requested_max_intrinsic_dim,
-        initialization_info$selected_M,
-        initialization_info$min_cluster_size
-      ))
-    }
-    greedy_info <- x$greedy_selection %||% NULL
-    if (!is.null(greedy_info)) {
-      cat(sprintf(
-        "  Greedy search  : %s (upper bound %d -> selected %d)\n",
-        greedy_info$mode,
-        greedy_info$requested_upper_bound,
-        greedy_info$selected_intrinsic_dim
-      ))
-    }
-    if (structured) {
-      if (M != idim) cat(sprintf("  Model dim      : %d\n", M))
-    } else {
-      cat(sprintf("  Dim (req/act/view): %d / %d / %d\n", M, active_dim, displayed_dim))
-    }
+    cat("  Variational    : structural q(C) q(Z) q(U | Z)\n")
+  } else {
+    cat("MPCurve fit\n")
+    cat(sprintf("  Backend        : %s\n",  x$algorithm))
+  }
+  if (!is.null(selection_info)) {
+    cat(sprintf(
+      "  M selection   : %s (upper bound %d -> selected %d)\n",
+      selection_info$direction,
+      selection_info$max_intrinsic_dim,
+      selection_info$selected_M
+    ))
+  }
+  if (!is.null(initialization_info) && is.null(x$dimension_estimation)) {
+    cat(sprintf(
+      "  Auto M init    : mean silhouette (upper bound %d -> selected %d; min size %d)\n",
+      initialization_info$requested_max_intrinsic_dim,
+      initialization_info$selected_M,
+      initialization_info$min_cluster_size
+    ))
+  }
+
+  if (is_partition) {
     cat(sprintf("  Intrinsic dim  : %d\n", idim))
     cat(sprintf("  n / d / K      : %d / %d / %d\n", x$n, x$d, x$K))
     cat(sprintf("  Iterations     : %d\n", x$iter))
@@ -1719,24 +613,6 @@ print.mpcurve <- function(x, ...) {
       tbl <- table(part$assign)
       part_str <- paste(sprintf("%s=%d", names(tbl), as.integer(tbl)), collapse = ", ")
       cat(sprintf("  Partition      : %s\n", part_str))
-      if (!structured) {
-        active <- part$active_orderings
-        ord_labels <- colnames(part$pi_weights) %||% .mpcurve_ordering_labels(M)
-        if (!is.null(active)) {
-          cat(sprintf("  Active         : %s\n",
-                      paste(ord_labels[active], collapse = ", ")))
-        }
-        frozen <- part$frozen_labels
-        if (!is.null(frozen) && length(frozen) > 0L) {
-          if (isTRUE(part$compacted)) {
-            cat(sprintf("  Dropped from view: %s\n",
-                        paste(frozen, collapse = ", ")))
-          } else {
-            cat(sprintf("  Frozen         : %s\n",
-                        paste(frozen, collapse = ", ")))
-          }
-        }
-      }
     }
     if (length(x$objective_history) > 0L)
       cat(sprintf("  Objective (last): %.6f\n",
@@ -1745,35 +621,6 @@ print.mpcurve <- function(x, ...) {
       cat(sprintf("  Converged      : %s\n", x$converged))
     }
   } else {
-    cat("MPCurve fit\n")
-    cat(sprintf("  Backend        : %s\n",  x$algorithm))
-    selection_info <- x$dimension_selection %||% NULL
-    if (!is.null(selection_info)) {
-      cat(sprintf(
-        "  M selection   : %s (upper bound %d -> selected %d)\n",
-        selection_info$direction,
-        (selection_info$max_intrinsic_dim %||% selection_info$max_num_orderings),
-        selection_info$selected_M
-      ))
-    }
-    initialization_info <- x$dimension_initialization %||% NULL
-    if (!is.null(initialization_info) && is.null(x$dimension_estimation)) {
-      cat(sprintf(
-        "  Auto M init    : mean silhouette (upper bound %d -> selected %d; min size %d)\n",
-        initialization_info$requested_max_intrinsic_dim,
-        initialization_info$selected_M,
-        initialization_info$min_cluster_size
-      ))
-    }
-    greedy_info <- x$greedy_selection %||% NULL
-    if (!is.null(greedy_info)) {
-      cat(sprintf(
-        "  Greedy search  : %s (upper bound %d -> selected %d)\n",
-        greedy_info$mode,
-        greedy_info$requested_upper_bound,
-        greedy_info$selected_intrinsic_dim
-      ))
-    }
     cat(sprintf("  Model          : %s\n",  x$modelName))
     cat(sprintf("  Intrinsic dim  : %d\n", idim))
     cat(sprintf("  n / d / K      : %d / %d / %d\n", x$n, x$d, x$K))
@@ -1800,7 +647,6 @@ print.mpcurve <- function(x, ...) {
 #'   ignored for structural partition summaries.
 #' @return An object of class \code{summary.mpcurve}. Every result contains
 #'   \code{$algorithm}, \code{$modelName}, \code{$intrinsic_dim},
-#'   \code{$model_intrinsic_dim},
 #'   \code{$dimension_selection} when returned by
 #'   \code{select_mpcurve_dimension()},
 #'   \code{$dimension_initialization} when \code{intrinsic_dim = "auto"} was
@@ -1815,24 +661,15 @@ print.mpcurve <- function(x, ...) {
 #'   \code{$variational_family}.
 #' @export
 summary.mpcurve <- function(object, ...) {
-  idim <- .mpcurve_reported_intrinsic_dim(object)
-  M <- .mpcurve_model_intrinsic_dim(object)
-  active_dim <- object$active_intrinsic_dim %||% .mpcurve_active_intrinsic_dim(object)
-  displayed_dim <- object$displayed_intrinsic_dim %||% if (.mpcurve_is_partition(object)) length(object$fits %||% list()) else 1L
+  idim <- as.integer(object$intrinsic_dim)
   priors <- .mpcurve_get_priors(object)
-  is_partition <- .mpcurve_is_partition(object)
 
-  if (is_partition) {
+  if (.mpcurve_is_partition(object)) {
     result <- list(
       algorithm     = object$algorithm,
       intrinsic_dim = idim,
-      model_intrinsic_dim = M,
-      requested_intrinsic_dim = object$requested_intrinsic_dim %||% M,
-      active_intrinsic_dim = active_dim,
-      displayed_intrinsic_dim = displayed_dim,
-      effective_count_tol = object$effective_count_tol %||%
-        .mpcurve_effective_count_tol(object$fit, M, object$d),
-      modelName     = object$modelName %||% "partition_cavi",
+      effective_count_tol = object$effective_count_tol,
+      modelName     = object$modelName,
       K             = object$K,
       n             = object$n,
       d             = object$d,
@@ -1840,14 +677,11 @@ summary.mpcurve <- function(object, ...) {
       partition     = object$partition,
       objective_history = object$objective_history,
       converged     = object$converged,
-      convergence_info = object$convergence_info %||% object$fit$convergence_info,
-      ordering_events = object$ordering_events %||% list(),
-      control       = object$control %||% list(),
+      convergence_info = object$convergence_info,
+      control       = object$control,
       sigma2        = object$params$sigma2,
       measurement_sd = object$measurement_sd,
-      variational_family = object$variational_family %||%
-        (object$control %||% list())$variational_family,
-      greedy_selection = object$greedy_selection %||% NULL,
+      variational_family = object$variational_family,
       dimension_selection = object$dimension_selection %||% NULL,
       dimension_initialization = object$dimension_initialization %||% NULL,
       dimension_estimation = object$dimension_estimation %||% NULL
@@ -1858,16 +692,12 @@ summary.mpcurve <- function(object, ...) {
       algorithm     = object$algorithm,
       modelName     = object$modelName,
       intrinsic_dim = idim,
-      model_intrinsic_dim = M,
-      active_intrinsic_dim = active_dim,
-      displayed_intrinsic_dim = displayed_dim,
       K             = object$K,
       n             = object$n,
       d             = object$d,
       priors        = priors,
       converged     = object$converged %||% underlying$converged %||% NULL,
       underlying    = underlying,
-      greedy_selection = object$greedy_selection %||% NULL,
       dimension_selection = object$dimension_selection %||% NULL,
       dimension_initialization = object$dimension_initialization %||% NULL,
       dimension_estimation = object$dimension_estimation %||% NULL
@@ -1882,26 +712,18 @@ summary.mpcurve <- function(object, ...) {
 #' @param x A \code{summary.mpcurve} object.
 #' @export
 print.summary.mpcurve <- function(x, ...) {
-  idim <- .mpcurve_reported_intrinsic_dim(x)
-  M <- .mpcurve_model_intrinsic_dim(x)
-  active_dim <- x$active_intrinsic_dim %||% M
-  displayed_dim <- x$displayed_intrinsic_dim %||% if (!is.null(x$partition)) length(x$partition$kept_labels %||% character(0)) else 1L
-  is_partition <- !is.null(x$partition)
+  idim <- as.integer(x$intrinsic_dim)
+  selection_info <- x$dimension_selection %||% NULL
+  initialization_info <- x$dimension_initialization %||% NULL
 
-  if (is_partition) {
-    structured <- identical(
-      x$variational_family %||% (x$control %||% list())$variational_family,
-      "structured"
-    )
+  if (!is.null(x$partition)) {
     cat("MPCurve Partition Summary\n")
-    selection_info <- x$dimension_selection %||% NULL
     if (!is.null(selection_info)) {
       cat(sprintf("M selection : %s  |  upper bound = %d  |  selected = %d\n",
                   selection_info$direction,
-                  (selection_info$max_intrinsic_dim %||% selection_info$max_num_orderings),
+                  selection_info$max_intrinsic_dim,
                   selection_info$selected_M))
     }
-    initialization_info <- x$dimension_initialization %||% NULL
     if (!is.null(initialization_info) && is.null(x$dimension_estimation)) {
       cat(sprintf(
         "Auto M init : mean silhouette  |  upper bound = %d  |  selected = %d  |  min size = %d\n",
@@ -1910,48 +732,17 @@ print.summary.mpcurve <- function(x, ...) {
         initialization_info$min_cluster_size
       ))
     }
-    greedy_info <- x$greedy_selection %||% NULL
-    if (!is.null(greedy_info)) {
-      cat(sprintf("Greedy search : %s  |  upper bound = %d  |  selected = %d\n",
-                  greedy_info$mode,
-                  greedy_info$requested_upper_bound,
-                  greedy_info$selected_intrinsic_dim))
-    }
-    if (structured) {
-      cat(sprintf("Algorithm : %s  |  structural VI  |  n=%d  d=%d  K=%d\n",
-                  x$algorithm, x$n, x$d, x$K))
-      if (M != idim) cat(sprintf("Retained model dimension : %d\n", M))
-      cat(sprintf("Intrinsic dimension : %d\n", idim))
-      if (is.null(x$measurement_sd)) {
-        cat(sprintf("Shared sigma2 range : [%.4g, %.4g]\n", min(x$sigma2), max(x$sigma2)))
-      } else {
-        cat("Noise model : known measurement SD\n")
-      }
+    cat(sprintf("Algorithm : %s  |  structural VI  |  n=%d  d=%d  K=%d\n",
+                x$algorithm, x$n, x$d, x$K))
+    cat(sprintf("Intrinsic dimension : %d\n", idim))
+    if (is.null(x$measurement_sd)) {
+      cat(sprintf("Shared sigma2 range : [%.4g, %.4g]\n", min(x$sigma2), max(x$sigma2)))
     } else {
-      cat(sprintf("Algorithm : %s  |  requested=%d  active=%d  displayed=%d  |  n=%d  d=%d  K=%d\n",
-                  x$algorithm, M, active_dim, displayed_dim, x$n, x$d, x$K))
-      cat(sprintf("Intrinsic dimension : %d\n", idim))
+      cat("Noise model : known measurement SD\n")
     }
-    if (!is.null(x$partition)) {
-      tbl <- table(x$partition$assign)
-      part_str <- paste(sprintf("%s=%d", names(tbl), as.integer(tbl)), collapse = "  ")
-      cat(sprintf("Partition : %s\n", part_str))
-      if (!structured) {
-        active <- x$partition$active_orderings
-        ord_labels <- colnames(x$partition$pi_weights) %||% .mpcurve_ordering_labels(M)
-        if (!is.null(active)) {
-          cat(sprintf("Active    : %s\n", paste(ord_labels[active], collapse = ", ")))
-        }
-        frozen <- x$partition$frozen_labels
-        if (!is.null(frozen) && length(frozen) > 0L) {
-          if (isTRUE(x$partition$compacted)) {
-            cat(sprintf("Dropped from view : %s\n", paste(frozen, collapse = ", ")))
-          } else {
-            cat(sprintf("Frozen    : %s\n", paste(frozen, collapse = ", ")))
-          }
-        }
-      }
-    }
+    tbl <- table(x$partition$assign)
+    part_str <- paste(sprintf("%s=%d", names(tbl), as.integer(tbl)), collapse = "  ")
+    cat(sprintf("Partition : %s\n", part_str))
     priors <- x$priors %||% NULL
     if (!is.null(priors$position)) {
       cat(sprintf("Position prior mode : %s\n", priors$position$mode))
@@ -1964,25 +755,9 @@ print.summary.mpcurve <- function(x, ...) {
         cat(sprintf("Effective omega : %s\n", omega_str))
       }
     }
-    events <- x$ordering_events %||% list()
-    if (!structured && length(events) > 0L) {
-      event_types <- vapply(events, `[[`, character(1), "event")
-      cat(sprintf("Events    : %d freeze\n",
-                  sum(event_types == "freeze")))
-    }
     if (length(x$objective_history) > 0L)
       cat(sprintf("Objective (last) : %.6f\n", tail(x$objective_history, 1L)))
-    if (structured) {
-      cat("Objective type : fixed-M structural ELBO\n")
-    } else {
-      drop_view <- isTRUE((x$control %||% list())$drop_unused_ordering)
-      cat(sprintf("Objective type : %s\n",
-                  if (drop_view) {
-                    "post-drop fit (not comparable across requested dimensions)"
-                  } else {
-                    "fixed-requested-M comparison"
-                  }))
-    }
+    cat("Objective type : fixed-M structural ELBO\n")
     if (!is.null(x$converged))
       cat(sprintf("Converged : %s\n", x$converged))
     conv_info <- x$convergence_info
@@ -1999,14 +774,12 @@ print.summary.mpcurve <- function(x, ...) {
     }
   } else {
     cat("MPCurve Model Summary\n")
-    selection_info <- x$dimension_selection %||% NULL
     if (!is.null(selection_info)) {
       cat(sprintf("M selection : %s  |  upper bound = %d  |  selected = %d\n",
                   selection_info$direction,
-                  (selection_info$max_intrinsic_dim %||% selection_info$max_num_orderings),
+                  selection_info$max_intrinsic_dim,
                   selection_info$selected_M))
     }
-    initialization_info <- x$dimension_initialization %||% NULL
     if (!is.null(initialization_info) && is.null(x$dimension_estimation)) {
       cat(sprintf(
         "Auto M init : mean silhouette  |  upper bound = %d  |  selected = %d  |  min size = %d\n",
@@ -2014,13 +787,6 @@ print.summary.mpcurve <- function(x, ...) {
         initialization_info$selected_M,
         initialization_info$min_cluster_size
       ))
-    }
-    greedy_info <- x$greedy_selection %||% NULL
-    if (!is.null(greedy_info)) {
-      cat(sprintf("Greedy search : %s  |  upper bound = %d  |  selected = %d\n",
-                  greedy_info$mode,
-                  greedy_info$requested_upper_bound,
-                  greedy_info$selected_intrinsic_dim))
     }
     cat(sprintf("Algorithm : %s  |  Model : %s  |  n=%d  d=%d  K=%d\n",
                 x$algorithm, x$modelName, x$n, x$d, x$K))
@@ -2109,19 +875,150 @@ print.summary.mpcurve <- function(x, ...) {
 }
 
 
+#' Plot a 2D embedding with trajectory component means overlaid
+#'
+#' @description
+#' Plot an \eqn{n \times 2} embedding (e.g., two selected dimensions, PCA/t-SNE/UMAP)
+#' and overlay the trajectory component means (\code{mu_list}) as points connected by arrows.
+#' Optionally color observations by a continuous vector (e.g., a Fiedler vector).
+#'
+#' @param mu_list A length-\eqn{K} list of mean vectors. Each element should be a numeric vector
+#'   of length at least 2, where the first two entries correspond to the coordinates in \code{X2}.
+#' @param X2 Numeric matrix of dimension \eqn{n \times 2} giving the embedding coordinates for observations.
+#' @param t_vec Optional numeric vector of length \eqn{n}. If provided, points are colored by \code{t_vec}
+#'   using \code{pal}.
+#' @param mu_order Optional integer permutation of \code{1:K} specifying the plotting order of components.
+#'   Defaults to \code{1:K}.
+#' @param pch Point character for observations (passed to \code{\link[graphics]{points}} / \code{\link[graphics]{plot}}).
+#' @param col Observation color used when \code{t_vec} is \code{NULL}.
+#' @param cex Point size for observations.
+#' @param mu_pch Point character for component means.
+#' @param mu_col Color for component means.
+#' @param mu_cex Point size for component means.
+#' @param arrow_col Color for arrows connecting consecutive component means.
+#' @param arrow_lwd Line width for arrows.
+#' @param arrow_len Arrow head length (see \code{\link[graphics]{arrows}}).
+#' @param add Logical; if \code{TRUE}, add to an existing plot. If \code{FALSE}, create a new plot.
+#' @param xlab,ylab Axis labels. If \code{NULL}, defaults to \code{"dim 1"} and \code{"dim 2"}.
+#' @param main Plot title. If \code{NULL}, uses a default title.
+#' @param add_legend Logical; if \code{TRUE} and \code{t_vec} is provided, add a small legend (quantile ticks).
+#' @param legend_title Title for the legend when \code{t_vec} is provided.
+#' @param pal A vector of colors used to map \code{t_vec} to point colors. Defaults to a blue-white-red palette.
+#' @param ... Additional arguments passed to \code{\link[graphics]{plot}} when \code{add = FALSE}.
+#'
+#' @return An invisible list with elements:
+#' \itemize{
+#'   \item \code{X2}: the embedding coordinates used for plotting.
+#'   \item \code{mu}: the \eqn{K \times 2} matrix of plotted component means (after \code{mu_order}).
+#'   \item \code{mu_order}: the component order used.
+#' }
+#'
+#' @examples
+#' set.seed(1)
+#' n <- 50
+#' X2 <- cbind(rnorm(n), rnorm(n))
+#' mu_list <- list(c(-1, -1), c(0, 0), c(1, 1))
+#' t_vec <- rnorm(n)
+#'
+#' .mpcurve_plot_embedding_2d(mu_list, X2)
+#' .mpcurve_plot_embedding_2d(mu_list, X2, t_vec = t_vec, legend_title = "Fiedler")
+#'
 #' @noRd
-.plot_structural_mu_mpcurve <- function(x, dims, ...) {
-  structured <- identical(
-    x$variational_family %||% (x$control %||% list())$variational_family,
-    "structured"
-  )
-  if (!structured) {
-    stop(
-      "plot_type = 'mu' for a partition fit requires a canonical structural state.",
-      call. = FALSE
+.mpcurve_plot_embedding_2d <- function(
+    mu_list,
+    X2,
+    t_vec = NULL,
+    mu_order = NULL,
+    pch = 19,
+    col = "grey60",
+    cex = 0.7,
+    mu_pch = 8,
+    mu_col = "orange",
+    mu_cex = 1.0,
+    arrow_col = "orange",
+    arrow_lwd = 2.5,
+    arrow_len = 0.08,
+    add = FALSE,
+    xlab = NULL,
+    ylab = NULL,
+    main = NULL,
+    add_legend = !is.null(t_vec),
+    legend_title = "t",
+    pal = grDevices::colorRampPalette(c("#2b8cbe", "white", "#de2d26"))(256),
+    ...
+) {
+  X2 <- as.matrix(X2)
+  if (!is.matrix(X2) || ncol(X2) != 2) stop("X2 must be an n x 2 matrix.")
+  n <- nrow(X2)
+
+  K <- length(mu_list)
+  if (K < 1) stop("mu_list must be a non-empty list.")
+  mu_mat <- do.call(rbind, mu_list)
+  if (!is.matrix(mu_mat) || nrow(mu_mat) != K) stop("Cannot rbind mu_list into a K x d matrix.")
+  if (ncol(mu_mat) < 2) stop("Each mu must have at least 2 entries.")
+
+  mup <- mu_mat[, 1:2, drop = FALSE]
+
+  if (is.null(mu_order)) mu_order <- seq_len(K)
+  mu_order <- as.integer(mu_order)
+  if (length(mu_order) != K || any(sort(mu_order) != seq_len(K))) {
+    stop("mu_order must be a permutation of 1:K.")
+  }
+  mup <- mup[mu_order, , drop = FALSE]
+
+  if (!is.null(t_vec)) {
+    if (length(t_vec) != n) stop("t_vec must have length nrow(X2).")
+    rng <- range(t_vec, na.rm = TRUE)
+    z <- (t_vec - rng[1]) / (rng[2] - rng[1] + 1e-12)
+    idx <- pmax(1L, pmin(256L, 1L + floor(z * 255)))
+    pt_col <- pal[idx]
+  } else {
+    pt_col <- col
+  }
+
+  if (is.null(xlab)) xlab <- "dim 1"
+  if (is.null(ylab)) ylab <- "dim 2"
+  if (is.null(main)) main <- "2D embedding"
+
+  if (!add) {
+    graphics::plot(X2[, 1], X2[, 2],
+                   pch = pch, col = pt_col, cex = cex,
+                   xlab = xlab, ylab = ylab, main = main, ...
+    )
+  } else {
+    graphics::points(X2[, 1], X2[, 2], pch = pch, col = pt_col, cex = cex, ...)
+  }
+
+  if (K >= 2) {
+    for (k in 1:(K - 1)) {
+      if (!.mpcurve_visible_segment(mup[k, ], mup[k + 1, ])) next
+      graphics::arrows(
+        mup[k, 1], mup[k, 2],
+        mup[k + 1, 1], mup[k + 1, 2],
+        col = arrow_col, lwd = arrow_lwd, length = arrow_len
+      )
+    }
+  }
+  graphics::points(mup[, 1], mup[, 2], pch = mu_pch, col = mu_col, cex = mu_cex)
+
+  if (!is.null(t_vec) && isTRUE(add_legend)) {
+    qs <- stats::quantile(t_vec, probs = c(0.05, 0.5, 0.95), na.rm = TRUE)
+    rng <- range(t_vec, na.rm = TRUE)
+    zq <- (qs - rng[1]) / (rng[2] - rng[1] + 1e-12)
+    idxq <- pmax(1L, pmin(256L, 1L + floor(zq * 255)))
+    graphics::legend(
+      "topright",
+      legend = sprintf("%.3g", qs),
+      col = pal[idxq], pch = 16, pt.cex = 1,
+      bty = "n", title = legend_title
     )
   }
 
+  invisible(list(X2 = X2, mu = mup, mu_order = mu_order))
+}
+
+#' @noRd
+.plot_structural_mu_mpcurve <- function(x, dims, ...) {
   means <- x$conditional_posterior$mean
   if (!is.list(means) || length(means) < 1L) {
     stop(
@@ -2130,7 +1027,7 @@ print.summary.mpcurve <- function(x, ...) {
     )
   }
 
-  M <- .mpcurve_model_intrinsic_dim(x)
+  M <- as.integer(x$intrinsic_dim)
   if (length(M) != 1L || is.na(M) || M < 2L || length(means) != M) {
     stop(
       "x$conditional_posterior$mean must contain one matrix per fixed ordering.",
@@ -2335,11 +1232,10 @@ plot.mpcurve <- function(
     dims <- .mpcurve_plot_dimensions(dims, x$d, colnames(x$data))
   }
   is_partition <- .mpcurve_is_partition(x)
-  displayed_dim <- x$displayed_intrinsic_dim %||% if (is_partition) length(x$fits %||% list()) else 1L
 
   # ---- Multi-ordering partition plot ----
   if (is_partition && plot_type == "scatterplot") {
-    M <- displayed_dim
+    M <- x$intrinsic_dim
     fits_list <- x$fits
     pi_w <- x$partition$pi_weights   # d x M
 
@@ -2417,35 +1313,7 @@ plot.mpcurve <- function(
   }
 
   if (is_partition && plot_type == "mu") {
-    structured <- identical(
-      x$variational_family %||% (x$control %||% list())$variational_family,
-      "structured"
-    )
-    if (structured) {
-      return(.plot_structural_mu_mpcurve(x, dims = dims, ...))
-    }
-
-    # Legacy partition objects remain readable through their derived fit views.
-    legacy_fits <- x$fits
-    if (!is.list(legacy_fits) || length(legacy_fits) < 1L) {
-      stop(
-        "Legacy partition trajectory plotting requires a non-empty x$fits list.",
-        call. = FALSE
-      )
-    }
-    old_par <- graphics::par(no.readonly = TRUE)
-    on.exit(graphics::par(old_par), add = TRUE)
-    graphics::par(mfrow = c(1L, length(legacy_fits)), mar = c(4, 4, 4, 1))
-    for (m in seq_along(legacy_fits)) {
-      .mpcurve_plot_call(plot, list(legacy_fits[[m]], plot_type = "mu", dims = dims), ...)
-      graphics::mtext(
-        sprintf("Ordering %s", names(legacy_fits)[m] %||% m),
-        side = 3,
-        line = 0.25,
-        cex = 0.8
-      )
-    }
-    return(invisible(x))
+    return(.plot_structural_mu_mpcurve(x, dims = dims, ...))
   }
 
   # ---- plot objective traces or delegate single-ordering diagnostics ----
@@ -2505,7 +1373,7 @@ plot.mpcurve <- function(
     # ===== 2D scatter =====
     mu_list_dims <- lapply(seq_len(K), function(k) mu_mat[dims, k])
 
-    .mpcurve_plot_call(plot_EM_embedding2D, list(
+    .mpcurve_plot_call(.mpcurve_plot_embedding_2d, list(
       mu_list    = mu_list_dims,
       X2         = data[, dims, drop = FALSE],
       t_vec      = NULL,
@@ -2547,8 +1415,7 @@ plot.mpcurve <- function(
 #' posterior, and parameters. Measurement errors, trajectory priors, and
 #' initialization are inherited. Partition inference resumes at temperature 1.
 #'
-#' @param object An `mpcurve` object returned by [fit_mpcurve()]. Legacy
-#'   augmented partition fits are read-only and require refitting.
+#' @param object An `mpcurve` object returned by [fit_mpcurve()].
 #' @param max_iter Positive integer maximum number of additional CAVI sweeps.
 #' @param tol Optional nonnegative stopping tolerance. `NULL` inherits the
 #'   stored tolerance; zero disables early stopping. See [fit_mpcurve()].
@@ -2582,19 +1449,11 @@ do_mpcurve <- function(object, max_iter = 1L, tol = NULL,
   }
   verbose <- .mpcurve_logical_setting(verbose, "verbose")
   ctrl <- .mpcurve_interface_options(control, mpcurve_continue_control, "control")
-  if (!identical(object$algorithm, "cavi")) {
-    stop("Only CAVI fits can be continued; refit with fit_mpcurve().", call. = FALSE)
-  }
   raw <- object$fit
   if (!inherits(raw, c("cavi", "soft_partition_cavi"))) {
     stop("object$fit must be a cavi or soft_partition_cavi object.")
   }
   partition <- inherits(raw, "soft_partition_cavi")
-  if (partition && !identical(raw$variational_family %||%
-                              raw$control$variational_family, "structured")) {
-    stop("Legacy augmented partition fits are read-only. Refit with fit_mpcurve().",
-         call. = FALSE)
-  }
   if (!is.null(ctrl$fix_lambda)) raw$control$fix_lambda <- ctrl$fix_lambda
   bounds <- ctrl$lambda_bounds %||%
     c(raw$control$lambda_min %||% 1e-10, raw$control$lambda_max %||% 1e10)
@@ -2632,7 +1491,6 @@ do_mpcurve <- function(object, max_iter = 1L, tol = NULL,
   updated$dimension_estimation <- object$dimension_estimation %||%
     object$fit$dimension_estimation %||% NULL
   updated$control$effective_count_tol <- raw$control$effective_count_tol
-  updated$control$intrinsic_dim_semantics <- raw$control$intrinsic_dim_semantics
   updated <- .mpcurve_finalize_automatic_dimension(updated)
   out <- as_mpcurve(updated)
   out$dimension_selection <- object$dimension_selection %||% NULL
@@ -2640,9 +1498,6 @@ do_mpcurve <- function(object, max_iter = 1L, tol = NULL,
     out$dimension_selection$continued_after_selection <- TRUE
   }
   out$dimension_initialization <- updated$dimension_initialization
-  out$requested_intrinsic_dim <- if (isTRUE(updated$dimension_initialization$automatic)) {
-    out$model_intrinsic_dim
-  } else object$requested_intrinsic_dim %||% out$model_intrinsic_dim
   out$continuation_history <- c(object$continuation_history %||% list(), list(list(
     start_trace_length = length(object$elbo_trace), max_iter = max_iter,
     tol = tol, control = ctrl)))
@@ -2717,7 +1572,6 @@ do_mpcurve <- function(object, max_iter = 1L, tol = NULL,
   smooth_fit_lambda_mode <- match.arg(smooth_fit_lambda_mode)
   lambda_sd_prior_rate <- .normalize_lambda_sd_prior_rate(lambda_sd_prior_rate)
   dots <- list(...)
-  .mpcurve_check_legacy_public_args(dots, caller = "fit_mpcurve()")
   reserved_initialization_args <- intersect(
     names(dots),
     c("similarity_precomputed", "initial_partition_probabilities",
@@ -2871,7 +1725,6 @@ do_mpcurve <- function(object, max_iter = 1L, tol = NULL,
     )
     raw <- do.call(soft_partition_cavi, sp_args)
     raw$control$effective_count_tol <- effective_count_tol
-    raw$control$intrinsic_dim_semantics <- "model"
     if (automatic_dimension) {
       raw$control$max_intrinsic_dim <- max_intrinsic_dim
       raw$dimension_initialization <- dimension_initialization

@@ -62,8 +62,8 @@ test_that("fit_mpcurve supports fixed structural M=2 and M=3", {
   ))
   expect_s3_class(fit2, "mpcurve")
   expect_s3_class(fit3, "mpcurve")
-  expect_equal(fit2$model_intrinsic_dim, 2L)
-  expect_equal(fit3$model_intrinsic_dim, 3L)
+  expect_equal(fit2$intrinsic_dim, 2L)
+  expect_equal(fit3$intrinsic_dim, 3L)
   expect_equal(fit2$params$sigma2, fit2$fit$params$sigma2)
   expect_equal(fit3$params$sigma2, fit3$fit$params$sigma2)
   expect_equal(length(fit2$fits), 2L)
@@ -112,11 +112,6 @@ test_that("do_mpcurve continues only from canonical structural state", {
   continued <- suppressWarnings(do_mpcurve(fit, max_iter = 2))
   expect_gt(length(continued$objective_history), before)
   expect_identical(continued$variational_family, "structured")
-
-  legacy <- fit
-  legacy$fit$variational_family <- NULL
-  legacy$fit$control$variational_family <- NULL
-  expect_error(do_mpcurve(legacy, max_iter = 1), "read-only")
 })
 
 test_that("partition initialization retains a common K", {
@@ -139,21 +134,6 @@ test_that("partition initialization retains a common K", {
   ))
   expect_equal(fit$K, 6L)
   expect_true(all(vapply(fit$gamma, ncol, integer(1)) == 6L))
-})
-
-test_that("soft two-trajectory wrapper delegates to structural VI", {
-  set.seed(7)
-  X <- matrix(rnorm(100), 20, 5)
-  fit <- suppressWarnings(soft_two_trajectory_cavi(
-    X,
-    K = 5,
-    n_outer = 1,
-    max_converge_iter = 1,
-    verbose = FALSE
-  ))
-  expect_s3_class(fit, "soft_partition_cavi")
-  expect_identical(fit$variational_family, "structured")
-  expect_equal(fit$M, 2L)
 })
 
 test_that("plot.mpcurve uses canonical structural means for trajectory plots", {
@@ -201,12 +181,6 @@ test_that("plot.mpcurve uses canonical structural means for trajectory plots", {
     plot(missing_canonical_means, plot_type = "mu", dims = 1L),
     "conditional_posterior"
   )
-
-  legacy_view <- fit
-  legacy_view$variational_family <- NULL
-  legacy_view$control$variational_family <- NULL
-  legacy_view$conditional_posterior <- NULL
-  expect_invisible(plot(legacy_view, plot_type = "mu", dims = 1L))
 })
 
 test_that("single-ordering trajectory plots honor the public dims argument", {
@@ -241,7 +215,7 @@ test_that("intrinsic_dim=1 remains the ordinary cavi path", {
   )
   expect_s3_class(fit$fit, "cavi")
   expect_null(fit$partition)
-  expect_equal(fit$model_intrinsic_dim, 1L)
+  expect_equal(fit$intrinsic_dim, 1L)
 })
 
 test_that("partition fits reject the removed algorithm argument", {

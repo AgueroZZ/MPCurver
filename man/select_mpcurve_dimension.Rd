@@ -27,7 +27,8 @@ select_mpcurve_dimension(
 \item{direction}{Either \code{"forward"} or \code{"backward"}.}
 
 \item{S}{Optional known measurement standard deviations, as a length-d feature
-vector or matrix matching \code{X}. Values must be finite and nonnegative, in
+vector or matrix matching \code{X}. Values must be finite and nonnegative at
+observed entries. A matrix may have \code{NA} only where \code{X} is \code{NA}. SDs are in
 the same units and positional order as \code{X}; names do not trigger reordering.
 Zero SDs are floored at \code{sqrt(.Machine$double.eps)} for computation. Otherwise
 feature noise variances are estimated.}
@@ -38,9 +39,12 @@ The sample count must be at least \code{control$rw_order + 1}. Collapsed initial
 reduce the realized count in a single-ordering fit.}
 
 \item{initial_method}{One initialization method: \code{"PCA"}, \code{"fiedler"},
-\code{"pcurve"}, \code{"tSNE"}, \code{"random"}, or \code{"isomap"}. Under similarity
-grouping this method is applied independently within each feature
-block. The default PCA uses each block's own PC1. Method vectors are rejected.}
+\code{"pcurve"}, \code{"tSNE"}, \code{"random"}, or \code{"isomap"}. The method's ordering
+score is cut into position bins by \code{init_control$discretization}.
+\code{"random"} scores a random permutation of the samples; use \code{\link[=set.seed]{set.seed()}}
+for a reproducible start. Under similarity grouping this method is applied
+independently within each feature block. The default PCA uses each
+block's own PC1. Method vectors are rejected.}
 
 \item{position_prior}{Estimate position probabilities (\code{"adaptive"}) or keep
 them fixed (\code{"fixed"}, uniform unless custom control weights are supplied).}
@@ -51,7 +55,7 @@ enabling it adds \code{anneal_steps * anneal_sweeps} sweeps before this phase,
 configured through \code{\link[=mpcurve_control]{mpcurve_control()}}. Zero skips this fitting phase.}
 
 \item{tol}{Shared ELBO-change stopping tolerance. The default rule uses
-\code{abs(delta_ELBO) / (nrow(X) * ncol(X))}; partition stopping is checked
+\code{abs(delta_ELBO) / sum(!is.na(X))}; partition stopping is checked
 at temperature 1, after any optional annealing. Existing numerical decrease
 checks apply.
 Zero disables early stopping. A small increment does not bound the

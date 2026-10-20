@@ -15,7 +15,7 @@ plot.mpcurve to visualize trajectories and sample orderings."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">MPCurver</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -94,7 +94,7 @@ along an inferred trajectory; its direction can be reversed.</p>
     <h2 id="single-ordering-objects">Single-ordering objects<a class="anchor" aria-label="anchor" href="#single-ordering-objects"></a></h2>
 
 
-<p>For <code>model_intrinsic_dim = 1</code>, <code>$params$pi</code> is a length-<code>K</code>
+<p>For <code>intrinsic_dim = 1</code>, <code>$params$pi</code> is a length-<code>K</code>
 position-prior vector, <code>$params$mu</code> is a <code>d x K</code> posterior-mean
 trajectory matrix, <code>$params$sigma2</code> is a length-<code>d</code> estimated
 variance vector (or <code>NULL</code> when measurement standard deviations are
@@ -108,7 +108,7 @@ form or its <code>n x d</code> observation-level form.</p>
     <h2 id="multiple-orderings-and-feature-assignments">Multiple orderings and feature assignments<a class="anchor" aria-label="anchor" href="#multiple-orderings-and-feature-assignments"></a></h2>
 
 
-<p>For <code>model_intrinsic_dim = M &gt;= 2</code>, the variational family is
+<p>For <code>intrinsic_dim = M &gt;= 2</code>, the variational family is
 $$q(C)\prod_{j=1}^d q(Z_j)q(U_j\mid Z_j).$$
 Here \(C\) represents sample positions, \(Z_j\) the ordering followed
 by feature \(j\), and \(U_j\) its trajectory. The object contains:</p><ul><li><p><code>$params$pi</code>: named list of <code>M</code> length-<code>K</code>
@@ -150,8 +150,7 @@ these probabilities.</p>
 <code>$fits</code> provides derived per-ordering views for inspection; continue
 the complete model with <code>do_mpcurve(object)</code>.
 <code>$intrinsic_dim</code> is the actual number of orderings in the returned model.
-The compatibility field <code>$model_intrinsic_dim</code> has the same value for
-current fits. An explicitly specified dimension is retained. With
+An explicitly specified dimension is retained. With
 <code>intrinsic_dim = "auto"</code> and an adaptive partition prior, orderings
 whose estimated prior weight \(\hat{\omega}_m\) is at or below
 <code>control$effective_count_tol / P</code> are removed. The tolerance defaults
